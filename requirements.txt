@@ -1,0 +1,17 @@
+# Core utilities
+numpy
+tqdm
+requests
+
+# Factbook + RAG
+tiktoken
+
+# Audio / TTS / STT stack
+sounddevice
+pyttsx3
+openai-whisper
+
+# Torch stack (CPU or CUDA wheels will be picked by pip)
+torch
+llvmlite
+numba
