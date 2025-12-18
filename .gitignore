@@ -1,27 +1,26 @@
-﻿# Python venv & cache
-.venv/
-venv/
+﻿cd "C:\00 HENOSIS CODING PROJECTS\CITL PROJECTS\Factbook-Assistant"
+
+@"
+# --- Python ---
 __pycache__/
 *.pyc
+.venv/
 
-# Large libs & binaries we NEVER push
-*.dll
-*.pyd
-*.so
-*.dylib
+# --- Generated embedding indexes / artifacts ---
+factbook_embeddings.json
+*_embeddings.json
+index/
+*.npy
 
-# Embedding indexes are regenerated on each machine
-factbook-assistant/*_embeddings.json
-
-# Audio + transcripts (local artifacts)
-factbook-assistant/CITL Transcripts/
+# --- Audio / transcripts output (if you add TTS/STT outputs later) ---
+CITL Transcripts/
 *.wav
+*.mp3
+*.m4a
+*.srt
+*.vtt
 *.summary.txt
 
-# VS Code / editor junk
-.vscode/
-*.code-workspace
-
-# Build / dist artifacts
-dist/
-build/
+# --- Ollama local models directory (never commit) ---
+ollama_models_export/
+"@ | Out-File -FilePath .\.gitignore -Encoding utf8 -Append

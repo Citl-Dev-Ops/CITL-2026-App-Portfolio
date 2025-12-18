@@ -1,75 +1,61 @@
-Write-Host "=== CITL Desktop: Text-to-Speech (TTS) launcher ===" -ForegroundColor Cyan
+# run_citl_desktop_tts.ps1
+# CITL Desktop: Text-to-Speech demo launcher (Windows)
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $root
+param(
+    [string]$PythonExe = "python"
+)
 
-$factbookPath = Join-Path $root "factbook-assistant"
-Write-Host "Using factbook-assistant at: $factbookPath"
+Write-Host "=== CITL Desktop LLM – TTS Demo ===" -ForegroundColor Cyan
 
-if (-not (Test-Path $factbookPath)) {
-    Write-Host "ERROR: factbook-assistant folder not found." -ForegroundColor Red
-    Write-Host "Expected at: $factbookPath" -ForegroundColor Red
-    Write-Host "Press Enter to close." -ForegroundColor Yellow
-    Read-Host | Out-Null
-    return
+# Go to repo root (this script's folder)
+$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $RepoRoot
+
+# ---------- 1. Check Python ----------
+Write-Host "`n[STEP] Checking Python..." -ForegroundColor Yellow
+try {
+    $pyVersion = & $PythonExe --version 2>$null
+} catch {
+    Write-Host "[ERROR] Python not found on PATH. Install Python 3.11 and retry." -ForegroundColor Red
+    exit 1
 }
+Write-Host "Using $pyVersion"
 
-Set-Location $factbookPath
+# ---------- 2. Ensure virtual environment ----------
+$VenvDir = Join-Path $RepoRoot ".venv"
+$VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 
-# Find Python
-$pythonCmd = $null
-if (Test-Path ".\.venv\Scripts\python.exe") {
-    $pythonCmd = ".\.venv\Scripts\python.exe"
-} elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    $pythonCmd = "python"
-} else {
-    Write-Host "ERROR: No python found (neither .venv\Scripts\python.exe nor system 'python')." -ForegroundColor Red
-    Write-Host "Install Python 3.x and/or create the venv from the Factbook-Assistant repo." -ForegroundColor Red
-    Write-Host "Press Enter to close." -ForegroundColor Yellow
-    Read-Host | Out-Null
-    return
-}
-
-Write-Host "Using Python: $pythonCmd"
-
-# Create venv if missing
-if (-not (Test-Path ".\.venv")) {
-    Write-Host "Creating virtual environment in .venv ..." -ForegroundColor Yellow
-    & $pythonCmd -m venv .venv
-    if (-not (Test-Path ".\.venv\Scripts\python.exe")) {
-        Write-Host "ERROR: venv creation seems to have failed." -ForegroundColor Red
-        Write-Host "Press Enter to close." -ForegroundColor Yellow
-        Read-Host | Out-Null
-        return
+if (-not (Test-Path $VenvPython)) {
+    Write-Host "`n[STEP] Creating virtual environment at $VenvDir..." -ForegroundColor Yellow
+    & $PythonExe -m venv $VenvDir
+    if (-not (Test-Path $VenvPython)) {
+        Write-Host "[ERROR] Failed to create venv." -ForegroundColor Red
+        exit 1
     }
-    $pythonCmd = ".\.venv\Scripts\python.exe"
-    Write-Host "Venv created. Using venv Python: $pythonCmd"
+} else {
+    Write-Host "[INFO] Reusing existing venv at $VenvDir"
 }
 
-Write-Host "Ensuring TTS-related dependencies are installed..." -ForegroundColor Yellow
-& $pythonCmd -m pip install --upgrade pip
-& $pythonCmd -m pip install numpy requests tqdm sounddevice pyttsx3 openai-whisper numba tiktoken torch
-
-# Optional: display torch / CUDA status (non-fatal)
-Write-Host "`nChecking torch / CUDA (informational)..." -ForegroundColor DarkCyan
-& $pythonCmd - << 'PYCODE'
-import torch
-print("Torch version:", getattr(torch, "__version__", "unknown"))
-cuda_ok = bool(getattr(torch, "cuda", None) and torch.cuda.is_available())
-print("CUDA available:", cuda_ok)
-PYCODE
-
-# Check TTS script exists
-if (-not (Test-Path ".\citl_tts.py")) {
-    Write-Host "ERROR: citl_tts.py not found in $factbookPath" -ForegroundColor Red
-    Write-Host "Place your TTS script as citl_tts.py in the factbook-assistant folder." -ForegroundColor Red
-    Write-Host "Press Enter to close." -ForegroundColor Yellow
-    Read-Host | Out-Null
-    return
+# ---------- 3. Install Python dependencies ----------
+$ReqFile = Join-Path $RepoRoot "requirements.txt"
+if (-not (Test-Path $ReqFile)) {
+    Write-Host "[ERROR] requirements.txt not found at $ReqFile" -ForegroundColor Red
+    Write-Host "Create it from the project docs, then re-run this script."
+    exit 1
 }
 
-Write-Host "`nLaunching TTS tool (citl_tts.py)..." -ForegroundColor Green
-& $pythonCmd .\citl_tts.py
+Write-Host "`n[STEP] Installing/Updating Python dependencies..." -ForegroundColor Yellow
+& $VenvPython -m pip install --upgrade pip
+& $VenvPython -m pip install -r $ReqFile
 
-Write-Host "`nTTS script finished. Press Enter to close." -ForegroundColor Cyan
-Read-Host | Out-Null
+# ---------- 4. Run the TTS demo ----------
+$TtsScript = Join-Path $RepoRoot "factbook-assistant\citl_tts.py"
+if (-not (Test-Path $TtsScript)) {
+    Write-Host "[ERROR] TTS script not found at $TtsScript" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "`n[STEP] Starting TTS demo (citl_tts.py)..." -ForegroundColor Green
+Write-Host "You may be asked to select a microphone or output device inside the Python app." -ForegroundColor DarkGray
+
+& $VenvPython $TtsScript
