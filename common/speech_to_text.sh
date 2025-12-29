@@ -1,43 +1,30 @@
-
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Determine installation base
-if [[ -z "${DST_BASE:-}" ]]; then
-  if [[ -d "/c/opt/citl-tools" ]]; then
-    DST_BASE="/c/opt/citl-tools"
-  else
-    DST_BASE="/opt/citl-tools"
-  fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN_DIR="${SCRIPT_DIR}/bin"
+
+if [[ -n "${CITL_STT_BACKEND:-}" ]]; then
+  exec "${CITL_STT_BACKEND}" "$@"
 fi
 
-has_gpu() {
-  command -v nvidia-smi >/dev/null 2>&1
-}
-
-INFILE="${1:-}"
-if [[ -z "${INFILE}" ]]; then
-  echo "Usage: citl-stt audio_file.wav"
-  exit 2
-fi
-
-echo "[CITL] citl-stt invoked on ${INFILE} (base: ${DST_BASE})"
-
-GPU_BINARY="${DST_BASE}/common/bin/stt_cuda"
-CPU_BINARY="${DST_BASE}/common/bin/stt_cpu"
-
-if has_gpu && [[ -x "${GPU_BINARY}" ]]; then
-  echo "[CITL] Using GPU-accelerated STT"
-  exec "${GPU_BINARY}" --in "${INFILE}"
-elif [[ -x "${CPU_BINARY}" ]]; then
-  echo "[CITL] Using CPU STT binary"
-  exec "${CPU_BINARY}" --in "${INFILE}"
+if [[ "${CITL_STT_MODE:-}" == "cpu" ]]; then
+  CANDIDATES=( "stt_cpu" )
 else
-  # Minimal fallback: try pocketsphinx-simple or other system tool
-  if command -v pocketsphinx_continuous >/dev/null 2>&1; then
-    pocketsphinx_continuous -infile "${INFILE}"
-  else
-    echo "[CITL] No STT engine found. Install ${DST_BASE}/common/bin/stt_* or install system STT tools."
-    exit 1
-  fi
+  CANDIDATES=( "stt_cuda" "stt_cpu" )
 fi
+
+for exe in "${CANDIDATES[@]}"; do
+  if [[ -x "${BIN_DIR}/${exe}" ]]; then
+    if [[ "${exe}" == "stt_cuda" ]]; then
+      export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+    fi
+    exec "${BIN_DIR}/${exe}" "$@"
+  fi
+done
+
+echo "[CITL] No STT backend found under: ${BIN_DIR}"
+echo "[CITL] Expected stt_cpu or stt_cuda. If using Python, install Vosk:"
+echo "  pip install vosk"
+echo "and install a compatible language model."
+exit 1

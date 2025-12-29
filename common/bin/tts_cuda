@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Minimal TTS shim: tries common Python TTS packages (Coqui TTS / TTS) in this order.
+TEXT=""
+OUT=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --text) TEXT="$2"; shift 2;;
+    --out) OUT="$2"; shift 2;;
+    *) if [[ -z "$TEXT" ]]; then TEXT="$1"; else OUT="$1"; fi; shift;;
+  esac
+done
+if [[ -z "${TEXT}" ]]; then
+  echo "Usage: tts_cpu \"Text to speak\" [out.wav] or --text/--out"
+  exit 2
+fi
+python3 - <<PY
+import sys, subprocess
+text = "${TEXT}"
+out = "${OUT}" or None
+try:
+    # Try Coqui TTS (TTS)
+    from TTS.api import TTS
+    tts = TTS(list_models()[0])
+    if out:
+        tts.tts_to_file(text=text, file_path=out)
+    else:
+        wav = tts.tts(text)
+        # write to stdout raw? print info
+        print("[CITL] TTS generated; save to file using --out")
+        sys.exit(0)
+except Exception as e:
+    print("[CITL] TTS Python backend not available or failed:", e)
+    print("Install Coqui TTS (pip install TTS) or provide native binaries.")
+    sys.exit(1)
+PY
