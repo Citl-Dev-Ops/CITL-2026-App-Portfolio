@@ -3,9 +3,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog
 import requests
-# -------------------------
-# Optional: Classroom capture module
-# -------------------------
+
+# Classroom capture (optional)
 try:
     from citl_class_capture import open_class_capture
 except Exception:
@@ -15,9 +14,9 @@ except Exception:
 # -------------------------
 IS_FROZEN = getattr(sys, "frozen", False)
 APP_DIR = Path(sys.executable).resolve().parent if IS_FROZEN else Path(__file__).resolve().parent
-DATA_DIR     = APP_DIR / "data"
-LIB_RAW      = DATA_DIR / "library_raw"
-INDEX_DIR    = DATA_DIR / "indexes"
+DATA_DIR   = APP_DIR / "data"
+LIB_RAW    = DATA_DIR / "library_raw"
+INDEX_DIR  = DATA_DIR / "indexes"
 FACTBOOK_TXT = APP_DIR / "factbook.txt"
 DATA_DIR.mkdir(exist_ok=True)
 LIB_RAW.mkdir(parents=True, exist_ok=True)
@@ -39,9 +38,9 @@ Rules:
 - Do NOT use outside knowledge.
 """
 def tokenize(s: str) -> set:
-    return set(WORD_RE.findall((s or "").lower()))
+    return set(WORD_RE.findall(s.lower()))
 def ollama_list_models():
-    r = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
+    r = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=3)
     r.raise_for_status()
     models = r.json().get("models", [])
     return sorted([m.get("name") for m in models if m.get("name")])
@@ -56,7 +55,7 @@ def ollama_generate(model: str, prompt: str, num_ctx: int = 4096, temperature: f
     r.raise_for_status()
     return (r.json().get("response") or "").strip()
 def chunk_text(text: str, max_chars: int = 2400):
-    text = (text or "").replace("\r\n", "\n")
+    text = text.replace("\r\n", "\n")
     parts = [p.strip() for p in text.split("\n\n") if p.strip()]
     buf, n = [], 0
     for p in parts:
@@ -91,6 +90,9 @@ def index_needed(txt_path: Path) -> bool:
     except Exception:
         return True
 def ensure_index(txt_path: Path, log=None) -> Path:
+    """
+    Guarantee that the index exists (and is up to date). Build if needed.
+    """
     idx = index_for_txt(txt_path)
     if index_needed(txt_path):
         idx = build_index_from_txt(txt_path, log=log)
@@ -149,7 +151,7 @@ class App(tk.Tk):
         super().__init__()
         self.title("CITL Library Assistant (Offline - Ollama)")
         self.geometry("1020x760")
-        self.status = tk.StringVar(value="Status: starting...")
+        self.status = tk.StringVar(value="Status: startingâ€¦")
         self.model_var = tk.StringVar(value=DEFAULT_MODEL)
         self.ctx_var = tk.StringVar(value=os.environ.get("CITL_NUM_CTX","4096"))
         self.topk_var = tk.StringVar(value=os.environ.get("CITL_TOPK","8"))
@@ -176,10 +178,6 @@ class App(tk.Tk):
         ttk.Label(top, text="Temp:").pack(side="left")
         ttk.Entry(top, textvariable=self.temp_var, width=4).pack(side="left", padx=6)
         ttk.Button(top, text="Refresh Models", command=self.refresh_models_async).pack(side="left", padx=6)
-        self.capture_btn = ttk.Button(top, text="Class Capture", command=self.open_capture)
-        self.capture_btn.pack(side="left", padx=6)
-        if open_class_capture is None:
-            self.capture_btn.state(["disabled"])
         qf = ttk.Frame(self, padding=10)
         qf.pack(fill="x")
         ttk.Label(qf, text="Question:").pack(anchor="w")
@@ -200,17 +198,6 @@ class App(tk.Tk):
     def append(self, text):
         self.out.insert("end", text + "\n")
         self.out.see("end")
-    def open_capture(self):
-        if open_class_capture is None:
-            messagebox.showerror(
-                "Class Capture unavailable",
-                "citl_class_capture.py failed to import.\n"
-                "Confirm numpy + sounddevice are installed in this venv."
-            )
-            return
-        root = Path(os.environ.get("CITL_RECORDINGS_ROOT") or str(APP_DIR / "Recordings"))
-        root.mkdir(parents=True, exist_ok=True)
-        open_class_capture(self, root)
     def refresh_corpora(self):
         items = available_corpora()
         self.corpus_combo["values"] = items
@@ -231,6 +218,7 @@ class App(tk.Tk):
             self.append(f"Added: {dst}")
             self.refresh_corpora()
             self.corpus_var.set(dst.name)
+            # Auto-index immediately (no user clicking)
             if self.auto_index_var.get():
                 self._index_one_async(dst)
         except Exception as e:
@@ -238,7 +226,7 @@ class App(tk.Tk):
     def refresh_models_async(self):
         def run():
             try:
-                self.set_status("checking Ollama...")
+                self.set_status("checking Ollamaâ€¦")
                 names = ollama_list_models()
                 if not names:
                     self.set_status("Ollama OK, but no models found.")
@@ -253,7 +241,7 @@ class App(tk.Tk):
     def _index_one_async(self, txt_path: Path):
         def run():
             try:
-                self.set_status(f"indexing {txt_path.name}...")
+                self.set_status(f"indexing {txt_path.name}â€¦")
                 idx = ensure_index(txt_path, log=self.append)
                 self.append(f"Index ready: {idx}")
                 self.set_status("index built OK")
@@ -272,7 +260,7 @@ class App(tk.Tk):
     def index_all_async(self):
         def run():
             try:
-                self.set_status("indexing ALL corpora...")
+                self.set_status("indexing ALL corporaâ€¦")
                 items = available_corpora()
                 for corpus in items:
                     txt_path = corpus_to_txtpath(corpus)
@@ -289,7 +277,13 @@ class App(tk.Tk):
                 self.append(f"INDEX ALL FAILED: {e}")
                 self.set_status("index all failed")
         threading.Thread(target=run, daemon=True).start()
-    def ask_async(self):
+    def open_capture(self):
+        if open_class_capture is None:
+            messagebox.showerror("Class Capture not installed", "citl_class_capture.py missing or dependencies not installed.")
+            return
+        recordings_root = Path(os.environ.get("CITL_RECORDINGS_ROOT", str(Path.cwd() / "Recordings")))
+        open_class_capture(self, recordings_root)
+
         q = self.q_entry.get().strip()
         if not q:
             return
@@ -297,12 +291,15 @@ class App(tk.Tk):
             try:
                 corpus = self.corpus_var.get()
                 txt_path = corpus_to_txtpath(corpus)
+                # If factbook selected, ensure file exists
                 if corpus.startswith("Factbook") and not txt_path.exists():
                     self.append("ERROR: factbook.txt not found next to the app.")
                     self.set_status("error")
                     return
+                # ðŸ”¥ SOLUTION: NEVER tell staff to click build.
+                # We automatically ensure an index exists (and rebuild if file changed).
                 if self.auto_index_var.get():
-                    self.set_status("ensuring index...")
+                    self.set_status("ensuring indexâ€¦")
                     idx_path = ensure_index(txt_path, log=self.append)
                 else:
                     idx_path = index_for_txt(txt_path)
@@ -310,14 +307,14 @@ class App(tk.Tk):
                         self.append("Index missing and Auto-index is OFF. Turn Auto-index ON or click Index Selected.")
                         self.set_status("missing index")
                         return
-                self.set_status("retrieving excerpts...")
+                self.set_status("retrieving excerptsâ€¦")
                 topk = int(self.topk_var.get() or "8")
                 excerpts = retrieve(q, idx_path, k=topk)
                 if not excerpts:
                     self.append("NOT FOUND IN SELECTED CORPUS.")
                     self.set_status("ready (no excerpts found)")
                     return
-                self.set_status("calling Ollama...")
+                self.set_status("calling Ollamaâ€¦")
                 prompt = build_prompt(q, excerpts)
                 model = self.model_var.get().strip()
                 ctx = int(self.ctx_var.get() or "4096")
