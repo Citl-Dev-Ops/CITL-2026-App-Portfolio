@@ -24,3 +24,13 @@ CITL Transcripts/
 # --- Ollama local models directory (never commit) ---
 ollama_models_export/
 "@ | Out-File -FilePath .\.gitignore -Encoding utf8 -Append
+# --- CITL generated artifacts ---
+factbook-assistant/index/
+**/*embeddings*.json
+**/*.emb.npy
+**/*.chunks.jsonl
+**/recordings/
+**/*.wav
+
+# Optional: local venvs
+.venv*/
