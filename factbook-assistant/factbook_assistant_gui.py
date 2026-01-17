@@ -1,334 +1,207 @@
-import os, json, re, sys, threading, shutil
+﻿import os, sys, json, time
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, filedialog
-import requests
-# -------------------------
-# Optional: Classroom capture module
-# -------------------------
-try:
-    from citl_class_capture import open_class_capture
-except Exception:
-    open_class_capture = None
-# -------------------------
-# Paths (works for EXE too)
-# -------------------------
-IS_FROZEN = getattr(sys, "frozen", False)
-APP_DIR = Path(sys.executable).resolve().parent if IS_FROZEN else Path(__file__).resolve().parent
-DATA_DIR     = APP_DIR / "data"
-LIB_RAW      = DATA_DIR / "library_raw"
-INDEX_DIR    = DATA_DIR / "indexes"
-FACTBOOK_TXT = APP_DIR / "factbook.txt"
-DATA_DIR.mkdir(exist_ok=True)
-LIB_RAW.mkdir(parents=True, exist_ok=True)
-INDEX_DIR.mkdir(parents=True, exist_ok=True)
-# -------------------------
-# Ollama
-# -------------------------
-OLLAMA_HOST   = os.environ.get("CITL_OLLAMA_HOST", "http://localhost:11434")
-DEFAULT_MODEL = os.environ.get("CITL_LLM_MODEL", "llama3.1:8b")
-# -------------------------
-# Retrieval rules
-# -------------------------
-WORD_RE = re.compile(r"[A-Za-z]{2,}")
-SYSTEM_RULES = """You are CITL Offline Library Assistant.
-Rules:
-- Answer ONLY using the EXCERPTS provided.
-- If the answer is not present in the excerpts, output exactly: NOT FOUND IN SELECTED CORPUS.
-- Every bullet/claim MUST end with a citation like [doc_id]. If you can't cite it, do not include it.
-- Do NOT use outside knowledge.
-"""
-def tokenize(s: str) -> set:
-    return set(WORD_RE.findall((s or "").lower()))
-def ollama_list_models():
-    r = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
-    r.raise_for_status()
-    models = r.json().get("models", [])
-    return sorted([m.get("name") for m in models if m.get("name")])
-def ollama_generate(model: str, prompt: str, num_ctx: int = 4096, temperature: float = 0.2) -> str:
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"num_ctx": int(num_ctx), "temperature": float(temperature)},
-    }
-    r = requests.post(f"{OLLAMA_HOST}/api/generate", json=payload, timeout=600)
-    r.raise_for_status()
-    return (r.json().get("response") or "").strip()
-def chunk_text(text: str, max_chars: int = 2400):
-    text = (text or "").replace("\r\n", "\n")
-    parts = [p.strip() for p in text.split("\n\n") if p.strip()]
-    buf, n = [], 0
-    for p in parts:
-        if n + len(p) > max_chars and buf:
-            yield "\n\n".join(buf)
-            buf, n = [], 0
-        buf.append(p); n += len(p)
-    if buf:
-        yield "\n\n".join(buf)
-def safe_stem(p: Path) -> str:
-    return re.sub(r"[^A-Za-z0-9_\-\.]+", "_", p.stem).strip("_")[:80] or "book"
-def index_for_txt(txt_path: Path) -> Path:
-    return INDEX_DIR / f"{safe_stem(txt_path)}_index.jsonl"
-def build_index_from_txt(txt_path: Path, log=None) -> Path:
-    if not txt_path.exists():
-        raise FileNotFoundError(f"Missing TXT file: {txt_path}")
-    out_path = index_for_txt(txt_path)
-    title = txt_path.stem
-    if log: log(f"Indexing: {txt_path.name} -> {out_path.name}")
-    with out_path.open("w", encoding="utf-8") as w:
-        text = txt_path.read_text(encoding="utf-8", errors="ignore")
-        for i, chunk in enumerate(chunk_text(text), 1):
-            rec = {"id": f"{title}:{i}", "title": title, "text": chunk}
-            w.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    return out_path
-def index_needed(txt_path: Path) -> bool:
-    idx = index_for_txt(txt_path)
-    if not idx.exists():
-        return True
+from tkinter import ttk, scrolledtext, messagebox
+
+from citl_audio_ffmpeg_graceful_v2 import (
+    find_ffmpeg,
+    list_dshow_audio_devices,
+    start_recording,
+    stop_recording,
+    dshow_diagnostics,
+)
+
+def pick_data_dir() -> Path:
+    env = os.environ.get("CITL_DATA_DIR", "").strip()
+    if env:
+        p = Path(env).expanduser()
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    appdata = os.environ.get("APPDATA", str(Path.home()))
+    p = Path(appdata) / "CITL"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+DATA_DIR = pick_data_dir()
+RECORD_DIR = DATA_DIR / "recordings"
+RECORD_DIR.mkdir(parents=True, exist_ok=True)
+CONFIG_PATH = DATA_DIR / "config.json"
+
+def load_config():
+    if CONFIG_PATH.exists():
+        try:
+            return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+def save_config(cfg):
     try:
-        return idx.stat().st_mtime < txt_path.stat().st_mtime
+        CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
     except Exception:
-        return True
-def ensure_index(txt_path: Path, log=None) -> Path:
-    idx = index_for_txt(txt_path)
-    if index_needed(txt_path):
-        idx = build_index_from_txt(txt_path, log=log)
-    return idx
-def load_index(index_path: Path):
-    if not index_path.exists():
-        return []
-    docs = []
-    with index_path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                docs.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    return docs
-def retrieve(query: str, index_path: Path, k: int = 6):
-    docs = load_index(index_path)
-    if not docs:
-        return []
-    q = tokenize(query)
-    scored = []
-    for d in docs:
-        text = (d.get("title","") + "\n" + d.get("text",""))
-        t = tokenize(text)
-        score = len(q.intersection(t))
-        if score:
-            scored.append((score, d))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [d for _, d in scored[:k]]
-def build_prompt(question: str, excerpts):
-    blocks = []
-    for d in excerpts:
-        blocks.append(f"[{d.get('id','?')}] {d.get('title','')}\n{d.get('text','')}")
-    context = "\n\n".join(blocks) if blocks else "(no excerpts found)"
-    return f"""{SYSTEM_RULES}
-EXCERPTS:
-{context}
-QUESTION:
-{question}
-ANSWER (with citations):
-"""
-def available_corpora():
-    corpora = ["Factbook (factbook.txt)"]
-    for fp in sorted(LIB_RAW.glob("*.txt")):
-        corpora.append(fp.name)
-    return corpora
-def corpus_to_txtpath(corpus_name: str) -> Path:
-    if corpus_name.startswith("Factbook"):
-        return FACTBOOK_TXT
-    return LIB_RAW / corpus_name
+        pass
+
+def transcribe_wav(path: str, lang_mode: str):
+    from faster_whisper import WhisperModel
+    model = WhisperModel("small", device="cpu", compute_type="int8")
+
+    if lang_mode == "English":
+        language = "en"
+    elif lang_mode == "Spanish":
+        language = "es"
+    else:
+        language = None
+
+    segments, info = model.transcribe(path, language=language)
+    detected = getattr(info, "language", None) or (language or "unknown")
+
+    # clamp to EN/ES in Auto
+    if lang_mode == "Auto" and detected not in ("en", "es"):
+        segments, info = model.transcribe(path, language="en")
+        detected = "en"
+
+    text = "".join(seg.text for seg in segments).strip()
+    return detected, text
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("CITL Library Assistant (Offline - Ollama)")
-        self.geometry("1020x760")
-        self.status = tk.StringVar(value="Status: starting...")
-        self.model_var = tk.StringVar(value=DEFAULT_MODEL)
-        self.ctx_var = tk.StringVar(value=os.environ.get("CITL_NUM_CTX","4096"))
-        self.topk_var = tk.StringVar(value=os.environ.get("CITL_TOPK","8"))
-        self.temp_var = tk.StringVar(value=os.environ.get("CITL_TEMP","0.2"))
-        self.corpus_var = tk.StringVar(value="Factbook (factbook.txt)")
-        self.auto_index_var = tk.BooleanVar(value=True)
-        top = ttk.Frame(self, padding=10)
-        top.pack(fill="x")
-        ttk.Label(top, text="Corpus:").pack(side="left")
-        self.corpus_combo = ttk.Combobox(top, textvariable=self.corpus_var, width=40, state="readonly")
-        self.corpus_combo.pack(side="left", padx=6)
-        ttk.Button(top, text="Add Book (.txt)", command=self.add_book).pack(side="left", padx=6)
-        ttk.Button(top, text="Refresh Corpora", command=self.refresh_corpora).pack(side="left", padx=6)
-        ttk.Checkbutton(top, text="Auto-index", variable=self.auto_index_var).pack(side="left", padx=10)
-        ttk.Button(top, text="Index Selected", command=self.index_selected_async).pack(side="left", padx=6)
-        ttk.Button(top, text="Index All", command=self.index_all_async).pack(side="left", padx=6)
-        ttk.Label(top, text="Model:").pack(side="left", padx=(18,0))
-        self.model_combo = ttk.Combobox(top, textvariable=self.model_var, width=22, state="readonly")
-        self.model_combo.pack(side="left", padx=6)
-        ttk.Label(top, text="Ctx:").pack(side="left")
-        ttk.Entry(top, textvariable=self.ctx_var, width=6).pack(side="left", padx=6)
-        ttk.Label(top, text="TopK:").pack(side="left")
-        ttk.Entry(top, textvariable=self.topk_var, width=4).pack(side="left", padx=6)
-        ttk.Label(top, text="Temp:").pack(side="left")
-        ttk.Entry(top, textvariable=self.temp_var, width=4).pack(side="left", padx=6)
-        ttk.Button(top, text="Refresh Models", command=self.refresh_models_async).pack(side="left", padx=6)
-        self.capture_btn = ttk.Button(top, text="Class Capture", command=self.open_capture)
-        self.capture_btn.pack(side="left", padx=6)
-        if open_class_capture is None:
-            self.capture_btn.state(["disabled"])
-        qf = ttk.Frame(self, padding=10)
-        qf.pack(fill="x")
-        ttk.Label(qf, text="Question:").pack(anchor="w")
-        self.q_entry = ttk.Entry(qf)
-        self.q_entry.pack(fill="x")
-        self.q_entry.focus_set()
-        btns = ttk.Frame(self, padding=10)
-        btns.pack(fill="x")
-        ttk.Button(btns, text="Ask", command=self.ask_async).pack(side="left")
-        ttk.Button(btns, text="Clear", command=self.clear).pack(side="left", padx=8)
-        self.out = scrolledtext.ScrolledText(self, wrap="word", font=("Consolas", 11))
-        self.out.pack(fill="both", expand=True, padx=10, pady=10)
-        ttk.Label(self, textvariable=self.status).pack(anchor="w", padx=10, pady=(0,10))
-        self.refresh_corpora()
-        self.after(200, self.refresh_models_async)
-    def set_status(self, msg): self.status.set(f"Status: {msg}")
-    def clear(self): self.out.delete("1.0","end")
-    def append(self, text):
-        self.out.insert("end", text + "\n")
-        self.out.see("end")
-    def open_capture(self):
-        if open_class_capture is None:
-            messagebox.showerror(
-                "Class Capture unavailable",
-                "citl_class_capture.py failed to import.\n"
-                "Confirm numpy + sounddevice are installed in this venv."
-            )
+        self.title("Recording + Transcription (FFmpeg - v2 Fix)")
+        self.geometry("1050x720")
+
+        self.cfg = load_config()
+        self.ffmpeg = find_ffmpeg()
+        self.proc = None
+        self.last_wav = None
+
+        self.build_ui()
+        self.refresh_devices()
+
+    def build_ui(self):
+        root = ttk.Frame(self, padding=8); root.pack(fill="both", expand=True)
+
+        box = ttk.LabelFrame(root, text="Microphone (DirectShow)", padding=8)
+        box.pack(fill="x")
+
+        self.device_combo = ttk.Combobox(box, state="normal")
+        self.device_combo.pack(fill="x")
+        self.device_combo.bind("<<ComboboxSelected>>", self.on_device_selected)
+
+        btns = ttk.Frame(box); btns.pack(fill="x", pady=(6,0))
+        ttk.Button(btns, text="Refresh Device List", command=self.refresh_devices).pack(side="left")
+        ttk.Button(btns, text="Diagnostics", command=self.on_diagnostics).pack(side="left", padx=8)
+
+        self.diag_out = scrolledtext.ScrolledText(box, height=8, wrap="word")
+        self.diag_out.pack(fill="both", expand=True, pady=(6,0))
+
+        rec = ttk.Frame(root); rec.pack(fill="x", pady=(10,6))
+        ttk.Button(rec, text="Start Recording", command=self.on_start).pack(side="left")
+        ttk.Button(rec, text="Stop Recording", command=self.on_stop).pack(side="left", padx=8)
+
+        trans = ttk.LabelFrame(root, text="Transcription (offline)", padding=8)
+        trans.pack(fill="x", pady=(6,6))
+        self.lang_var = tk.StringVar(value="English")
+        ttk.Label(trans, text="Language:").pack(side="left")
+        ttk.Combobox(trans, textvariable=self.lang_var, state="readonly",
+                     values=["Auto","English","Spanish"], width=10).pack(side="left", padx=6)
+        ttk.Button(trans, text="Transcribe Last WAV", command=self.on_transcribe).pack(side="left", padx=6)
+
+        self.status_var = tk.StringVar(value="Ready.")
+        ttk.Label(root, textvariable=self.status_var, foreground="#006").pack(anchor="w", pady=(8,0))
+
+        self.out = scrolledtext.ScrolledText(root, height=18, wrap="word")
+        self.out.pack(fill="both", expand=True, pady=(6,0))
+
+    def on_diagnostics(self):
+        self.diag_out.delete("1.0","end")
+        if not self.ffmpeg:
+            self.diag_out.insert("end","FFmpeg not found.\nPlace it at: factbook-assistant\\bin\\ffmpeg.exe\n")
             return
-        root = Path(os.environ.get("CITL_RECORDINGS_ROOT") or str(APP_DIR / "Recordings"))
-        root.mkdir(parents=True, exist_ok=True)
-        open_class_capture(self, root)
-    def refresh_corpora(self):
-        items = available_corpora()
-        self.corpus_combo["values"] = items
-        if self.corpus_var.get() not in items:
-            self.corpus_var.set(items[0])
-        self.set_status("corpora refreshed")
-    def add_book(self):
-        fp = filedialog.askopenfilename(
-            title="Select a .txt book file",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
-        )
-        if not fp:
+        self.diag_out.insert("end", f"FFmpeg path: {self.ffmpeg}\n\n")
+        self.diag_out.insert("end", dshow_diagnostics(self.ffmpeg) or "(no output)\n")
+
+    def refresh_devices(self):
+        if not self.ffmpeg:
+            self.device_combo["values"] = ["(ffmpeg missing)"]
+            self.device_combo.set("(ffmpeg missing)")
             return
-        src = Path(fp)
-        dst = LIB_RAW / src.name
+
+        devs = list_dshow_audio_devices(self.ffmpeg)
+        saved = (self.cfg.get("dshow_audio_device","") or "").strip()
+
+        if devs:
+            self.device_combo["values"] = devs
+            self.device_combo.set(saved if saved in devs else devs[0])
+        else:
+            # still allow manual typing
+            guess = saved or "Microphone (Yeti Stereo Microphone)"
+            self.device_combo["values"] = [guess]
+            self.device_combo.set(guess)
+
+    def on_device_selected(self, _evt=None):
+        self.cfg["dshow_audio_device"] = self.device_combo.get().strip()
+        save_config(self.cfg)
+
+    def on_start(self):
+        if not self.ffmpeg:
+            messagebox.showerror("FFmpeg missing","ffmpeg.exe not found.")
+            return
+        if self.proc is not None:
+            return
+
+        dev = self.device_combo.get().strip()
+        if not dev:
+            messagebox.showerror("No device","Type/select a microphone name.")
+            return
+
+        self.cfg["dshow_audio_device"] = dev
+        save_config(self.cfg)
+
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        out = str(RECORD_DIR / f"recording_{ts}.wav")
+
         try:
-            shutil.copyfile(str(src), str(dst))
-            self.append(f"Added: {dst}")
-            self.refresh_corpora()
-            self.corpus_var.set(dst.name)
-            if self.auto_index_var.get():
-                self._index_one_async(dst)
+            self.proc = start_recording(self.ffmpeg, dev, out, samplerate=16000)
+            self.last_wav = out
+            self.status_var.set(f"Recording… saving to {out}")
         except Exception as e:
-            messagebox.showerror("Add book failed", str(e))
-    def refresh_models_async(self):
-        def run():
-            try:
-                self.set_status("checking Ollama...")
-                names = ollama_list_models()
-                if not names:
-                    self.set_status("Ollama OK, but no models found.")
-                    return
-                self.model_combo["values"] = names
-                if self.model_var.get() not in names:
-                    self.model_var.set(names[0])
-                self.set_status("ready")
-            except Exception:
-                self.set_status("Ollama not reachable (start Ollama)")
-        threading.Thread(target=run, daemon=True).start()
-    def _index_one_async(self, txt_path: Path):
-        def run():
-            try:
-                self.set_status(f"indexing {txt_path.name}...")
-                idx = ensure_index(txt_path, log=self.append)
-                self.append(f"Index ready: {idx}")
-                self.set_status("index built OK")
-            except Exception as e:
-                self.append(f"INDEX FAILED: {e}")
-                self.set_status("index failed")
-        threading.Thread(target=run, daemon=True).start()
-    def index_selected_async(self):
-        corpus = self.corpus_var.get()
-        txt_path = corpus_to_txtpath(corpus)
-        if corpus.startswith("Factbook") and not txt_path.exists():
-            self.append("ERROR: factbook.txt not found next to the app.")
-            self.set_status("index failed")
+            messagebox.showerror("Start failed", str(e))
+            self.proc = None
+            self.last_wav = None
+
+    def on_stop(self):
+        if self.proc is None:
+            self.status_var.set("Not recording.")
             return
-        self._index_one_async(txt_path)
-    def index_all_async(self):
-        def run():
-            try:
-                self.set_status("indexing ALL corpora...")
-                items = available_corpora()
-                for corpus in items:
-                    txt_path = corpus_to_txtpath(corpus)
-                    if corpus.startswith("Factbook") and not txt_path.exists():
-                        self.append("SKIP: factbook.txt missing (cannot index Factbook).")
-                        continue
-                    try:
-                        idx = ensure_index(txt_path, log=self.append)
-                        self.append(f"Index ready: {idx}")
-                    except Exception as e:
-                        self.append(f"INDEX FAILED for {txt_path.name}: {e}")
-                self.set_status("all indexing complete")
-            except Exception as e:
-                self.append(f"INDEX ALL FAILED: {e}")
-                self.set_status("index all failed")
-        threading.Thread(target=run, daemon=True).start()
-    def ask_async(self):
-        q = self.q_entry.get().strip()
-        if not q:
+
+        ff_out = stop_recording(self.proc)
+        self.proc = None
+
+        # Wait briefly for finalize
+        for _ in range(20):
+            if self.last_wav and Path(self.last_wav).exists():
+                break
+            time.sleep(0.1)
+
+        if self.last_wav and Path(self.last_wav).exists():
+            self.status_var.set(f"Saved WAV: {self.last_wav}")
+            self.out.insert("end", f"\n[SAVED] {self.last_wav}\n")
+            self.out.see("end")
+        else:
+            self.status_var.set("Stopped, but WAV not found. Showing FFmpeg output.")
+            self.out.insert("end", "\n[FFMPEG OUTPUT]\n" + (ff_out or "(no output)") + "\n")
+            self.out.see("end")
+
+    def on_transcribe(self):
+        if not self.last_wav or not Path(self.last_wav).exists():
+            messagebox.showinfo("No WAV","Record and stop first.")
             return
-        def run():
-            try:
-                corpus = self.corpus_var.get()
-                txt_path = corpus_to_txtpath(corpus)
-                if corpus.startswith("Factbook") and not txt_path.exists():
-                    self.append("ERROR: factbook.txt not found next to the app.")
-                    self.set_status("error")
-                    return
-                if self.auto_index_var.get():
-                    self.set_status("ensuring index...")
-                    idx_path = ensure_index(txt_path, log=self.append)
-                else:
-                    idx_path = index_for_txt(txt_path)
-                    if not idx_path.exists():
-                        self.append("Index missing and Auto-index is OFF. Turn Auto-index ON or click Index Selected.")
-                        self.set_status("missing index")
-                        return
-                self.set_status("retrieving excerpts...")
-                topk = int(self.topk_var.get() or "8")
-                excerpts = retrieve(q, idx_path, k=topk)
-                if not excerpts:
-                    self.append("NOT FOUND IN SELECTED CORPUS.")
-                    self.set_status("ready (no excerpts found)")
-                    return
-                self.set_status("calling Ollama...")
-                prompt = build_prompt(q, excerpts)
-                model = self.model_var.get().strip()
-                ctx = int(self.ctx_var.get() or "4096")
-                temp = float(self.temp_var.get() or "0.2")
-                answer = ollama_generate(model=model, prompt=prompt, num_ctx=ctx, temperature=temp)
-                self.append(f"[Corpus: {corpus}]")
-                self.append(f"Q: {q}\n{answer}\n---\n")
-                self.set_status("ready")
-            except Exception as e:
-                self.append(f"ERROR: {e}")
-                self.set_status("error")
-        threading.Thread(target=run, daemon=True).start()
-if __name__ == "__main__":
+        detected, text = transcribe_wav(self.last_wav, self.lang_var.get())
+        self.out.insert("end", f"\n[TRANSCRIPT lang={detected}]\n{text}\n")
+        self.out.see("end")
+
+def main():
     App().mainloop()
+
+if __name__ == "__main__":
+    main()
