@@ -1,0 +1,14 @@
+﻿cff-version: 1.2.0
+title: "CITL Library Assistant (Offline LLM + RAG + Class Capture)"
+message: "If you use this software, please cite it."
+type: software
+authors:
+  - family-names: Mohamed
+    given-names: Abdo
+    email: ammohamed@student.rtc.edu
+  - family-names: al Obid
+    given-names: Wahaj
+    email: walobid@rtc.edu
+  - family-names: Jones
+    given-names: Mason
+    email: mjones1@rtc.edu
