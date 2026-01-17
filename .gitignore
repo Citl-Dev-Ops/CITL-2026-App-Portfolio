@@ -36,3 +36,21 @@ factbook-assistant/index/
 .venv*/
 factbook-assistant/data/config.json
 profile/
+
+# Local-only
+profile/
+factbook-assistant/data/config.json
+factbook-assistant/bin/ffmpeg.exe
+
+
+# Local-only
+profile/
+factbook-assistant/data/config.json
+factbook-assistant/bin/ffmpeg.exe
+
+
+# Local-only
+profile/
+factbook-assistant/data/config.json
+factbook-assistant/bin/ffmpeg.exe
+
