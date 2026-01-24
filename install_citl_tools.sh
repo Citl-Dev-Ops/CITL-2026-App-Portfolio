@@ -58,15 +58,15 @@ if [[ -f "${PROJECT_ROOT}/common-binaries.zip" ]]; then
   echo "[CITL] Found prebuilt archive: ${PROJECT_ROOT}/common-binaries.zip"
   if [[ "${SUDO_CMD}" != "" ]]; then
     ${SUDO_CMD} mkdir -p "${DST_BASE}"
-    ${SUDO_CMD} unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null
+    ${SUDO_CMD} unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null || true
     ${SUDO_CMD} chmod -R a+rX "${DST_BASE}"
   else
     mkdir -p "${DST_BASE}" 2>/dev/null || mkdir -p "${DST_BASE_FALLBACK}"
     if [[ -d "${DST_BASE}" ]]; then
-      unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null
+      unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null || true
       chmod -R a+rX "${DST_BASE}"
     else
-      unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE_FALLBACK}" >/dev/null
+      unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE_FALLBACK}" >/dev/null || true
       chmod -R a+rX "${DST_BASE_FALLBACK}"
       DST_BASE="${DST_BASE_FALLBACK}"
     fi
@@ -79,15 +79,15 @@ else
     # extract into DST_BASE
     if [[ "${SUDO_CMD}" != "" ]]; then
       ${SUDO_CMD} mkdir -p "${DST_BASE}"
-      ${SUDO_CMD} unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null
+      ${SUDO_CMD} unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null || true
       ${SUDO_CMD} chmod -R a+rX "${DST_BASE}"
     else
       mkdir -p "${DST_BASE}" 2>/dev/null || mkdir -p "${DST_BASE_FALLBACK}"
       if [[ -d "${DST_BASE}" ]]; then
-        unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null
+        unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE}" >/dev/null || true
         chmod -R a+rX "${DST_BASE}"
       else
-        unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE_FALLBACK}" >/dev/null
+        unzip -o "${PROJECT_ROOT}/common-binaries.zip" -d "${DST_BASE_FALLBACK}" >/dev/null || true
         chmod -R a+rX "${DST_BASE_FALLBACK}"
         DST_BASE="${DST_BASE_FALLBACK}"
       fi
@@ -215,7 +215,6 @@ Write-Host "[CITL] No native executable or bash found to run citl-%NAME%"
 exit 1
 EOF
     sed -e "s|%NAME%|${name}|g" -e "s|%REL%|${rel}|g" "${ps1_path}" > "${ps1_path}.tmp" && mv "${ps1_path}.tmp" "${ps1_path}"
-    # no chmod on Windows paths; for Git Bash accessibility, also write a small shim to /usr/local/bin if writable
   }
 
   write_windows_wrappers "factbook" "common/factbook.sh"

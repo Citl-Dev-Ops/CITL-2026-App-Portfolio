@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "citl-factbook"
+version = "0.1.0"
+description = "CITL Factbook assistant using Ollama"
+requires-python = ">=3.10"
+dependencies = ["requests"]
+[project.scripts]
+citl-factbook = "citl_factbook.cli:main"
+[tool.setuptools]
+packages = ["citl_factbook"]

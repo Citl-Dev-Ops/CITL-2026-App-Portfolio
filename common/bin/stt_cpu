@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Minimal STT shim: try Vosk; writes transcript to stdout
+INFILE="$1"
+if [[ -z "${INFILE}" ]]; then
+  echo "Usage: stt_cpu <audio.wav>"
+  exit 2
+fi
+python3 - <<PY
+import sys
+infile = sys.argv[1]
+try:
+    from vosk import Model, KaldiRecognizer
+    import wave, json
+    wf = wave.open(infile, "rb")
+    model = Model(lang="en-us")
+    rec = KaldiRecognizer(model, wf.getframerate())
+    res = []
+    while True:
+        data = wf.readframes(4000)
+        if len(data) == 0:
+            break
+        if rec.AcceptWaveform(data):
+            res.append(rec.Result())
+    res.append(rec.FinalResult())
+    print("\n".join(res))
+except Exception as e:
+    print("[CITL] Vosk STT backend not available or failed:", e)
+    print("Install vosk (pip install vosk) and a model, or provide native binaries.")
+    sys.exit(1)
+PY
