@@ -1,61 +1,27 @@
-﻿cd "C:\00 HENOSIS CODING PROJECTS\CITL PROJECTS\Factbook-Assistant"
-
-@"
-# --- Python ---
+﻿# Python caches
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Virtual environments
 .venv/
+venv/
+ENV/
+env/
 
-# --- Generated embedding indexes / artifacts ---
-factbook_embeddings.json
-*_embeddings.json
-index/
-*.npy
+# Junk outputs
+results/
+*.log
 
-# --- Audio / transcripts output (if you add TTS/STT outputs later) ---
-CITL Transcripts/
-*.wav
-*.mp3
-*.m4a
-*.srt
-*.vtt
-*.summary.txt
+# Backup files we created during patching
+*.bak
+*.bak_*
+*.pre_fix_*.bak
 
-# --- Ollama local models directory (never commit) ---
-ollama_models_export/
-"@ | Out-File -FilePath .\.gitignore -Encoding utf8 -Append
-# --- CITL generated artifacts ---
-factbook-assistant/index/
-**/*embeddings*.json
-**/*.emb.npy
-**/*.chunks.jsonl
-**/recordings/
-**/*.wav
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
-# Optional: local venvs
-.venv*/
-factbook-assistant/data/config.json
-profile/
-
-# Local-only
-profile/
-factbook-assistant/data/config.json
-factbook-assistant/bin/ffmpeg.exe
-
-
-# Local-only
-profile/
-factbook-assistant/data/config.json
-factbook-assistant/bin/ffmpeg.exe
-
-
-# Local-only
-profile/
-factbook-assistant/data/config.json
-factbook-assistant/bin/ffmpeg.exe
-
-LAST_GUI_CRASH.txt
-Run-CITL.ps1
-.bak
-.bak_
-.pre_fix_*
+# Accidental tilde folder at repo root (your commit shows ~/GPUInspector/...)
+~/
