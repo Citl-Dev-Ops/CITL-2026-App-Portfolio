@@ -236,10 +236,10 @@ def stop_recording(handle) -> str:
 # ---------------------------
 
 def audio_diagnostics(ffmpeg: str) -> str:
-    \"\"\"Backwards-compatible diagnostics entrypoint.
+    """Backwards-compatible diagnostics entrypoint.
 
     Returns combined sounddevice + DirectShow diagnostics when available.
-    \"\"\"
+    """
     parts = []
 
     # sounddevice
@@ -262,3 +262,15 @@ def audio_diagnostics(ffmpeg: str) -> str:
 
     out = "\\n\\n".join([p for p in parts if p]).strip()
     return out or "(no diagnostics)"
+
+
+
+# --- GUI compatibility export ---
+def audio_diagnostics(ffmpeg: str) -> str:
+    try:
+        fn = globals().get("dshow_diagnostics")
+        if callable(fn):
+            return fn(ffmpeg)
+    except Exception as e:
+        return f"(diagnostics failed: {e})"
+    return "(no diagnostics)"
