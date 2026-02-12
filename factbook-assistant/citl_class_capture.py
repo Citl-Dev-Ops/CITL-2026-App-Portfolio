@@ -417,6 +417,7 @@ class ClassCaptureWindow(tk.Toplevel):
 
         except Exception:
             pass
+        
 
         self.after(500, self._tick)
 

@@ -153,21 +153,3 @@ def stop_recording(proc, timeout: float = 3.0):
         proc.terminate()
     except Exception:
         pass
-
-# --- compat shim: delegate missing attributes to citl_audio_ffmpeg_graceful_v2
-try:
-    import citl_audio_ffmpeg_graceful_v2 as _citl_ffmpeg_compat
-except Exception:
-    _citl_ffmpeg_compat = None
-
-def dshow_diagnostics():
-    """Return DirectShow diagnostics if available (Windows)."""
-    if _citl_ffmpeg_compat and hasattr(_citl_ffmpeg_compat, "dshow_diagnostics"):
-        return _citl_ffmpeg_compat.dshow_diagnostics()
-    return ""
-
-def __getattr__(name):
-    if _citl_ffmpeg_compat and hasattr(_citl_ffmpeg_compat, name):
-        return getattr(_citl_ffmpeg_compat, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-

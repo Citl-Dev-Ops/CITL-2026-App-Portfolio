@@ -1,148 +1,233 @@
-﻿import os, re, shutil, subprocess, time
+﻿import os
+import re
+import time
+import shutil
+import wave
+import queue
+import threading
 from pathlib import Path
+from typing import List, Optional, Tuple
 
-def find_ffmpeg() -> str | None:
-    env = os.environ.get("CITL_FFMPEG_PATH", "").strip()
-    if env and Path(env).exists():
-        return env
-    bundled = Path(__file__).resolve().parent / "bin" / "ffmpeg.exe"
+# ---------------------------
+# FFmpeg discovery (kept for diagnostics)
+# ---------------------------
+def find_ffmpeg() -> Optional[str]:
+    here = Path(__file__).resolve().parent
+    bundled = here / "bin" / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
     if bundled.exists():
         return str(bundled)
-    return shutil.which("ffmpeg")
+    p = shutil.which("ffmpeg")
+    return p if p else None
 
-def dshow_diagnostics(ffmpeg_path: str) -> str:
-    p = subprocess.run(
-        [ffmpeg_path, "-hide_banner", "-f", "dshow", "-list_devices", "true", "-i", "dummy"],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, encoding="utf-8", errors="replace"
-    )
-    return p.stdout or ""
+# ---------------------------
+# Windows device listing (human-friendly)
+# ---------------------------
+_SD_TAG = re.compile(r"\[Device\s+(\d+)\]\s*$", re.I)
 
-def list_dshow_audio_devices(ffmpeg_path: str) -> list[str]:
+def _try_sounddevice_list() -> Tuple[List[str], str]:
     """
-    Returns BOTH friendly names and @device_cm alternative names.
+    Returns (labels, diagnostics_text).
+    Labels are human-readable and device-agnostic:
+      '<device name> [Device <index>]'
     """
-    out = dshow_diagnostics(ffmpeg_path)
-    lines = out.splitlines()
-    devs = []
-    in_audio = False
-    last_friendly = None
-
-    for line in lines:
-        if re.search(r"DirectShow audio devices", line, re.IGNORECASE):
-            in_audio = True
-            continue
-        if re.search(r"DirectShow video devices", line, re.IGNORECASE):
-            break
-
-        if not in_audio:
-            continue
-
-        # Friendly name line: [dshow]  "Microphone (Yeti...)"
-        m = re.search(r'"([^"]+)"', line)
-        if m and "Alternative name" not in line:
-            last_friendly = m.group(1).strip()
-            if last_friendly and last_friendly not in devs:
-                devs.append(last_friendly)
-            continue
-
-        # Alternative name line: Alternative name "@device_cm_...\wave_{...}"
-        if "Alternative name" in line:
-            m2 = re.search(r'"([^"]+)"', line)
-            if m2:
-                alt = m2.group(1).strip()
-                if alt and alt not in devs:
-                    devs.append(alt)
-
-    return devs
-
-def _normalize_dshow_input(device_name: str) -> str:
-    """
-    KEY FIX: Do NOT embed quotes inside the argument when using subprocess(list).
-    Accepts:
-      - Friendly name: Microphone (Yeti Stereo Microphone)
-      - Alternative name: @device_cm_...\wave_{...}
-      - Full spec: audio=...
-    """
-    s = (device_name or "").strip()
-
-    # If user already typed full spec
-    if s.lower().startswith("audio="):
-        return s
-
-    # If they pasted the @device alternative
-    if s.startswith("@"):
-        return "audio=" + s
-
-    # Normal friendly name
-    return "audio=" + s
-
-def start_recording(ffmpeg_path: str, device_name: str, out_wav: str, samplerate: int = 16000) -> subprocess.Popen:
-    dshow_in = _normalize_dshow_input(device_name)
-
-    cmd = [
-        ffmpeg_path,
-        "-y",
-        "-hide_banner",
-        "-loglevel", "info",
-        "-f", "dshow",
-        "-i", dshow_in,
-        "-ac", "1",
-        "-ar", str(int(samplerate)),
-        "-acodec", "pcm_s16le",
-        out_wav,
-    ]
-
-    proc = subprocess.Popen(
-        cmd,
-        stdin=subprocess.PIPE,                  # send 'q' for graceful finalize
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True, encoding="utf-8", errors="replace",
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-    )
-
-    # Detect immediate exit and show output
-    time.sleep(0.35)
-    if proc.poll() is not None:
-        try:
-            out = proc.communicate(timeout=1)[0] or ""
-        except Exception:
-            out = ""
-        raise RuntimeError("FFmpeg exited immediately. Output:\n\n" + (out or "(no output)"))
-
-    return proc
-
-def stop_recording(proc: subprocess.Popen, wait_sec: float = 6.0) -> str:
-    if proc is None:
-        return ""
-
-    # Graceful stop (finalizes WAV header)
     try:
-        if proc.stdin:
-            proc.stdin.write("q\n")
-            proc.stdin.flush()
+        import sounddevice as sd  # type: ignore
+    except Exception as e:
+        return [], f"sounddevice import failed: {e}"
+
+    try:
+        devs = sd.query_devices()
+        default_in = None
+        try:
+            default_in = sd.default.device[0]
+        except Exception:
+            default_in = None
+
+        labels: List[str] = []
+        for i, d in enumerate(devs):
+            try:
+                if int(d.get("max_input_channels", 0)) <= 0:
+                    continue
+                name = str(d.get("name", "")).strip()
+                if not name:
+                    continue
+                labels.append(f"{name} [Device {i}]")
+            except Exception:
+                continue
+
+        diag_lines = []
+        diag_lines.append(f"Audio devices detected: {len(labels)} input(s)")
+        diag_lines.append(f"Default input index: {default_in}")
+        # Show a short list
+        for lab in labels[:60]:
+            diag_lines.append(f"  - {lab}")
+        return labels, "\n".join(diag_lines)
+
+    except Exception as e:
+        return [], f"sounddevice query failed: {e}"
+
+def list_audio_devices(ffmpeg: Optional[str] = None) -> List[str]:
+    """
+    Primary: sounddevice (Windows) -> auto-populated list of input devices.
+    Fallback: empty list (GUI still allows manual typing if needed).
+    """
+    labels, _diag = _try_sounddevice_list()
+    return labels
+
+# ---------------------------
+# FFmpeg DirectShow diagnostics (optional)
+# ---------------------------
+_DSHOW_PREFIX = re.compile(r'^\s*\[dshow @ [0-9A-Fa-f]+\]\s*')
+
+def _run_ffmpeg_text(ffmpeg: str, args: List[str], timeout: int = 20) -> Tuple[int, str]:
+    import subprocess
+    p = subprocess.run(
+        [ffmpeg] + args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        errors="replace",
+        timeout=timeout,
+        check=False,
+    )
+    txt = (p.stdout or "") + "\n" + (p.stderr or "")
+    return p.returncode, txt
+
+def dshow_diagnostics(ffmpeg: Optional[str]) -> str:
+    if not ffmpeg:
+        return "FFmpeg not found."
+    code, txt = _run_ffmpeg_text(
+        ffmpeg,
+        ["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+        timeout=20,
+    )
+    lines = []
+    lines.append("=== FFmpeg DirectShow Diagnostics ===")
+    lines.append(f"FFmpeg: {ffmpeg}")
+    lines.append(f"Exit code: {code} (non-zero is NORMAL for listing)")
+    lines.append("")
+    lines.append("---- Raw output (truncated) ----")
+    raw = txt.splitlines()
+    for ln in raw[:220]:
+        lines.append(ln[:300])
+    if len(raw) > 220:
+        lines.append("... (truncated) ...")
+    return "\n".join(lines)
+
+# ---------------------------
+# Recording via sounddevice (NO FFmpeg needed)
+# ---------------------------
+class _SDRec:
+    def __init__(self, stream, wf, q: "queue.Queue[bytes]", t: threading.Thread):
+        self.kind = "sounddevice"
+        self.stream = stream
+        self.wf = wf
+        self.q = q
+        self.t = t
+
+def _parse_sd_index(label: str) -> Optional[int]:
+    m = _SD_TAG.search((label or "").strip())
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+def start_recording(ffmpeg: Optional[str], device_name: str, out_wav: str, samplerate: int = 16000):
+    """
+    Start recording from the selected device label '<name> [Device N]'.
+    Writes PCM16 mono WAV at samplerate.
+    Returns an opaque handle used by stop_recording().
+    """
+    device_name = (device_name or "").strip()
+    if not device_name:
+        raise RuntimeError("No device selected.")
+
+    idx = _parse_sd_index(device_name)
+    if idx is None:
+        raise RuntimeError("Selected device label is invalid. Please Refresh Device List and select a device.")
+
+    try:
+        import sounddevice as sd  # type: ignore
+    except Exception as e:
+        raise RuntimeError(f"sounddevice is not available: {e}")
+
+    out_path = Path(out_wav)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    q: "queue.Queue[bytes]" = queue.Queue()
+
+    # Open WAV now so any permission/path issues happen immediately
+    wf = wave.open(str(out_path), "wb")
+    wf.setnchannels(1)
+    wf.setsampwidth(2)  # int16
+    wf.setframerate(int(samplerate))
+
+    def callback(indata, frames, time_info, status):
+        if status:
+            # keep going; status is often harmless (xruns)
+            pass
+        q.put(bytes(indata))
+
+    def writer():
+        while True:
+            b = q.get()
+            if b is None:  # type: ignore[comparison-overlap]
+                break
+            wf.writeframes(b)
+        wf.close()
+
+    t = threading.Thread(target=writer, daemon=True)
+    t.start()
+
+    try:
+        stream = sd.RawInputStream(
+            device=idx,
+            samplerate=int(samplerate),
+            channels=1,
+            dtype="int16",
+            callback=callback,
+            blocksize=0,
+        )
+        stream.start()
+    except Exception as e:
+        try:
+            q.put(None)  # type: ignore[arg-type]
+        except Exception:
+            pass
+        try:
+            wf.close()
+        except Exception:
+            pass
+        raise RuntimeError(f"Could not start recording on selected device.\n\n{e}")
+
+    return _SDRec(stream, wf, q, t)
+
+def stop_recording(handle) -> str:
+    """
+    Stops recording. Works with the _SDRec handle.
+    Returns a short log string.
+    """
+    if handle is None:
+        return ""
+    if getattr(handle, "kind", "") != "sounddevice":
+        return "(unknown handle type)"
+
+    try:
+        handle.stream.stop()
+        handle.stream.close()
     except Exception:
         pass
 
-    t0 = time.time()
-    out = ""
-    while time.time() - t0 < wait_sec:
-        if proc.poll() is not None:
-            try:
-                out = proc.communicate(timeout=1)[0] or ""
-            except Exception:
-                out = ""
-            return out
-        time.sleep(0.1)
-
-    # Fallback
     try:
-        proc.terminate()
-        out = proc.communicate(timeout=2)[0] or ""
+        handle.q.put(None)  # type: ignore[arg-type]
     except Exception:
-        try:
-            proc.kill()
-        except Exception:
-            pass
-    return out or ""
+        pass
+
+    try:
+        handle.t.join(timeout=3)
+    except Exception:
+        pass
+
+    return "Stopped (sounddevice)."

@@ -54,3 +54,8 @@ profile/
 factbook-assistant/data/config.json
 factbook-assistant/bin/ffmpeg.exe
 
+LAST_GUI_CRASH.txt
+Run-CITL.ps1
+.bak
+.bak_
+.pre_fix_*
