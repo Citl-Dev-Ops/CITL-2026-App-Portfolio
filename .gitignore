@@ -1,27 +1,14 @@
-﻿# Python caches
-__pycache__/
-*.py[cod]
-
-# Virtual environments
+﻿# --- never commit ---
 .venv/
 venv/
-ENV/
-env/
-
-# Junk outputs
-results/
-*.log
-
-# Backup files we created during patching
-*.bak
-*.bak_*
-*.pre_fix_*.bak
-
-# OS / IDE
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# Accidental tilde folder at repo root (your commit shows ~/GPUInspector/...)
 ~/
+results/
+*.bak_*
+LAST_GUI_CRASH.txt
+profile/
+
+# --- local/runtime outputs ---
+factbook-assistant/data/config.json
+factbook-assistant/data/recordings/
+factbook-assistant/*_embeddings.json
+factbook-assistant/index/
