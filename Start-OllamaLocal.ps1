@@ -1,45 +1,57 @@
 ﻿param(
-  [string]$OllamaHost = "http://127.0.0.1:11434"
+  [string]$OllamaHost = "http://localhost:11434",
+  [int]$TimeoutSec = 12
 )
-function Test-Ollama {
-  try { Invoke-RestMethod "$OllamaHost/api/tags" -TimeoutSec 2 | Out-Null; return $true }
-  catch { return $false }
+function Test-OllamaUp {
+  param([string]$Host)
+  try {
+    Invoke-RestMethod "$Host/api/tags" -TimeoutSec 2 | Out-Null
+    return $true
+  } catch { return $false }
 }
-Write-Host ""
-Write-Host "Checking Ollama at $OllamaHost ..." -ForegroundColor Cyan
-if (Test-Ollama) {
-  Write-Host "Ollama: OK" -ForegroundColor Green
-  exit 0
-}
-Write-Warning "Ollama not reachable. Attempting to start..."
-# Try service first (some installs use it)
-$svc = Get-Service -Name "Ollama" -ErrorAction SilentlyContinue
-if ($svc -and $svc.Status -ne "Running") {
-  Start-Service "Ollama" | Out-Null
-  Start-Sleep -Seconds 2
-}
-# Try CLI if available
-$oll = Get-Command "ollama" -ErrorAction SilentlyContinue
-if ($oll) {
-  Start-Process -FilePath $oll.Source -ArgumentList "serve" -WindowStyle Minimized
-  Start-Sleep -Seconds 2
-} else {
-  # Try common install locations
+function Find-OllamaExe {
   $candidates = @(
     "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
-    "$env:ProgramFiles\Ollama\ollama.exe"
-  ) | Where-Object { Test-Path $_ }
-  if ($candidates.Count -gt 0) {
-    Start-Process -FilePath $candidates[0] -ArgumentList "serve" -WindowStyle Minimized
-    Start-Sleep -Seconds 2
+    "$env:ProgramFiles\Ollama\ollama.exe",
+    "$env:ProgramFiles(x86)\Ollama\ollama.exe"
+  )
+  foreach ($p in $candidates) { if (Test-Path -LiteralPath $p) { return $p } }
+  # last-resort: search LOCALAPPDATA\Programs (can take a moment)
+  $root = Join-Path $env:LOCALAPPDATA "Programs"
+  if (Test-Path $root) {
+    $hit = Get-ChildItem $root -Recurse -Filter ollama.exe -ErrorAction SilentlyContinue |
+           Select-Object -First 1 -ExpandProperty FullName
+    if ($hit) { return $hit }
   }
+  return $null
 }
-if (Test-Ollama) {
-  Write-Host "Ollama: STARTED and reachable." -ForegroundColor Green
+if (Test-OllamaUp -Host $OllamaHost) {
+  Write-Host "Ollama API: OK ($OllamaHost)" -ForegroundColor Green
   exit 0
 }
-Write-Warning "Ollama still not reachable."
-Write-Host "Quick checks:" -ForegroundColor Yellow
-Write-Host "  netstat -ano | findstr :11434"
-Write-Host "  Get-Process ollama -ErrorAction SilentlyContinue"
-exit 1
+$ollamaExe = Find-OllamaExe
+if (-not $ollamaExe) {
+  Write-Warning "Ollama not found. Install Ollama, then re-run. Expected: $env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
+  exit 1
+}
+# add to PATH for current session
+$dir = Split-Path $ollamaExe -Parent
+if ($env:Path -notlike "*$dir*") { $env:Path = "$dir;$env:Path" }
+Write-Host "Ollama exe: OK ($ollamaExe)" -ForegroundColor Green
+# start serve (hidden)
+try {
+  Start-Process -FilePath $ollamaExe -ArgumentList "serve" -WindowStyle Hidden | Out-Null
+} catch {
+  Write-Warning "Failed to start Ollama: $($_.Exception.Message)"
+}
+# wait for API
+$sw = [Diagnostics.Stopwatch]::StartNew()
+while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
+  if (Test-OllamaUp -Host $OllamaHost) {
+    Write-Host "Ollama API: OK ($OllamaHost)" -ForegroundColor Green
+    exit 0
+  }
+  Start-Sleep -Milliseconds 400
+}
+Write-Warning "Ollama API still not reachable at $OllamaHost. Try launching Ollama desktop app manually, then re-run."
+exit 2
