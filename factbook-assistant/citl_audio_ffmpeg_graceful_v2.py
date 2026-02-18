@@ -146,3 +146,14 @@ def stop_recording(proc: subprocess.Popen, wait_sec: float = 6.0) -> str:
         except Exception:
             pass
     return out or ""
+
+
+# --- GUI compatibility export ---
+def audio_diagnostics(ffmpeg: str) -> str:
+    try:
+        fn = globals().get("dshow_diagnostics")
+        if callable(fn):
+            return fn(ffmpeg)
+    except Exception as e:
+        return f"(diagnostics failed: {e})"
+    return "(no diagnostics)"
