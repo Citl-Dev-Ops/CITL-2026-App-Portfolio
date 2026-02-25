@@ -1,17 +1,53 @@
-﻿import os, json, time, platform
+"""
+CITL Factbook + Transcription + Translation GUI
+================================================
+Tabs:
+  1. Factbook  — RAG-powered Ollama query panel
+  2. Audio/Transcribe — device-agnostic recording + Whisper transcription
+  3. Translate — offline argostranslate with live mode + vocabulary study aid
+
+Toolbar: Bot name | Load Modelfile | Theme selector
+"""
+
+import os
+import json
+import time
+import platform
+import threading
 from pathlib import Path
+from typing import Optional
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
+from tkinter import ttk, scrolledtext, messagebox, filedialog
 
-from citl_audio_ffmpeg_graceful_v2 import (
-    find_ffmpeg,
-    list_audio_devices,
-    start_recording,
-    stop_recording,
-    audio_diagnostics,
-)
+# ── Optional CITL modules (graceful degradation if absent) ─────────────────
+try:
+    from citl_audio_ffmpeg_graceful_v2 import (
+        find_ffmpeg, list_audio_devices, start_recording, stop_recording, audio_diagnostics,
+    )
+    _HAS_AUDIO = True
+except ImportError:
+    _HAS_AUDIO = False
 
-def pick_data_dir() -> Path:
+try:
+    import citl_theme as _theme
+    _HAS_THEME = True
+except ImportError:
+    _HAS_THEME = False
+
+try:
+    import citl_modelfile as _mf
+    _HAS_MODELFILE = True
+except ImportError:
+    _HAS_MODELFILE = False
+
+try:
+    import citl_translation as _tr
+    _HAS_TR = True
+except ImportError:
+    _HAS_TR = False
+
+# ── Data directory ──────────────────────────────────────────────────────────
+def _pick_data_dir() -> Path:
     env = os.environ.get("CITL_DATA_DIR", "").strip()
     if env:
         p = Path(env).expanduser()
@@ -22,15 +58,14 @@ def pick_data_dir() -> Path:
     p.mkdir(parents=True, exist_ok=True)
     return p
 
-DATA_DIR = pick_data_dir()
+DATA_DIR   = _pick_data_dir()
 RECORD_DIR = DATA_DIR / "recordings"
 RECORD_DIR.mkdir(parents=True, exist_ok=True)
 
-# per-machine config so copied kits don't keep a "sticky" mic from another PC
-_MACHINE = (os.environ.get("COMPUTERNAME") or platform.node() or "machine").strip().replace(" ", "_")
+_MACHINE    = (os.environ.get("COMPUTERNAME") or platform.node() or "machine").strip().replace(" ", "_")
 CONFIG_PATH = DATA_DIR / f"config_{_MACHINE}.json"
 
-def load_config():
+def _load_cfg() -> dict:
     if CONFIG_PATH.exists():
         try:
             return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
@@ -38,178 +73,551 @@ def load_config():
             return {}
     return {}
 
-def save_config(cfg):
+def _save_cfg(cfg: dict) -> None:
     try:
         CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
     except Exception:
         pass
 
-def transcribe_wav(path: str, lang_mode: str):
+# ── Transcription ───────────────────────────────────────────────────────────
+def _transcribe_wav(path: str, lang_mode: str) -> tuple:
     from faster_whisper import WhisperModel
     model = WhisperModel("small", device="cpu", compute_type="int8")
-
-    if lang_mode == "English":
-        language = "en"
-    elif lang_mode == "Spanish":
-        language = "es"
-    else:
-        language = None
-
+    lang_map = {"English": "en", "Spanish": "es", "Arabic": "ar"}
+    language = lang_map.get(lang_mode)
     segments, info = model.transcribe(path, language=language)
-    detected = getattr(info, "language", None) or (language or "unknown")
-
-    if lang_mode == "Auto" and detected not in ("en", "es"):
+    detected = getattr(info, "language", None) or language or "unknown"
+    if lang_mode == "Auto" and detected not in ("en", "es", "ar"):
         segments, info = model.transcribe(path, language="en")
         detected = "en"
-
     text = "".join(seg.text for seg in segments).strip()
     return detected, text
 
+# ── Factbook RAG query ──────────────────────────────────────────────────────
+def _query_factbook(question: str, model: str, host: str) -> str:
+    try:
+        from query_factbook import answer_question
+        return answer_question(question, model=model, ollama_host=host)
+    except Exception as e:
+        return f"[Factbook error: {e}]"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Main Application
+# ═══════════════════════════════════════════════════════════════════════════
 class App(tk.Tk):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.title("Recording + Transcription (Device-Agnostic)")
-        self.geometry("1100x760")
+        self.title("CITL Desktop LLM Assistant")
+        self.geometry("1150x800")
+        self.minsize(800, 600)
 
-        self.cfg = load_config()
-        self.ffmpeg = find_ffmpeg()
-        self.handle = None
-        self.last_wav = None
+        self.cfg                = _load_cfg()
+        self.ffmpeg             = find_ffmpeg() if _HAS_AUDIO else None
+        self.handle             = None
+        self.last_wav: Optional[str] = None
+        self._modelfile_meta: dict = {}
+        self._live_translate_id: Optional[str] = None
 
-        self.build_ui()
+        self._build_ui()
+        self._apply_saved_theme()
         self.refresh_devices(first_load=True)
+        self._tick()
 
-    def build_ui(self):
-        root = ttk.Frame(self, padding=8); root.pack(fill="both", expand=True)
+    # ── UI Construction ────────────────────────────────────────────────────
 
-        box = ttk.LabelFrame(root, text="Microphone (auto-detect)", padding=8)
-        box.pack(fill="x")
+    def _build_ui(self) -> None:
+        self._build_toolbar()
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill="both", expand=True, padx=4, pady=(0, 4))
+        self._build_factbook_tab()
+        self._build_audio_tab()
+        self._build_translate_tab()
 
-        self.device_combo = ttk.Combobox(box, state="readonly")
+    def _build_toolbar(self) -> None:
+        bar = ttk.Frame(self)
+        bar.pack(fill="x", padx=4, pady=(4, 2))
+
+        ttk.Label(bar, text="Bot:").pack(side="left")
+        self.botname_var = tk.StringVar(value=self.cfg.get("botname", "CITL Assistant"))
+        ttk.Label(bar, textvariable=self.botname_var,
+                  font=("TkDefaultFont", 10, "bold")).pack(side="left", padx=(2, 12))
+
+        ttk.Button(bar, text="Load Modelfile", command=self.on_load_modelfile).pack(side="left", padx=4)
+        ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=6)
+
+        ttk.Label(bar, text="Theme:").pack(side="left")
+        themes = list(_theme.PALETTE_DISPLAY.values()) if _HAS_THEME else ["Default"]
+        self.theme_display_var = tk.StringVar(value=self._saved_theme_display())
+        self.theme_combo = ttk.Combobox(bar, textvariable=self.theme_display_var,
+                                        values=themes, state="readonly", width=18)
+        self.theme_combo.pack(side="left", padx=4)
+        self.theme_combo.bind("<<ComboboxSelected>>", self.on_theme_changed)
+
+    def _saved_theme_display(self) -> str:
+        if not _HAS_THEME:
+            return "Default"
+        key = self.cfg.get("theme", "ops")
+        return _theme.PALETTE_DISPLAY.get(key, _theme.PALETTE_DISPLAY["ops"])
+
+    # ── Tab 1: Factbook ────────────────────────────────────────────────────
+
+    def _build_factbook_tab(self) -> None:
+        tab = ttk.Frame(self.notebook, padding=8)
+        self.notebook.add(tab, text=" Factbook ")
+
+        top = ttk.LabelFrame(tab, text="Query", padding=6)
+        top.pack(fill="x")
+
+        ttk.Label(top, text="Ollama model:").grid(row=0, column=0, sticky="w")
+        self.fb_model_var = tk.StringVar(value=self.cfg.get("ollama_model", "mistral:7b-instruct"))
+        ttk.Entry(top, textvariable=self.fb_model_var, width=28).grid(row=0, column=1, sticky="ew", padx=4)
+
+        ttk.Label(top, text="Host:").grid(row=0, column=2, sticky="w", padx=(8, 0))
+        self.fb_host_var = tk.StringVar(value=self.cfg.get("ollama_host", "http://localhost:11434"))
+        ttk.Entry(top, textvariable=self.fb_host_var, width=28).grid(row=0, column=3, sticky="ew", padx=4)
+        top.columnconfigure(1, weight=1)
+        top.columnconfigure(3, weight=1)
+
+        ttk.Label(top, text="Question:").grid(row=1, column=0, sticky="nw", pady=(6, 0))
+        self.fb_question = tk.Text(top, height=3, wrap="word")
+        self.fb_question.grid(row=1, column=1, columnspan=3, sticky="ew", padx=4, pady=(6, 0))
+
+        btn_row = ttk.Frame(top)
+        btn_row.grid(row=2, column=0, columnspan=4, sticky="w", pady=(4, 0))
+        ttk.Button(btn_row, text="Ask Factbook",
+                   command=self.on_ask_factbook).pack(side="left")
+        ttk.Button(btn_row, text="-> Translate Answer",
+                   command=self.on_send_factbook_to_translate).pack(side="left", padx=8)
+
+        self.fb_status_var = tk.StringVar(value="Ready.")
+        ttk.Label(tab, textvariable=self.fb_status_var).pack(anchor="w", pady=(6, 0))
+
+        self.fb_out = scrolledtext.ScrolledText(tab, height=22, wrap="word")
+        self.fb_out.pack(fill="both", expand=True, pady=(4, 0))
+
+    # ── Tab 2: Audio / Transcribe ──────────────────────────────────────────
+
+    def _build_audio_tab(self) -> None:
+        tab = ttk.Frame(self.notebook, padding=8)
+        self.notebook.add(tab, text=" Audio / Transcribe ")
+
+        mic_box = ttk.LabelFrame(tab, text="Microphone (auto-detect)", padding=8)
+        mic_box.pack(fill="x")
+
+        self.device_combo = ttk.Combobox(mic_box, state="readonly")
         self.device_combo.pack(fill="x")
         self.device_combo.bind("<<ComboboxSelected>>", self.on_device_selected)
 
-        btns = ttk.Frame(box); btns.pack(fill="x", pady=(6,0))
-        ttk.Button(btns, text="Refresh Device List", command=self.refresh_devices).pack(side="left")
-        ttk.Button(btns, text="Reset Saved Device", command=self.reset_saved_device).pack(side="left", padx=8)
-        ttk.Button(btns, text="Diagnostics", command=self.on_diagnostics).pack(side="left", padx=8)
+        btns = ttk.Frame(mic_box)
+        btns.pack(fill="x", pady=(6, 0))
+        ttk.Button(btns, text="Refresh", command=self.refresh_devices).pack(side="left")
+        ttk.Button(btns, text="Reset Saved", command=self.reset_saved_device).pack(side="left", padx=6)
+        ttk.Button(btns, text="Diagnostics", command=self.on_diagnostics).pack(side="left", padx=6)
 
-        self.diag_out = scrolledtext.ScrolledText(box, height=10, wrap="word")
-        self.diag_out.pack(fill="both", expand=True, pady=(6,0))
+        self.diag_out = scrolledtext.ScrolledText(mic_box, height=6, wrap="word")
+        self.diag_out.pack(fill="both", expand=False, pady=(6, 0))
 
-        rec = ttk.Frame(root); rec.pack(fill="x", pady=(10,6))
+        rec = ttk.Frame(tab)
+        rec.pack(fill="x", pady=(10, 6))
         ttk.Button(rec, text="Start Recording", command=self.on_start).pack(side="left")
-        ttk.Button(rec, text="Stop Recording", command=self.on_stop).pack(side="left", padx=8)
+        ttk.Button(rec, text="Stop Recording",  command=self.on_stop).pack(side="left", padx=8)
 
-        trans = ttk.LabelFrame(root, text="Transcription (offline)", padding=8)
-        trans.pack(fill="x", pady=(6,6))
+        trans_box = ttk.LabelFrame(tab, text="Transcription (offline Whisper)", padding=8)
+        trans_box.pack(fill="x", pady=(6, 6))
         self.lang_var = tk.StringVar(value="English")
-        ttk.Label(trans, text="Language:").pack(side="left")
-        ttk.Combobox(trans, textvariable=self.lang_var, state="readonly",
-                     values=["Auto","English","Spanish"], width=10).pack(side="left", padx=6)
-        ttk.Button(trans, text="Transcribe Last WAV", command=self.on_transcribe).pack(side="left", padx=6)
+        ttk.Label(trans_box, text="Language:").pack(side="left")
+        ttk.Combobox(trans_box, textvariable=self.lang_var, state="readonly",
+                     values=["Auto", "English", "Spanish", "Arabic"], width=10).pack(side="left", padx=6)
+        ttk.Button(trans_box, text="Transcribe Last WAV",
+                   command=self.on_transcribe).pack(side="left", padx=6)
+        ttk.Button(trans_box, text="-> Translate Transcript",
+                   command=self.on_send_transcript_to_translate).pack(side="left", padx=6)
 
-        self.status_var = tk.StringVar(value="Ready.")
-        ttk.Label(root, textvariable=self.status_var).pack(anchor="w", pady=(8,0))
+        self.audio_status_var = tk.StringVar(value="Ready.")
+        ttk.Label(tab, textvariable=self.audio_status_var).pack(anchor="w", pady=(4, 0))
 
-        self.out = scrolledtext.ScrolledText(root, height=18, wrap="word")
-        self.out.pack(fill="both", expand=True, pady=(6,0))
+        self.audio_out = scrolledtext.ScrolledText(tab, height=16, wrap="word")
+        self.audio_out.pack(fill="both", expand=True, pady=(4, 0))
 
-    def set_status(self, msg: str):
-        self.status_var.set(msg)
-        self.update_idletasks()
+    # ── Tab 3: Translate ───────────────────────────────────────────────────
 
-    def reset_saved_device(self):
-        self.cfg.pop("audio_device", None)
-        save_config(self.cfg)
-        self.refresh_devices(first_load=False)
+    def _build_translate_tab(self) -> None:
+        tab = ttk.Frame(self.notebook, padding=8)
+        self.notebook.add(tab, text=" Translate ")
 
-    def refresh_devices(self, first_load: bool = False):
+        lang_names = list(_tr.LANGUAGES.values()) if _HAS_TR else ["English", "Spanish", "Arabic"]
+
+        ctrl = ttk.Frame(tab)
+        ctrl.pack(fill="x")
+
+        ttk.Label(ctrl, text="From:").pack(side="left")
+        self.tr_from_var = tk.StringVar(value="English")
+        self.tr_from_combo = ttk.Combobox(ctrl, textvariable=self.tr_from_var,
+                                          values=lang_names, state="readonly", width=16)
+        self.tr_from_combo.pack(side="left", padx=4)
+
+        ttk.Button(ctrl, text="<->", width=4, command=self.on_swap_languages).pack(side="left")
+
+        ttk.Label(ctrl, text="To:").pack(side="left", padx=(8, 0))
+        self.tr_to_var = tk.StringVar(value="Spanish")
+        self.tr_to_combo = ttk.Combobox(ctrl, textvariable=self.tr_to_var,
+                                        values=lang_names, state="readonly", width=16)
+        self.tr_to_combo.pack(side="left", padx=4)
+
+        ttk.Separator(ctrl, orient="vertical").pack(side="left", fill="y", padx=8)
+
+        ttk.Button(ctrl, text="Translate", command=self.on_translate).pack(side="left")
+        ttk.Button(ctrl, text="Install Pack",
+                   command=self.on_install_lang_pack).pack(side="left", padx=6)
+        ttk.Button(ctrl, text="Clear", command=self.on_clear_translate).pack(side="left")
+
+        live_frame = ttk.Frame(tab)
+        live_frame.pack(fill="x", pady=(4, 0))
+        self.live_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(live_frame, text="Live translation (800 ms debounce)",
+                        variable=self.live_var).pack(side="left")
+
+        self.tr_status_var = tk.StringVar(value="")
+        ttk.Label(tab, textvariable=self.tr_status_var).pack(anchor="w")
+
+        pane = ttk.PanedWindow(tab, orient="horizontal")
+        pane.pack(fill="both", expand=True, pady=(4, 0))
+
+        left = ttk.LabelFrame(pane, text="Source text", padding=4)
+        pane.add(left, weight=1)
+        self.tr_source = scrolledtext.ScrolledText(left, wrap="word")
+        self.tr_source.pack(fill="both", expand=True)
+        self.tr_source.bind("<KeyRelease>", self._on_tr_source_keyrelease)
+
+        right = ttk.LabelFrame(pane, text="Translation", padding=4)
+        pane.add(right, weight=1)
+        self.tr_result = scrolledtext.ScrolledText(right, wrap="word", state="disabled")
+        self.tr_result.pack(fill="both", expand=True)
+
+        vocab_frame = ttk.LabelFrame(tab, text="Vocabulary / Study Pairs", padding=4)
+        vocab_frame.pack(fill="x", pady=(6, 0))
+        self.tr_vocab = scrolledtext.ScrolledText(vocab_frame, height=5, wrap="word",
+                                                  state="disabled")
+        self.tr_vocab.pack(fill="both", expand=True)
+
+    # ── Theme ──────────────────────────────────────────────────────────────
+
+    def _apply_saved_theme(self) -> None:
+        if not _HAS_THEME:
+            return
+        key = self.cfg.get("theme", "ops")
+        _theme.apply_theme(self, key)
+
+    def on_theme_changed(self, _evt=None) -> None:
+        if not _HAS_THEME:
+            return
+        display = self.theme_display_var.get()
+        key = next((k for k, v in _theme.PALETTE_DISPLAY.items() if v == display), "ops")
+        _theme.apply_theme(self, key)
+        self.cfg["theme"] = key
+        _save_cfg(self.cfg)
+
+    # ── Modelfile ──────────────────────────────────────────────────────────
+
+    def on_load_modelfile(self) -> None:
+        if not _HAS_MODELFILE:
+            messagebox.showinfo("Unavailable", "citl_modelfile module not found.")
+            return
+        path = filedialog.askopenfilename(
+            title="Select Modelfile",
+            filetypes=[("Modelfile", "Modelfile*"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            _, meta = _mf.load_modelfile(path)
+        except Exception as e:
+            messagebox.showerror("Load failed", str(e))
+            return
+
+        self._modelfile_meta = meta
+
+        if meta.get("botname"):
+            self.botname_var.set(meta["botname"])
+            self.cfg["botname"] = meta["botname"]
+
+        if _HAS_THEME and meta.get("color"):
+            key = meta["color"].lower()
+            if key in _theme.PALETTE_NAMES:
+                self.theme_display_var.set(_theme.PALETTE_DISPLAY[key])
+                _theme.apply_theme(self, key)
+                self.cfg["theme"] = key
+
+        if _HAS_TR and meta.get("lang"):
+            lang_name = _tr.LANGUAGES.get(meta["lang"].lower())
+            if lang_name:
+                self.tr_from_var.set(lang_name)
+
+        _save_cfg(self.cfg)
+        messagebox.showinfo(
+            "Modelfile loaded",
+            f"Bot: {meta.get('botname') or '(unnamed)'}\n"
+            f"Color: {meta.get('color')}\n"
+            f"Lang: {meta.get('lang')}",
+        )
+
+    # ── Factbook ──────────────────────────────────────────────────────────
+
+    def on_ask_factbook(self) -> None:
+        q = self.fb_question.get("1.0", "end").strip()
+        if not q:
+            return
+        model = self.fb_model_var.get().strip()
+        host  = self.fb_host_var.get().strip()
+        self.fb_status_var.set("Querying Ollama...")
+        self.cfg["ollama_model"] = model
+        self.cfg["ollama_host"]  = host
+        _save_cfg(self.cfg)
+
+        def _run():
+            result = _query_factbook(q, model, host)
+            self.after(0, lambda: self._show_factbook(result))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _show_factbook(self, text: str) -> None:
+        q = self.fb_question.get("1.0", "end").strip()
+        self.fb_out.insert("end", f"\n[Q] {q}\n\n{text}\n{'─'*60}\n")
+        self.fb_out.see("end")
+        self.fb_status_var.set("Done.")
+
+    def on_send_factbook_to_translate(self) -> None:
+        text = self.fb_out.get("1.0", "end").strip()
+        if text:
+            self.tr_source.delete("1.0", "end")
+            self.tr_source.insert("end", text)
+        self.notebook.select(2)
+
+    # ── Audio / Recording ──────────────────────────────────────────────────
+
+    def refresh_devices(self, first_load: bool = False) -> None:
+        if not _HAS_AUDIO:
+            self.device_combo["values"] = ()
+            self.audio_status_var.set("Audio module unavailable.")
+            return
+
         devs = list_audio_devices(self.ffmpeg)
+        saved = (self.cfg.get("audio_device", "") or "").strip()
 
-        saved = (self.cfg.get("audio_device","") or "").strip()
-
-        # Clear stale saved device if it doesn't exist here
         if saved and saved not in devs:
             saved = ""
             self.cfg["audio_device"] = ""
-            save_config(self.cfg)
+            _save_cfg(self.cfg)
 
         self.device_combo["values"] = tuple(devs)
-
         if devs:
-            pick = saved if saved in devs else devs[0]  # auto-select best choice
+            pick = saved if saved in devs else devs[0]
             self.device_combo.set(pick)
             self.cfg["audio_device"] = pick
-            save_config(self.cfg)
-            self.set_status(f"{'Loaded' if first_load else 'Refreshed'} {len(devs)} device(s). Config: {CONFIG_PATH.name}")
+            _save_cfg(self.cfg)
+            label = "Loaded" if first_load else "Refreshed"
+            self.audio_status_var.set(
+                f"{label} {len(devs)} device(s). Config: {CONFIG_PATH.name}"
+            )
         else:
             self.device_combo.set("")
-            self.set_status("No devices detected. Click Diagnostics.")
+            self.audio_status_var.set("No devices detected. Click Diagnostics.")
 
-    def on_device_selected(self, _evt=None):
+    def reset_saved_device(self) -> None:
+        self.cfg.pop("audio_device", None)
+        _save_cfg(self.cfg)
+        self.refresh_devices(first_load=False)
+
+    def on_device_selected(self, _evt=None) -> None:
         v = self.device_combo.get().strip()
         self.cfg["audio_device"] = v
-        save_config(self.cfg)
+        _save_cfg(self.cfg)
 
-    def on_diagnostics(self):
-        self.diag_out.delete("1.0","end")
+    def on_diagnostics(self) -> None:
+        if not _HAS_AUDIO:
+            return
+        self.diag_out.delete("1.0", "end")
         self.diag_out.insert("end", audio_diagnostics(self.ffmpeg) + "\n")
 
-    def on_start(self):
+    def on_start(self) -> None:
         if self.handle is not None:
             return
-
+        if not _HAS_AUDIO:
+            messagebox.showerror("Unavailable", "Audio module not installed.")
+            return
         dev = self.device_combo.get().strip()
         if not dev:
-            messagebox.showerror("No device","Click Refresh Device List, then select a device.")
+            messagebox.showerror("No device", "Select a microphone first.")
             return
-
-        ts = time.strftime("%Y%m%d_%H%M%S")
+        ts  = time.strftime("%Y%m%d_%H%M%S")
         out = str(RECORD_DIR / f"recording_{ts}.wav")
-
         try:
-            self.handle = start_recording(self.ffmpeg, dev, out, samplerate=16000)
+            self.handle   = start_recording(self.ffmpeg, dev, out, samplerate=16000)
             self.last_wav = out
-            self.set_status(f"Recording saving to {out}")
+            self.audio_status_var.set(f"Recording -> {out}")
         except Exception as e:
             messagebox.showerror("Start failed", str(e))
-            self.handle = None
+            self.handle   = None
             self.last_wav = None
             self.refresh_devices(first_load=False)
 
-    def on_stop(self):
+    def on_stop(self) -> None:
         if self.handle is None:
-            self.set_status("Not recording.")
+            self.audio_status_var.set("Not recording.")
             return
-
-        out = stop_recording(self.handle)
+        stop_recording(self.handle)
         self.handle = None
-
         for _ in range(25):
             if self.last_wav and Path(self.last_wav).exists():
                 break
             time.sleep(0.1)
-
         if self.last_wav and Path(self.last_wav).exists():
-            self.set_status(f"Saved WAV: {self.last_wav}")
-            self.out.insert("end", f"\n[SAVED] {self.last_wav}\n")
-            self.out.see("end")
+            self.audio_status_var.set(f"Saved: {self.last_wav}")
+            self.audio_out.insert("end", f"\n[SAVED] {self.last_wav}\n")
+            self.audio_out.see("end")
         else:
-            self.set_status("Stopped, but WAV not found. Showing recorder output.")
-            self.out.insert("end", "\n[OUTPUT]\n" + (out or "(no output)") + "\n")
-            self.out.see("end")
+            self.audio_status_var.set("Stopped - WAV not found. Check Diagnostics.")
 
-    def on_transcribe(self):
+    def on_transcribe(self) -> None:
         if not self.last_wav or not Path(self.last_wav).exists():
-            messagebox.showinfo("No WAV","Record and stop first.")
+            messagebox.showinfo("No WAV", "Record and stop first.")
             return
-        detected, text = transcribe_wav(self.last_wav, self.lang_var.get())
-        self.out.insert("end", f"\n[TRANSCRIPT lang={detected}]\n{text}\n")
-        self.out.see("end")
+        self.audio_status_var.set("Transcribing...")
 
-def main():
+        def _run():
+            try:
+                detected, text = _transcribe_wav(self.last_wav, self.lang_var.get())
+                self.after(0, lambda: self._show_transcript(detected, text))
+            except Exception as e:
+                self.after(0, lambda: self.audio_status_var.set(f"Transcription error: {e}"))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _show_transcript(self, detected: str, text: str) -> None:
+        self.audio_out.insert("end", f"\n[TRANSCRIPT lang={detected}]\n{text}\n")
+        self.audio_out.see("end")
+        self.audio_status_var.set(f"Transcribed (lang={detected}).")
+
+    def on_send_transcript_to_translate(self) -> None:
+        text = self.audio_out.get("1.0", "end").strip()
+        if text:
+            self.tr_source.delete("1.0", "end")
+            self.tr_source.insert("end", text)
+        self.notebook.select(2)
+
+    # ── Translation ────────────────────────────────────────────────────────
+
+    def _code_for(self, display_name: str) -> str:
+        if not _HAS_TR:
+            return display_name[:2].lower()
+        return next((k for k, v in _tr.LANGUAGES.items() if v == display_name), "en")
+
+    def on_translate(self) -> None:
+        if not _HAS_TR:
+            messagebox.showinfo("Unavailable",
+                                "citl_translation / argostranslate not installed.\n"
+                                "Run: pip install argostranslate")
+            return
+        text = self.tr_source.get("1.0", "end").strip()
+        if not text:
+            return
+        from_code = self._code_for(self.tr_from_var.get())
+        to_code   = self._code_for(self.tr_to_var.get())
+        self.tr_status_var.set("Translating...")
+
+        def _run():
+            try:
+                result = _tr.translate(text, from_code, to_code)
+                self.after(0, lambda: self._display_translation(text, result))
+            except Exception as e:
+                self.after(0, lambda: self._translation_error(str(e)))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _display_translation(self, source: str, result: str) -> None:
+        self.tr_result.configure(state="normal")
+        self.tr_result.delete("1.0", "end")
+        self.tr_result.insert("end", result)
+        self.tr_result.configure(state="disabled")
+        self.tr_status_var.set("Translation complete.")
+
+        if _HAS_TR:
+            try:
+                pairs = _tr.build_study_pairs(source, result)
+                self.tr_vocab.configure(state="normal")
+                self.tr_vocab.delete("1.0", "end")
+                for src_s, tr_s in pairs:
+                    self.tr_vocab.insert("end", f"{src_s}\n  -> {tr_s}\n\n")
+                self.tr_vocab.configure(state="disabled")
+            except Exception:
+                pass
+
+    def _translation_error(self, msg: str) -> None:
+        self.tr_status_var.set(f"Error: {msg}")
+
+    def on_swap_languages(self) -> None:
+        a, b = self.tr_from_var.get(), self.tr_to_var.get()
+        self.tr_from_var.set(b)
+        self.tr_to_var.set(a)
+
+    def on_clear_translate(self) -> None:
+        self.tr_source.delete("1.0", "end")
+        self.tr_result.configure(state="normal")
+        self.tr_result.delete("1.0", "end")
+        self.tr_result.configure(state="disabled")
+        self.tr_vocab.configure(state="normal")
+        self.tr_vocab.delete("1.0", "end")
+        self.tr_vocab.configure(state="disabled")
+        self.tr_status_var.set("")
+
+    def on_install_lang_pack(self) -> None:
+        if not _HAS_TR:
+            messagebox.showinfo("Unavailable",
+                                "citl_translation / argostranslate not installed.")
+            return
+        from_code = self._code_for(self.tr_from_var.get())
+        to_code   = self._code_for(self.tr_to_var.get())
+        self.tr_status_var.set(f"Installing {from_code} -> {to_code} ...")
+
+        def _run():
+            status = _tr.install_pair(
+                from_code, to_code,
+                progress_cb=lambda m: self.after(0, lambda msg=m: self.tr_status_var.set(msg)),
+            )
+            self.after(0, lambda: self.tr_status_var.set(status))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    # ── Live translation debounce ──────────────────────────────────────────
+
+    def _on_tr_source_keyrelease(self, _evt=None) -> None:
+        if not self.live_var.get():
+            return
+        if self._live_translate_id:
+            self.after_cancel(self._live_translate_id)
+        self._live_translate_id = self.after(800, self._live_translate_debounced)
+
+    def _live_translate_debounced(self) -> None:
+        self._live_translate_id = None
+        self.on_translate()
+
+    # ── Periodic tick ─────────────────────────────────────────────────────
+
+    def _tick(self) -> None:
+        if self.handle is not None and _HAS_AUDIO:
+            try:
+                stream = getattr(self.handle, "stream", None)
+                if stream and not stream.active:
+                    self.handle = None
+                    self.audio_status_var.set("Recording stopped unexpectedly.")
+            except Exception:
+                pass
+        self.after(1000, self._tick)
+
+
+def main() -> None:
     App().mainloop()
+
 
 if __name__ == "__main__":
     main()

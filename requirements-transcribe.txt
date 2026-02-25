@@ -1,0 +1,3 @@
+# Offline transcription (Whisper)
+faster-whisper
+soundfile

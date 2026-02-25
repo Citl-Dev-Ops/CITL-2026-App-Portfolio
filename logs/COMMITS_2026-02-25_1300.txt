@@ -1,0 +1,23 @@
+﻿939c172 (HEAD -> main, tag: KNOWN_GOOD_20260225_0556, origin/main) Fix broken escaped triple-quotes in audio_diagnostics
+a3004b3 Add audio_diagnostics export for GUI compatibility
+73e729b Add WSL demo launcher for Windows screenshots
+f6b8408 Add gitignore/gitattributes to prevent venv+outputs from being committed
+3e2b034 Stop tracking venv/backups; add WSL Ubuntu demo launcher; normalize line endings
+0a4ef6b Fix audio device dropdown labels + device-agnostic recording
+826a07d Fix PS5 launchers: Ollama starter + PS5-safe preflight + correct GUI path
+af7c4e5 Fix PS5 compatibility + preflight + restore transcribe/TTS runners
+0537652 Move CITL engineer credits to top of README + citation metadata
+7d628c1 Merge ffmpeg GUI + class capture; add CITL engineer credits
+7e3611e (ffmpeg-latest) Add prominent CITL engineer credits + citation metadata
+41c5349 Fix ffmpeg audio capture + transcription pipeline
+1c7081c (fix/ffmpeg-gui-v2) Rename canonical launcher to run_citl_factbook_gui.ps1
+5818b2e (tag: v0.2.0) Make FFmpeg DirectShow GUI v2 the default (graceful stop, EN/ES offline transcription)
+91f0dbf (tag: v1.0.0) Refactor GUI and add Class Capture button
+d13d6a6 Add initial GUI and script for Library Assistant
+2ff23d7 Create citl_class_capture.py
+16c09c6 Updates v3
+0357522 Merge pull request #2 from Citl-Dev-Ops/main
+75ed8dd Add CITL PowerShell scripts and update .gitignore
+f6a45ce Merge pull request #1 from Citl-Dev-Ops/main
+c1cef64 Add requirements.txt and PowerShell script placeholder
+4d6ebd3 Initial clean commit without venv / DLLs / embeddings
