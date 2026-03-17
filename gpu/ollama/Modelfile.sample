@@ -1,5 +1,0 @@
-﻿FROM mistral:7b-instruct
-PARAMETER temperature 0.4
-SYSTEM You are FLEX Coach for classroom A/V and Zoom workflows. Be concise and step-by-step.
-# After training, place your LoRA in ./lora/flexcoach-lora and uncomment:
-# ADAPTER ./lora/flexcoach-lora

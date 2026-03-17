@@ -1,0 +1,88 @@
+﻿CITL FACTBOOK UBUNTU
+Plain-Language Release Note
+Release date: March 11, 2026
+
+Who this is for
+---------------
+This note is for CITL staff and users who run the Factbook utility on Ubuntu.
+
+Short version
+-------------
+This build is easier to maintain, safer to use, and more reliable for everyday work.
+
+The main change is that Ubuntu users should now install the app to their local machine,
+run the local copy, and use the new sync utility when they need to move updates between
+devices or copies.
+
+What improved
+-------------
+1) Better day-to-day reliability
+- The app is copied from USB to ~/CITL-Factbook and runs from the Ubuntu machine itself.
+- This avoids many common USB problems such as slow reads, odd permissions behavior,
+  and inconsistent file handling.
+
+2) Safer Factbook answers
+- The Factbook question pipeline is more strict about answering only from the local offline corpus.
+- If the system cannot verify the answer well enough, it should say that clearly instead of guessing.
+- This is especially important for direct factual questions and country-to-country comparisons.
+
+3) Stronger update process
+- A cross-platform App Sync utility is now included.
+- This gives CITL a cleaner way to patch other copies of the app without manually dragging files around.
+- It is meant to reduce missed files, partial updates, and confusion between versions.
+
+4) Better support for reference materials
+- The utility is no longer limited to one narrow factbook workflow.
+- It can work with a broader set of reference-style materials and more document types.
+
+What this means for users
+-------------------------
+- The app should feel more stable on Ubuntu.
+- Direct factual answers should be more trustworthy.
+- Users may see the message "Cannot answer reliably" more often in edge cases. This is an
+  improvement, not a regression. It means the system is refusing to bluff.
+- CITL staff should have a much easier time distributing updates.
+
+How staff should use it now
+---------------------------
+For first-time setup on Ubuntu:
+1) Plug in the USB.
+2) Open Terminal in the folder that contains INSTALL_UBUNTU.sh.
+3) Run:
+
+   bash ./INSTALL_UBUNTU.sh
+
+4) After install, start the app with:
+
+   bash ~/CITL-Factbook/RUN_FACTBOOK.sh
+
+For normal daily use:
+- Run the local copy in ~/CITL-Factbook.
+- Do not treat the USB copy as the main working copy.
+
+For updates and patching:
+- Use the App Sync utility when you want to move changes between CITL copies.
+- From the installed Ubuntu copy, run:
+
+   bash ~/CITL-Factbook/RUN_APP_SYNC.sh
+
+- Or from the USB root, run:
+
+   bash ./RUN_APP_SYNC_UBUNTU.sh
+
+What users should stop doing
+----------------------------
+- Do not work directly from the USB as the normal runtime environment.
+- Do not assume a missing answer means the app is broken. In many cases it means the app
+  is correctly refusing to invent an answer it cannot verify.
+
+Important caution
+-----------------
+- Re-running INSTALL_UBUNTU.sh replaces the installed folder at ~/CITL-Factbook with the
+  current USB version. Use that when you want a fresh reinstall or a full update.
+- If the goal is just to patch another copy, the App Sync utility is usually the better tool.
+
+Bottom line
+-----------
+This March 11, 2026 Ubuntu build is a more operational version of the Factbook utility.
+It is designed to be installed locally, queried more safely, and updated more cleanly.

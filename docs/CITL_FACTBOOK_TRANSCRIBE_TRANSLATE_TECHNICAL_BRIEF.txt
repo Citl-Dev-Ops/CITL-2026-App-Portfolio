@@ -1,0 +1,96 @@
+CITL FACTBOOK + TRANSCRIBE + TRANSLATION UTILITY
+Technical Overview and Model Transparency Brief
+Version date: 2026-03-11
+
+Purpose
+This utility provides an offline-first academic assistant for:
+1) Reference Q&A (Factbook plus other reference-style corpora)
+2) Audio capture and transcription
+3) Translation and study-pair generation
+
+It is built for classroom and NGO workflows where privacy, reliability, and reproducibility matter.
+
+----------------------------------------------------------------
+1) What the utility does
+----------------------------------------------------------------
+
+A. Reference Q&A (Factbook and other reference books)
+- Ingests source text into a local structured/FTS pipeline.
+- Detects entities and canonical fields (for example: borders, population, languages, religions).
+- Uses entity-locked retrieval to avoid cross-entity contamination.
+- Returns confidence, citations/snippets, and deterministic fallback responses when needed.
+- Supports generic reference corpora through the `citl_factbook/reference_*` modules, not only CIA Factbook.
+
+B. Transcription utility
+- GUI path uses `faster-whisper` with `WhisperModel("small", device="cpu", compute_type="int8")`.
+- Additional capture scripts support `openai-whisper` with selectable model sizes.
+- Saves transcript artifacts locally (WAV/TXT and optional VTT in class-capture workflow).
+
+C. Translation utility
+- Uses `argostranslate`.
+- Language packs are downloaded once; translation runs offline after install.
+- Includes optional sentence-aligned study pairs for instructional use.
+
+----------------------------------------------------------------
+2) How LLMs help in this system
+----------------------------------------------------------------
+
+LLMs are used as controlled components, not as unconstrained truth sources:
+- Retrieval support: embeddings index local chunks for semantic lookup.
+- Answer synthesis: generate concise, classroom-ready responses from retrieved local context.
+- Fallback behavior: when generation is unavailable or context is weak, the system returns deterministic or "cannot answer reliably" responses instead of hallucinating.
+- Optional transcription summarization path in CLI tooling.
+
+----------------------------------------------------------------
+3) Model and engine map (current deployment snapshot)
+----------------------------------------------------------------
+
+As configured in this repository and local runtime on 2026-03-11:
+
+- Operational QA model (configured): `citl-custom4qw` (resolved runtime: `citl-custom4qw:latest`)
+- Base model lineage for `citl-custom4qw`: `olmo2:13b` (via Modelfile FROM)
+- Embedding model: `nomic-embed-text` / `nomic-embed-text:latest`
+- GUI transcription model: Whisper small (faster-whisper, CPU int8)
+- Translation engine: Argos Translate (offline after pack install)
+
+Installed local Ollama models include:
+- `olmo2:13b`
+- `olmo2:7b`
+- `olmo-3:7b-instruct`
+- `olmo-3:7b-think`
+- `citl-custom4qw:latest`
+- `citl-olmo-classroom:latest`
+
+Notes:
+- `citl-custom4qw:latest` is a CITL-customized model derived from AllenAI OLMo2.
+- The GUI model list prioritization includes a preference rule to surface AllenAI-tagged models when present.
+
+----------------------------------------------------------------
+4) Why AllenAI models in this program
+----------------------------------------------------------------
+
+Program rationale for preferring AllenAI/OLMo-family bases:
+- Engineering transparency: open model lineage and inspectable Modelfile-based customization.
+- Security posture: local Ollama deployment keeps inference on institutional infrastructure.
+- Governance: reproducible model provenance and easier auditability for education workflows.
+- Mission alignment: AllenAI nonprofit research orientation is compatible with education/NGO deployment values.
+
+Important precision:
+- Security outcomes depend on full system operations (host hardening, access control, patching), not model brand alone.
+- Embeddings and translation in this stack are currently provided by non-AllenAI components (`nomic-embed-text`, `argostranslate`).
+
+----------------------------------------------------------------
+5) Institutional transparency statement
+----------------------------------------------------------------
+
+For student and faculty trust, each answer workflow should expose:
+- Detected entity/entities
+- Resolved field/section
+- Source/corpus and year metadata
+- Citation snippet(s)
+- Confidence score
+- Mode used (deterministic fallback vs LLM-formatted)
+
+If those checks fail, the system should explicitly return:
+"Cannot answer reliably from the offline corpus."
+

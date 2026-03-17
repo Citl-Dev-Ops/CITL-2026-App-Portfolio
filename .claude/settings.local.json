@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add scripts/bootstrap_ubuntu.sh scripts/linux/run.sh scripts/linux/setup.sh)",
+      "Bash(git update-index --chmod=+x scripts/bootstrap_ubuntu.sh scripts/linux/run.sh scripts/linux/setup.sh)"
+    ]
+  }
+}

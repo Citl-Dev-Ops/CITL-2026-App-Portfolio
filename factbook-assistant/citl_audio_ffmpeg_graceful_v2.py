@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import time
 import shutil
@@ -118,12 +118,14 @@ def dshow_diagnostics(ffmpeg: Optional[str]) -> str:
 # Recording via sounddevice (NO FFmpeg needed)
 # ---------------------------
 class _SDRec:
-    def __init__(self, stream, wf, q: "queue.Queue[bytes]", t: threading.Thread):
+    def __init__(self, stream, wf, q: "queue.Queue[bytes]", t: threading.Thread, samplerate: int, channels: int):
         self.kind = "sounddevice"
         self.stream = stream
         self.wf = wf
         self.q = q
         self.t = t
+        self.samplerate = int(samplerate)
+        self.channels = int(channels)
 
 def _parse_sd_index(label: str) -> Optional[int]:
     m = _SD_TAG.search((label or "").strip())
@@ -133,6 +135,65 @@ def _parse_sd_index(label: str) -> Optional[int]:
         return int(m.group(1))
     except Exception:
         return None
+
+def _build_rate_candidates(requested: int, default_sr: Optional[float]) -> List[int]:
+    out: List[int] = []
+
+    def add(x) -> None:
+        try:
+            r = int(float(x))
+        except Exception:
+            return
+        if r > 0 and r not in out:
+            out.append(r)
+
+    add(requested)
+    add(default_sr)
+    for r in (48000, 44100, 32000, 24000, 22050, 16000, 11025, 8000):
+        add(r)
+    return out
+
+def _open_compatible_input_stream(sd, device_index: int, requested_sr: int, callback):
+    """
+    Open a RawInputStream using a compatible (samplerate, channels) pair.
+    Returns: (stream, chosen_samplerate, chosen_channels, attempts)
+    """
+    info = sd.query_devices(device_index, "input")
+    max_in = int(info.get("max_input_channels", 0) or 0)
+    if max_in <= 0:
+        raise RuntimeError("Selected device has no input channels.")
+
+    default_sr = info.get("default_samplerate")
+    rates = _build_rate_candidates(requested_sr, default_sr)
+    channel_candidates: List[int] = [1]
+    if max_in >= 2:
+        channel_candidates.append(2)
+
+    attempts: List[str] = []
+    last_err: Optional[Exception] = None
+
+    for ch in channel_candidates:
+        for rate in rates:
+            try:
+                sd.check_input_settings(device=device_index, samplerate=rate, channels=ch, dtype="int16")
+                stream = sd.RawInputStream(
+                    device=device_index,
+                    samplerate=rate,
+                    channels=ch,
+                    dtype="int16",
+                    callback=callback,
+                    blocksize=0,
+                )
+                return stream, int(rate), int(ch), attempts
+            except Exception as e:
+                attempts.append(f"{rate}Hz/{ch}ch -> {e}")
+                last_err = e
+                continue
+
+    msg = "No supported input format found."
+    if attempts:
+        msg += "\nTried:\n  - " + "\n  - ".join(attempts[:12])
+    raise RuntimeError(msg) from last_err
 
 def start_recording(ffmpeg: Optional[str], device_name: str, out_wav: str, samplerate: int = 16000):
     """
@@ -157,18 +218,39 @@ def start_recording(ffmpeg: Optional[str], device_name: str, out_wav: str, sampl
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     q: "queue.Queue[bytes]" = queue.Queue()
-
-    # Open WAV now so any permission/path issues happen immediately
-    wf = wave.open(str(out_path), "wb")
-    wf.setnchannels(1)
-    wf.setsampwidth(2)  # int16
-    wf.setframerate(int(samplerate))
+    active_channels = 1
 
     def callback(indata, frames, time_info, status):
         if status:
             # keep going; status is often harmless (xruns)
             pass
-        q.put(bytes(indata))
+        try:
+            if active_channels == 1:
+                q.put(bytes(indata))
+            else:
+                # Keep output WAV mono by taking the first channel.
+                mono = indata[:, 0:1]
+                q.put(mono.tobytes())
+        except Exception:
+            q.put(bytes(indata))
+
+    try:
+        stream, chosen_sr, chosen_ch, attempts = _open_compatible_input_stream(
+            sd=sd,
+            device_index=idx,
+            requested_sr=int(samplerate),
+            callback=callback,
+        )
+    except Exception as e:
+        raise RuntimeError(f"Could not open selected input device.\n\n{e}")
+
+    active_channels = int(chosen_ch)
+
+    # Open WAV once the actual capture format has been negotiated.
+    wf = wave.open(str(out_path), "wb")
+    wf.setnchannels(1)
+    wf.setsampwidth(2)  # int16
+    wf.setframerate(int(chosen_sr))
 
     def writer():
         while True:
@@ -182,16 +264,12 @@ def start_recording(ffmpeg: Optional[str], device_name: str, out_wav: str, sampl
     t.start()
 
     try:
-        stream = sd.RawInputStream(
-            device=idx,
-            samplerate=int(samplerate),
-            channels=1,
-            dtype="int16",
-            callback=callback,
-            blocksize=0,
-        )
         stream.start()
     except Exception as e:
+        try:
+            stream.close()
+        except Exception:
+            pass
         try:
             q.put(None)  # type: ignore[arg-type]
         except Exception:
@@ -202,7 +280,7 @@ def start_recording(ffmpeg: Optional[str], device_name: str, out_wav: str, sampl
             pass
         raise RuntimeError(f"Could not start recording on selected device.\n\n{e}")
 
-    return _SDRec(stream, wf, q, t)
+    return _SDRec(stream, wf, q, t, samplerate=chosen_sr, channels=chosen_ch)
 
 def stop_recording(handle) -> str:
     """
@@ -235,42 +313,23 @@ def stop_recording(handle) -> str:
 # Compatibility exports (GUI expects these names)
 # ---------------------------
 
-def audio_diagnostics(ffmpeg: str) -> str:
-    """Backwards-compatible diagnostics entrypoint.
-
-    Returns combined sounddevice + DirectShow diagnostics when available.
-    """
+def audio_diagnostics(ffmpeg: Optional[str]) -> str:
+    """Returns combined sounddevice + DirectShow diagnostics."""
     parts = []
 
     # sounddevice
     try:
-        fn = globals().get("_try_sounddevice_list")
-        if callable(fn):
-            ok, sd_text, _ = fn()  # type: ignore[misc]
-            if sd_text:
-                parts.append(sd_text)
+        _, sd_text = _try_sounddevice_list()
+        if sd_text:
+            parts.append(sd_text)
     except Exception as e:
         parts.append(f"(sounddevice diagnostics failed: {e})")
 
     # DirectShow
     try:
-        fn = globals().get("dshow_diagnostics")
-        if callable(fn):
-            parts.append(fn(ffmpeg))  # type: ignore[misc]
+        parts.append(dshow_diagnostics(ffmpeg))
     except Exception as e:
         parts.append(f"(DirectShow diagnostics failed: {e})")
 
-    out = "\\n\\n".join([p for p in parts if p]).strip()
+    out = "\n\n".join([p for p in parts if p]).strip()
     return out or "(no diagnostics)"
-
-
-
-# --- GUI compatibility export ---
-def audio_diagnostics(ffmpeg: str) -> str:
-    try:
-        fn = globals().get("dshow_diagnostics")
-        if callable(fn):
-            return fn(ffmpeg)
-    except Exception as e:
-        return f"(diagnostics failed: {e})"
-    return "(no diagnostics)"

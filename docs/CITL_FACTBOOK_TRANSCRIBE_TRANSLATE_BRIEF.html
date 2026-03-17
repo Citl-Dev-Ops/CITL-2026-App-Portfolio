@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CITL Engineering Manual</title>
+  <style>
+    :root {
+      --bg: #f3f5f8;
+      --surface: #ffffff;
+      --surface-2: #f9fafb;
+      --text: #1a1f27;
+      --muted: #4f5a6b;
+      --line: #d7dde6;
+      --brand: #8a1538;
+      --brand-2: #b1274f;
+      --accent: #324562;
+      --ok-bg: #ecf7ef;
+      --ok-line: #2f7d4f;
+      --note-bg: #edf3ff;
+      --note-line: #2f5eb9;
+      --warn-bg: #fff4e7;
+      --warn-line: #b86d00;
+      --risk-bg: #fff0f2;
+      --risk-line: #b32d49;
+      --shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1218;
+        --surface: #151b24;
+        --surface-2: #1a222d;
+        --text: #e6eaf1;
+        --muted: #b3bccb;
+        --line: #2a3443;
+        --brand: #dd537b;
+        --brand-2: #f06d93;
+        --accent: #93abdc;
+        --ok-bg: #16261f;
+        --ok-line: #64bb88;
+        --note-bg: #162237;
+        --note-line: #80a3e8;
+        --warn-bg: #2b2215;
+        --warn-line: #f0ad59;
+        --risk-bg: #2a1a20;
+        --risk-line: #ea6e8d;
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.52;
+    }
+
+    .wrap {
+      width: min(1240px, calc(100vw - 28px));
+      margin: 18px auto 28px;
+    }
+
+    .hero {
+      background: linear-gradient(130deg, var(--brand), var(--brand-2));
+      color: #fff;
+      border-radius: 14px;
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      line-height: 1.2;
+      letter-spacing: 0.2px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      font-size: 0.97rem;
+      opacity: 0.98;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 270px 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card .head {
+      padding: 11px 13px;
+      font-weight: 700;
+      color: var(--brand);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .card .body {
+      padding: 12px 13px 14px;
+    }
+
+    nav ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    nav li {
+      margin: 6px 0;
+      font-size: 0.94rem;
+    }
+
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    nav a:hover {
+      text-decoration: underline;
+    }
+
+    section {
+      margin-bottom: 14px;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 1.25rem;
+      color: var(--brand);
+    }
+
+    h3 {
+      margin: 12px 0 6px;
+      font-size: 1.02rem;
+      color: var(--accent);
+    }
+
+    p { margin: 8px 0; }
+
+    ul {
+      margin: 8px 0 8px 18px;
+      padding: 0;
+    }
+
+    li { margin: 4px 0; }
+
+    .box {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--line);
+      border-radius: 8px;
+      margin: 10px 0;
+      padding: 9px 11px;
+      background: var(--surface-2);
+    }
+
+    .box.ok { background: var(--ok-bg); border-left-color: var(--ok-line); }
+    .box.note { background: var(--note-bg); border-left-color: var(--note-line); }
+    .box.warn { background: var(--warn-bg); border-left-color: var(--warn-line); }
+    .box.risk { background: var(--risk-bg); border-left-color: var(--risk-line); }
+    .box strong { display: block; margin-bottom: 4px; }
+    .box p:last-child,
+    .box ul:last-child,
+    .box pre:last-child { margin-bottom: 0; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.91em;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      background: var(--surface-2);
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      margin: 10px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      overflow: auto;
+      background: var(--surface-2);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: auto;
+      margin: 9px 0;
+      background: var(--surface);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      padding: 9px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.93rem;
+    }
+
+    th {
+      background: var(--surface-2);
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .small {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .qa {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin: 9px 0;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .qa .q {
+      padding: 8px 10px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .qa .a {
+      padding: 9px 10px;
+    }
+
+    .footer {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.89rem;
+    }
+
+    @media print {
+      .wrap { width: 100%; margin: 0; }
+      .grid { display: block; }
+      .card { box-shadow: none; }
+      .hero { box-shadow: none; }
+      nav { display: none; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <h1>CITL Factbook + Transcribe + Translation</h1>
+      <p><strong>Engineering Technical Manual</strong> | Build snapshot: <strong>2026-03-11</strong> | Audience: Engineering, IT Security, Academic Technology, Compliance Reviewers</p>
+    </header>
+
+    <div class="grid">
+      <aside class="card">
+        <div class="head">Manual Index</div>
+        <div class="body">
+          <nav>
+            <ul>
+              <li><a href="#scope">1. Scope and Operating Model</a></li>
+              <li><a href="#architecture">2. Architecture and Data Flows</a></li>
+              <li><a href="#files">3. Important Files and Responsibilities</a></li>
+              <li><a href="#buttons">4. GUI Control and Button Reference</a></li>
+              <li><a href="#provenance">5. LLM Provenance and Governance</a></li>
+              <li><a href="#privacy">6. Privacy, SaaS Risk, and Institutional Controls</a></li>
+              <li><a href="#runbook">7. Runbook and Verification Steps</a></li>
+              <li><a href="#qa">8. Engineer Q&amp;A (Tough Questions)</a></li>
+              <li><a href="#limits">9. Known Limits and Escalation Triggers</a></li>
+            </ul>
+          </nav>
+          <div class="box note">
+            <strong>Positioning:</strong> This system is designed to keep instructional data processing on institutional infrastructure by default.
+          </div>
+          <div class="box warn">
+            <strong>Legal note:</strong> This manual is technical guidance and does not replace legal counsel review.
+          </div>
+        </div>
+      </aside>
+
+      <div>
+        <section id="scope" class="card">
+          <div class="head">1) Scope and Operating Model</div>
+          <div class="body">
+            <p>This application provides a local-first assistant for three primary workloads:</p>
+            <ul>
+              <li><strong>Reference Q&amp;A:</strong> deterministic and retrieval-augmented answers over local corpus data.</li>
+              <li><strong>Audio capture and transcription:</strong> in-app microphone capture and local speech-to-text.</li>
+              <li><strong>Translation:</strong> offline machine translation with optional study-pair generation.</li>
+            </ul>
+
+            <h3>Primary design goals</h3>
+            <ul>
+              <li>Reduce cloud exposure of classroom artifacts.</li>
+              <li>Keep outputs grounded in local corpus evidence where possible.</li>
+              <li>Support reproducible model governance (Modelfile-based customization).</li>
+              <li>Offer a practical operations surface for instructors and technical staff.</li>
+            </ul>
+
+            <h3>Non-goals</h3>
+            <ul>
+              <li>No claim of full legal compliance automation.</li>
+              <li>No guarantee of correctness without corpus coverage and quality checks.</li>
+              <li>No replacement for institutional records-retention policy and access control policy.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="architecture" class="card">
+          <div class="head">2) Architecture and Data Flows</div>
+          <div class="body">
+            <h3>High-level runtime flow</h3>
+            <pre>GUI (Tkinter)
+  -> Factbook tab asks question
+    -> factbook_assistant_gui._query_factbook(...)
+      -> citl_factbook_query.answer_question(...)
+        1) deterministic local truth path (entity-locked where available)
+        2) embedding retrieval from local index
+        3) local Ollama generation with grounding constraints
+        4) safe fallback if generation unavailable
+
+Audio tab
+  -> start_recording/stop_recording (sounddevice)
+  -> faster-whisper transcription (local CPU)
+
+Translate tab
+  -> argostranslate translate(...)
+  -> optional language-pack install
+
+Library/Models tab
+  -> corpus indexing scripts
+  -> Modelfile authoring
+  -> ollama pull/create/list lifecycle</pre>
+
+            <h3>Reference QA reliability layers</h3>
+            <ul>
+              <li><strong>Generic reference pipeline:</strong> <code>citl_factbook/reference_ingest.py</code>, <code>reference_db.py</code>, <code>reference_query.py</code>.</li>
+              <li><strong>Entity-locked answering:</strong> entity detection + canonical-field routing + constrained lookup.</li>
+              <li><strong>Fallback strategy:</strong> deterministic answer path preferred; safe refusal when reliability checks fail.</li>
+            </ul>
+
+            <div class="box ok">
+              <strong>Core reliability principle:</strong> Do not emit unconstrained high-rank chunk text as final answer when grounding cannot be verified.
+            </div>
+          </div>
+        </section>
+
+        <section id="files" class="card">
+          <div class="head">3) Important Files and Responsibilities</div>
+          <div class="body">
+            <p class="small">Paths are relative to repository root.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Primary Responsibility</th>
+                    <th>Operational Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>factbook_assistant_gui.py</code></td>
+                    <td>Root launcher wrapper that delegates to package GUI.</td>
+                    <td>Ensures <code>factbook-assistant/</code> is on <code>sys.path</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/factbook_assistant_gui.py</code></td>
+                    <td>Main desktop UI (tabs, buttons, model management, query dispatch).</td>
+                    <td>Central control-plane for most operator workflows.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook_query.py</code></td>
+                    <td>Reference-answer orchestration, embedding retrieval, Ollama generation, fallback behavior.</td>
+                    <td>Contains strict grounding safeguards and model resolution logic.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook/reference_ingest.py</code></td>
+                    <td>Generic corpus parser/ingester into entity + section structures.</td>
+                    <td>Supports configurable regex/header/canonical-field mappings.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook/reference_db.py</code></td>
+                    <td>SQLite schema + FTS operations for corpora/entities/sections.</td>
+                    <td>Contains structured lookup and entity-scoped FTS fallback.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook/reference_query.py</code></td>
+                    <td>Query planning (entity, intent, field), execution, rendering.</td>
+                    <td>Implements comparison mode and reliability outcomes.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook/reference_config.py</code></td>
+                    <td>Default parser/field config and optional JSON/YAML override load.</td>
+                    <td>Key extension point for non-Factbook reference corpora.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook/cli.py</code></td>
+                    <td>CLI entrypoint for offline reference QA.</td>
+                    <td>Uses reference pipeline first, legacy retrieval fallback second.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook/retrieve.py</code></td>
+                    <td>Legacy keyword scoring retriever over JSONL index.</td>
+                    <td>Basic fallback, not the preferred reliability path.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_factbook/ollama_client.py</code></td>
+                    <td>Simple Ollama generate client using env-configured model/host.</td>
+                    <td>Legacy/simple generation utility.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/build_corpus_index.py</code></td>
+                    <td>Builds local embedding index from file/dir sources.</td>
+                    <td>Auto-defaults <code>--src</code>/<code>--out</code> for GUI-triggered calls.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/build_factbook_index.py</code></td>
+                    <td>Factbook-specific embedding index build path.</td>
+                    <td>Triggered from Library/Models tab button.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_audio_ffmpeg_graceful_v2.py</code></td>
+                    <td>Audio device discovery, recording start/stop, diagnostics.</td>
+                    <td>Primary recording path uses <code>sounddevice</code>; FFmpeg used for diagnostics/compatibility.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_translation.py</code></td>
+                    <td>Offline translation and language-pack install wrappers.</td>
+                    <td>Built on <code>argostranslate</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_transcribe_lecture.py</code></td>
+                    <td>Lecture CLI (record, transcribe, optional summarize).</td>
+                    <td>Useful for scripted/terminal workflows.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_class_capture.py</code></td>
+                    <td>Class capture UI with recording + whisper transcription + VTT export.</td>
+                    <td>Alternate capture experience.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_modelfile.py</code></td>
+                    <td>Parses Modelfile metadata and extracts base/system fields.</td>
+                    <td>Backs GUI modelfile load/apply behavior.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_theme.py</code></td>
+                    <td>Theme palette definitions and apply helper.</td>
+                    <td>Includes accessible dark/light palette set.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/citl_app_sync.py</code></td>
+                    <td>Cross-platform repository sync utility for external/USB targets.</td>
+                    <td>Excludes large caches/models/audio by default.</td>
+                  </tr>
+                  <tr>
+                    <td><code>data/citl/config_citl-mainframe-All-Series.json</code></td>
+                    <td>Local persisted operational profile (model, host, theme, modelfile path).</td>
+                    <td>Primary provenance and runtime default source on this host.</td>
+                  </tr>
+                  <tr>
+                    <td><code>data/citl/modelfiles/Modelfile.citl-custom4qw</code></td>
+                    <td>CITL model customization profile (FROM base + SYSTEM prompt).</td>
+                    <td>Documents local custom-model behavior and constraints.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/tests/test_factbook_reliable_qa.py</code></td>
+                    <td>Reliability tests for factbook workflow (goldens + negative controls).</td>
+                    <td>Includes Iran-vs-UAE contamination regression guard.</td>
+                  </tr>
+                  <tr>
+                    <td><code>factbook-assistant/tests/test_reference_pipeline_generic.py</code></td>
+                    <td>Generic non-Factbook reference-pipeline behavior tests.</td>
+                    <td>Validates entity-locking and unknown-field fail-safe behavior.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="buttons" class="card">
+          <div class="head">4) GUI Control and Button Reference (Main Window)</div>
+          <div class="body">
+            <h3>Toolbar controls</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Control</th><th>Handler</th><th>Technical Action</th><th>State Impact</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>Load Modelfile</strong></td><td><code>on_load_modelfile()</code></td><td>Opens file picker, parses metadata/system/base, applies profile to UI, refreshes model lists, may trigger auto-graft check.</td><td>Updates config keys: model/base/theme/bot/language/system prompt.</td></tr>
+                  <tr><td><strong>USB Sync</strong></td><td><code>on_open_usb_sync()</code></td><td>Launches app sync utility window for cross-repo synchronization.</td><td>No model state change; may copy files to external target.</td></tr>
+                  <tr><td><strong>Theme dropdown</strong></td><td><code>on_theme_changed()</code></td><td>Applies palette from <code>citl_theme</code>.</td><td>Writes <code>theme</code> to config.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Factbook tab</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Control</th><th>Handler</th><th>Technical Action</th><th>Dependencies</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>Refresh Models</strong></td><td><code>on_refresh_models()</code></td><td>Fetches <code>/api/tags</code> from Ollama, merges JSON model list + saved models, de-duplicates, repopulates combos.</td><td>Ollama reachable or JSON model list fallback.</td></tr>
+                  <tr><td><strong>Load Model JSON</strong></td><td><code>on_load_model_json()</code></td><td>Loads external JSON and extracts model names recursively from common keys.</td><td>Readable JSON file.</td></tr>
+                  <tr><td><strong>Ask Factbook</strong></td><td><code>on_ask_factbook()</code></td><td>Captures question/model/host; async call to <code>_query_factbook()</code> and writes response to output pane.</td><td><code>citl_factbook_query</code>, local index files, Ollama (optional depending on deterministic path).</td></tr>
+                  <tr><td><strong>Translate Answer</strong></td><td><code>on_send_factbook_to_translate()</code></td><td>Copies Factbook output text into Translate tab source and switches tab.</td><td>None.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Audio / Transcribe tab</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Control</th><th>Handler</th><th>Technical Action</th><th>Output</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>Refresh</strong></td><td><code>refresh_devices()</code></td><td>Enumerates input devices; updates saved device selection.</td><td>Device list + status message.</td></tr>
+                  <tr><td><strong>Reset Saved</strong></td><td><code>reset_saved_device()</code></td><td>Clears persisted audio device from config and re-enumerates.</td><td>Config update.</td></tr>
+                  <tr><td><strong>Diagnostics</strong></td><td><code>on_diagnostics()</code></td><td>Prints audio diagnostics (including dshow note on Linux).</td><td>Diagnostics text pane.</td></tr>
+                  <tr><td><strong>Start Recording</strong></td><td><code>on_start()</code></td><td>Calls <code>start_recording()</code>, creates WAV in recordings directory, caches handle.</td><td>Live recording stream.</td></tr>
+                  <tr><td><strong>Stop Recording</strong></td><td><code>on_stop()</code></td><td>Stops stream, validates WAV signal metrics, logs evidence line.</td><td>Saved WAV and metrics log.</td></tr>
+                  <tr><td><strong>Open Recordings Folder</strong></td><td><code>on_open_recordings_folder()</code></td><td>Opens recordings directory via OS file manager.</td><td>Folder view.</td></tr>
+                  <tr><td><strong>Open Last WAV</strong></td><td><code>on_open_last_wav()</code></td><td>Opens latest recorded WAV in system default app.</td><td>File open.</td></tr>
+                  <tr><td><strong>Transcribe Last WAV</strong></td><td><code>on_transcribe()</code></td><td>Runs <code>_transcribe_wav()</code> using faster-whisper; writes transcript text and sidecar TXT.</td><td>Transcript in pane + <code>.txt</code> file.</td></tr>
+                  <tr><td><strong>Translate Transcript</strong></td><td><code>on_send_transcript_to_translate()</code></td><td>Copies transcript pane text into Translate tab source.</td><td>Tab switch with text seed.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Translate tab</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Control</th><th>Handler</th><th>Technical Action</th><th>Notes</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>⇄</strong></td><td><code>on_swap_languages()</code></td><td>Swaps source and target languages in UI vars.</td><td>No translation call.</td></tr>
+                  <tr><td><strong>Translate</strong></td><td><code>on_translate()</code></td><td>Runs offline translation via <code>citl_translation.translate()</code> thread.</td><td>Requires installed pair.</td></tr>
+                  <tr><td><strong>Install Pack</strong></td><td><code>on_install_lang_pack()</code></td><td>Calls Argos package index/update/install workflow.</td><td>May require internet once for package download.</td></tr>
+                  <tr><td><strong>Clear</strong></td><td><code>on_clear_translate()</code></td><td>Clears source/result/vocabulary panes.</td><td>UI reset only.</td></tr>
+                  <tr><td><strong>Live translation checkbox</strong></td><td><code>_on_tr_source_keyrelease()</code></td><td>Debounced translate call every 800ms while typing.</td><td>Optional real-time translation mode.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Library / Models tab</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Control</th><th>Handler</th><th>Technical Action</th><th>Execution Detail</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>Add Books (txt/docx/pdf)</strong></td><td><code>on_add_books()</code></td><td>Copies selected files into <code>factbook-assistant/library/</code>.</td><td>Does not auto-index; run rebuild next.</td></tr>
+                  <tr><td><strong>Rebuild Factbook Index</strong></td><td><code>on_rebuild_factbook_index()</code></td><td>Launches <code>python build_factbook_index.py</code> in background log runner.</td><td>Writes embeddings/chunks artifacts.</td></tr>
+                  <tr><td><strong>Rebuild Corpus Index</strong></td><td><code>on_rebuild_corpus_index()</code></td><td>Launches <code>python build_corpus_index.py</code>.</td><td>Generic corpus path.</td></tr>
+                  <tr><td><strong>Verify Index Health</strong></td><td><code>on_verify_index()</code></td><td>Loads common embedding JSON files and reports detected matrix shape.</td><td>Best-effort health check.</td></tr>
+                  <tr><td><strong>USB App Sync</strong></td><td><code>on_open_usb_sync()</code></td><td>Opens CITL app sync utility from this tab context.</td><td>Optional control availability.</td></tr>
+                  <tr><td><strong>Set As Operational</strong></td><td><code>on_set_operational_from_new_name()</code></td><td>Promotes new model name to active operational model.</td><td>Persists to config.</td></tr>
+                  <tr><td><strong>Browse</strong></td><td><code>on_browse_modelfile()</code></td><td>Selects modelfile path.</td><td>No write until save/create.</td></tr>
+                  <tr><td><strong>Open Folder</strong></td><td><code>on_open_modelfiles_dir()</code></td><td>Opens Modelfile directory in file manager.</td><td>Path from config/env fallback.</td></tr>
+                  <tr><td><strong>Write Modelfile</strong></td><td><code>on_write_modelfile()</code></td><td>Generates Modelfile with metadata + FROM + SYSTEM prompt.</td><td>Updates config and model selections.</td></tr>
+                  <tr><td><strong>Ollama: List</strong></td><td><code>on_ollama_list()</code></td><td>Runs <code>ollama list</code> and streams output to log pane.</td><td>Requires <code>ollama</code> in PATH.</td></tr>
+                  <tr><td><strong>Ollama: Pull FROM</strong></td><td><code>on_ollama_pull_from()</code></td><td>Runs <code>ollama pull &lt;base_model&gt;</code>.</td><td>Downloads base model artifact.</td></tr>
+                  <tr><td><strong>Ollama: Create/Update</strong></td><td><code>on_ollama_create()</code></td><td>Ensures Modelfile exists, then runs <code>ollama create &lt;name&gt; -f &lt;modelfile&gt;</code>.</td><td>Verifies model appears in <code>ollama list</code>.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="box note">
+              <strong>Coverage note:</strong> This section documents controls in the main application window and its four primary tabs.
+            </div>
+          </div>
+        </section>
+
+        <section id="provenance" class="card">
+          <div class="head">5) LLM Provenance and Governance</div>
+          <div class="body">
+            <h3>Current local model provenance snapshot (2026-03-11)</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Item</th><th>Observed Value</th><th>Evidence Path / Command</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Configured operational model</td><td><code>citl-custom4qw</code></td><td><code>data/citl/config_citl-mainframe-All-Series.json</code></td></tr>
+                  <tr><td>Resolved runtime model</td><td><code>citl-custom4qw:latest</code></td><td><code>ollama list</code></td></tr>
+                  <tr><td>Base model for custom model</td><td><code>olmo2:13b</code></td><td><code>data/citl/modelfiles/Modelfile.citl-custom4qw</code> (FROM line)</td></tr>
+                  <tr><td>Base model architecture</td><td><code>olmo2</code>, 13.7B params, Q4_K_M</td><td><code>ollama show olmo2:13b</code></td></tr>
+                  <tr><td>Base model system provenance text</td><td>"...built by the Allen Institute for AI"</td><td><code>ollama show olmo2:13b</code></td></tr>
+                  <tr><td>Custom model system prompt</td><td>CITL academic support + fact-checking rules</td><td><code>ollama show --modelfile citl-custom4qw:latest</code></td></tr>
+                  <tr><td>Embedding model</td><td><code>nomic-embed-text:latest</code></td><td><code>ollama list</code> + retrieval defaults</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Governance procedure for model changes</h3>
+            <ol>
+              <li>Update or write Modelfile via GUI (<strong>Write Modelfile</strong>).</li>
+              <li>Create model artifact via <strong>Ollama: Create/Update</strong>.</li>
+              <li>Record model hash and metadata from <code>ollama list</code> and <code>ollama show</code>.</li>
+              <li>Persist operational model selection in config profile.</li>
+              <li>Run reliability smoke tests before classroom deployment.</li>
+            </ol>
+
+            <div class="box ok">
+              <strong>Why AllenAI model bases here:</strong> transparent lineage, local deployment support, open licensing posture (Apache 2.0 in observed local model metadata), and fit for education/NGO governance requirements.
+            </div>
+          </div>
+        </section>
+
+        <section id="privacy" class="card">
+          <div class="head">6) Privacy, SaaS Risk, and Institutional Controls</div>
+          <div class="body">
+            <h3>How this architecture addresses SaaS privacy concerns</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Risk Area</th><th>Typical SaaS LLM Risk</th><th>CITL Local Mitigation</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Student text/audio exposure</td><td>Data sent to external vendor endpoints.</td><td>Inference/transcription/translation run locally by default; no mandatory cloud API in primary workflow.</td></tr>
+                  <tr><td>Vendor model training reuse</td><td>Potential use of prompts/logs for provider model improvement (policy-dependent).</td><td>Local-hosted models avoid automatic third-party training pipelines.</td></tr>
+                  <tr><td>Data brokerage / repurposing</td><td>Unclear downstream sharing controls across vendor ecosystem.</td><td>Institution controls storage and transport boundaries; no inherent broker feed in local stack.</td></tr>
+                  <tr><td>Cross-border data transfer</td><td>Opaque data residency and subprocessors.</td><td>Local deployment supports institution-controlled residency strategy.</td></tr>
+                  <tr><td>Auditing and evidence</td><td>Limited vendor transparency into model lineage and runtime details.</td><td>Modelfile + local config + local model metadata are inspectable and reproducible.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Institutional privacy ordinance alignment (technical posture)</h3>
+            <ul>
+              <li>Supports data minimization by keeping instructional processing local when configured accordingly.</li>
+              <li>Supports least-privilege operations through local account and filesystem controls.</li>
+              <li>Supports auditability through config files, model manifests, and local logs.</li>
+              <li>Supports policy-driven retention by controlling local transcript/index storage directories.</li>
+            </ul>
+
+            <div class="box warn">
+              <strong>Compliance boundary:</strong> this software can support compliance objectives (for example FERPA-style student record controls), but institutional policy, legal review, IAM controls, and endpoint security are still required.
+            </div>
+
+            <h3>Data handling boundaries to enforce operationally</h3>
+            <ul>
+              <li>Do not enable outbound LLM APIs in classroom profiles unless approved by policy.</li>
+              <li>Pin Ollama host to institution-managed local endpoint.</li>
+              <li>Limit corpus ingestion paths to approved instructional materials.</li>
+              <li>Apply retention schedules to <code>data/citl/recordings</code> and transcript outputs.</li>
+              <li>Restrict access to config and index artifacts to authorized staff.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="runbook" class="card">
+          <div class="head">7) Engineer Runbook and Verification Steps</div>
+          <div class="body">
+            <h3>Startup validation checklist</h3>
+            <pre>1. Start Ollama service
+2. Verify models:
+   ollama list
+3. Verify active profile:
+   cat data/citl/config_citl-mainframe-All-Series.json
+4. Open app and confirm model/host in Factbook tab
+5. Run smoke query and verify citations + country/entity lock behavior
+6. Run transcript test (30-60 sec audio)
+7. Run translation test with installed language pair</pre>
+
+            <div class="box note">
+              <strong>Ollama verification chain</strong>
+              Execute this sequence without skipping steps when validating a new profile rollout.
+              <pre>ollama list
+ollama show olmo2:13b
+ollama show citl-custom4qw:latest
+ollama show --modelfile citl-custom4qw:latest</pre>
+            </div>
+
+            <h3>Model provenance verification commands</h3>
+            <pre>ollama list
+ollama show olmo2:13b
+ollama show citl-custom4qw:latest
+ollama show --modelfile citl-custom4qw:latest</pre>
+
+            <h3>Regression checks before deployment</h3>
+            <pre>python -m unittest factbook-assistant/tests/test_factbook_reliable_qa.py
+python -m unittest factbook-assistant/tests/test_reference_pipeline_generic.py</pre>
+
+            <div class="box risk">
+              <strong>Release gate:</strong> if entity-locking regressions are observed (for example wrong country/entity response), block classroom release until fixed and re-tested.
+            </div>
+          </div>
+        </section>
+
+        <section id="qa" class="card">
+          <div class="head">8) Engineer Q&amp;A (Tough Questions Playbook)</div>
+          <div class="body">
+            <div class="qa">
+              <div class="q">Q1. Is this just another chatbot wrapper?</div>
+              <div class="a">No. It is a composite local system: deterministic reference query logic, local retrieval/indexing, local model lifecycle management, local transcription, and offline translation. The chatbot surface is only one component.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q2. How do we prove model provenance?</div>
+              <div class="a">Use local evidence chain: config profile (<code>ollama_model</code>), Modelfile FROM line, <code>ollama list</code> model IDs, and <code>ollama show</code> metadata. This establishes model identity, lineage, and local runtime artifact.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q3. Why AllenAI/OLMo family instead of closed SaaS models?</div>
+              <div class="a">Primary reasons are governance and controllability: inspectable model lineage, local hosting, reproducible deployment, and reduced third-party exposure of classroom artifacts.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q4. Does the app send student data to the cloud?</div>
+              <div class="a">In default local deployment, primary inference and processing paths are local. Administrators must still verify network policy, host configuration, and package-install phases (for example one-time language pack downloads).</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q5. Can vendor-side training on our prompts happen here?</div>
+              <div class="a">For local-only model execution, there is no default external provider training loop. If external APIs are introduced later, this assumption changes and requires policy review.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q6. How does this reduce data brokerage risk?</div>
+              <div class="a">By avoiding default transmission of classroom data to ad-tech or multi-tenant SaaS ecosystems, institutional data remains in governed local infrastructure unless explicitly exported.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q7. What institutional privacy frameworks does this support?</div>
+              <div class="a">It supports technical controls commonly needed for student-data governance (local processing, access control, auditability, retention controls). Formal legal compliance status must be determined by institutional counsel and policy teams.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q8. What problem does entity-locked retrieval solve?</div>
+              <div class="a">It prevents cross-entity contamination (for example returning UAE data for an Iran question). This is critical for trust in reference-book QA workflows.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q9. What happens when model generation endpoint is unavailable?</div>
+              <div class="a">The system can return deterministic/local reliability-safe results or explicit inability-to-answer messages instead of hallucinated content.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q10. Why keep the legacy retriever modules if a better pipeline exists?</div>
+              <div class="a">Legacy modules preserve backward compatibility and can act as degraded fallback paths while migration to the generic reference pipeline continues.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q11. Is transcription fully offline?</div>
+              <div class="a">Speech recognition is local in current workflows. One-time dependency/model installation may require internet during setup phases.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q12. Is translation fully offline?</div>
+              <div class="a">After language packs are installed, translation runs offline via Argos. Initial package retrieval is network-dependent.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q13. What is the strongest evidence this is not locked to one book?</div>
+              <div class="a">The <code>reference_ingest/reference_query/reference_config</code> modules are corpus-agnostic and tested with non-Factbook sample corpora in <code>test_reference_pipeline_generic.py</code>.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q14. How do we answer claims that local models are less accurate than SaaS?</div>
+              <div class="a">Accuracy is workload-specific. This system mitigates risk by deterministic extraction, citation requirements, entity-locking, and regression tests. For high-stakes use, domain eval sets and acceptance thresholds should drive deployment decisions.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q15. What if instructors accidentally ingest sensitive files?</div>
+              <div class="a">Implement ingestion policy controls: approved directories, access controls, and review workflows. The tool allows local governance; it does not enforce institution policy by itself.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q16. What if a dean asks "why this app exists"?</div>
+              <div class="a">It solves the gap between AI utility and institutional privacy obligations: local-first instructional assistance, auditable model governance, and practical teacher-facing workflows for Q&amp;A, transcription, and translation.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q17. What are the primary measurable outcomes?</div>
+              <div class="a">Reduced external data transfer for classroom artifacts, faster instructor retrieval workflows, improved transcript availability, and repeatable provenance tracking for deployed models.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q18. Can this meet all privacy requirements automatically?</div>
+              <div class="a">No. It provides a strong technical substrate, but compliance requires policy, IAM, endpoint controls, network controls, retention policy, and legal governance.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q19. How do we defend against "black box" criticism?</div>
+              <div class="a">By providing inspectable Modelfiles, local model metadata, explicit retrieval pipelines, citation outputs, deterministic fallback logic, and regression tests tied to known failure modes.</div>
+            </div>
+
+            <div class="qa">
+              <div class="q">Q20. What should trigger immediate engineering escalation?</div>
+              <div class="a">Cross-entity answer contamination, missing-citation high-confidence answers, model identity drift, unexpected outbound traffic, or failures in reliability test suite.</div>
+            </div>
+          </div>
+        </section>
+
+        <section id="limits" class="card">
+          <div class="head">9) Known Limits and Escalation Triggers</div>
+          <div class="body">
+            <h3>Known technical limits</h3>
+            <ul>
+              <li>Legacy retriever path remains keyword-based and should not be treated as high-assurance by itself.</li>
+              <li>Corpus quality and parser heuristics directly affect deterministic extraction quality.</li>
+              <li>Audio quality, device gain, and environment noise strongly affect transcription outcomes.</li>
+            </ul>
+
+            <h3>Escalate immediately when observed</h3>
+            <ul>
+              <li>Any wrong-entity answers in known deterministic question classes.</li>
+              <li>Loss of model provenance evidence (unknown model ID/lineage in deployment).</li>
+              <li>Operational profile drift across lab/classroom endpoints.</li>
+              <li>Any policy exception requiring non-local API routing for student artifacts.</li>
+            </ul>
+
+            <p class="footer">
+              Document owner: CITL Engineering. Review cadence: each model or architecture change, or at least once per academic term.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

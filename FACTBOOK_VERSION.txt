@@ -1,0 +1,3 @@
+﻿CITL FACTBOOK v2.0.1
+Baseline date: 2026-03-17
+Purpose: Shared Windows and Ubuntu content set with the same CITL sync path.

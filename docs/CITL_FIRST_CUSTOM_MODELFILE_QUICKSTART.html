@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CITL First Custom Modelfile Quickstart</title>
+  <style>
+    :root {
+      --bg: #f4f6fa;
+      --surface: #ffffff;
+      --surface-2: #f8fafd;
+      --text: #1b2230;
+      --muted: #516077;
+      --line: #d7deea;
+      --brand: #8a1538;
+      --brand-2: #b3274f;
+      --accent: #2f4f86;
+      --ok-bg: #eaf8ef;
+      --ok-line: #2f8a54;
+      --do-bg: #ecf3ff;
+      --do-line: #2f63c2;
+      --warn-bg: #fff4e6;
+      --warn-line: #c06f00;
+      --risk-bg: #fff0f3;
+      --risk-line: #c13353;
+      --shadow: 0 6px 22px rgba(17, 24, 39, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f141c;
+        --surface: #151c27;
+        --surface-2: #1a2330;
+        --text: #e7ebf4;
+        --muted: #afbad0;
+        --line: #2a3648;
+        --brand: #df5b81;
+        --brand-2: #f17499;
+        --accent: #93b3f0;
+        --ok-bg: #162920;
+        --ok-line: #67c08e;
+        --do-bg: #172641;
+        --do-line: #7ea8f1;
+        --warn-bg: #2b2316;
+        --warn-line: #f2b15d;
+        --risk-bg: #2b1a21;
+        --risk-line: #ef7594;
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.52;
+    }
+
+    .wrap {
+      width: min(1080px, calc(100vw - 28px));
+      margin: 18px auto 28px;
+    }
+
+    .hero {
+      background: linear-gradient(130deg, var(--brand), var(--brand-2));
+      border-radius: 14px;
+      color: #fff;
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 1.82rem;
+      line-height: 1.2;
+    }
+    .hero p {
+      margin: 9px 0 0;
+      font-size: 1rem;
+      opacity: 0.98;
+    }
+
+    .panel {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel .head {
+      padding: 11px 14px;
+      font-weight: 700;
+      color: var(--brand);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+    .panel .body {
+      padding: 12px 14px 14px;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 1.2rem;
+      color: var(--brand);
+    }
+    h3 {
+      margin: 10px 0 6px;
+      font-size: 1.02rem;
+      color: var(--accent);
+    }
+    p { margin: 7px 0; }
+    ul {
+      margin: 8px 0 8px 18px;
+      padding: 0;
+    }
+    li { margin: 4px 0; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 900px) {
+      .row { grid-template-columns: 1fr; }
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 11px;
+      margin: 8px 0;
+      background: var(--surface-2);
+    }
+    .box.ok { background: var(--ok-bg); border-left-color: var(--ok-line); }
+    .box.do { background: var(--do-bg); border-left-color: var(--do-line); }
+    .box.warn { background: var(--warn-bg); border-left-color: var(--warn-line); }
+    .box.risk { background: var(--risk-bg); border-left-color: var(--risk-line); }
+    .box strong { display: block; margin-bottom: 4px; }
+    .box p:last-child,
+    .box ul:last-child,
+    .box pre:last-child { margin-bottom: 0; }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    .step .step-head {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
+    }
+    .badge {
+      min-width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #fff;
+      background: var(--brand);
+    }
+    .step .step-title {
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 1.02rem;
+    }
+    .mins {
+      margin-left: auto;
+      font-size: 0.84rem;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: var(--surface);
+    }
+    .step .step-body {
+      padding: 10px 12px 12px;
+    }
+    .row > div { min-width: 0; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.91em;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      background: var(--surface-2);
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      margin: 8px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      overflow: auto;
+      background: var(--surface-2);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .checklist label {
+      display: block;
+      margin: 5px 0;
+      font-size: 0.95rem;
+    }
+    .checklist input {
+      transform: scale(1.15);
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .flow {
+      margin: 8px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px dashed var(--line);
+    }
+    .flow-step:last-child { border-bottom: none; }
+    .flow-step .num {
+      min-width: 22px;
+      font-weight: 800;
+      color: var(--brand);
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: auto;
+      margin: 8px 0;
+      background: var(--surface);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 740px;
+    }
+    th, td {
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.92rem;
+    }
+    th {
+      background: var(--surface-2);
+      font-weight: 700;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    .footer {
+      margin-top: 12px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    @media print {
+      .wrap { width: 100%; margin: 0; }
+      .panel, .step { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <h1>CITL Quickstart: First Custom Modelfile</h1>
+      <p><strong>Scan-friendly setup guide</strong> | Goal: get your first custom model running in under 20 minutes</p>
+    </header>
+
+    <section class="panel">
+      <div class="head">What You Will Finish</div>
+      <div class="body">
+        <ul>
+          <li>Create a new Modelfile with your own bot name + system prompt.</li>
+          <li>Build a local custom model in Ollama from a base model.</li>
+          <li>Set that model as operational in the CITL app.</li>
+          <li>Run one verification question to confirm it works.</li>
+        </ul>
+        <div class="box ok">
+          <strong>Success looks like:</strong> your model appears in <code>Ollama: List</code> and answers in the Factbook tab without errors.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">Ultra-Short Checklist (Do This First)</div>
+      <div class="body checklist">
+        <label><input type="checkbox"> Ollama is installed and running.</label>
+        <label><input type="checkbox"> CITL app opens to the 4-tab interface.</label>
+        <label><input type="checkbox"> You can open the <strong>Library / Models</strong> tab.</label>
+        <label><input type="checkbox"> You know which base model to use (recommended: <code>olmo2:13b</code> if available).</label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">Step-by-Step (Main Path)</div>
+      <div class="body">
+
+        <div class="step">
+          <div class="step-head">
+            <span class="badge">1</span>
+            <span class="step-title">Start Ollama and launch CITL</span>
+            <span class="mins">2 min</span>
+          </div>
+          <div class="step-body">
+            <div class="row">
+              <div>
+                <h3>Do</h3>
+                <ul>
+                  <li>Start Ollama service.</li>
+                  <li>Launch CITL via your normal launcher (for example <code>RUN_FACTBOOK.sh</code> on Ubuntu).</li>
+                </ul>
+              </div>
+              <div>
+                <h3>Expect</h3>
+                <ul>
+                  <li>App opens with tabs: Factbook, Audio / Transcribe, Translate, Library / Models.</li>
+                  <li>No immediate \"ollama not found\" error.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="box do">
+              Quick check command:
+              <pre>ollama list</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head">
+            <span class="badge">2</span>
+            <span class="step-title">Open Library / Models and choose base model</span>
+            <span class="mins">2 min</span>
+          </div>
+          <div class="step-body">
+            <ul>
+              <li>Go to <strong>Library / Models</strong> tab.</li>
+              <li>Click <strong>Refresh Models</strong> (on Factbook tab if needed).</li>
+              <li>In <strong>Base model (FROM)</strong>, pick your base (example: <code>olmo2:13b</code>).</li>
+            </ul>
+            <div class="box warn">
+              If base model is missing, click <strong>Ollama: Pull FROM</strong> before continuing.
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head">
+            <span class="badge">3</span>
+            <span class="step-title">Fill the model form correctly</span>
+            <span class="mins">3 min</span>
+          </div>
+          <div class="step-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Field</th><th>What to enter</th><th>Example</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><strong>Bot name</strong></td><td>Display label for your assistant.</td><td><code>CITL Policy Coach</code></td></tr>
+                  <tr><td><strong>CITL-COLOR</strong></td><td>Theme profile (optional, visual only).</td><td><code>soft_midnight</code></td></tr>
+                  <tr><td><strong>CITL-LANG</strong></td><td>Default language code.</td><td><code>en</code></td></tr>
+                  <tr><td><strong>Base model (FROM)</strong></td><td>The model your custom model inherits from.</td><td><code>olmo2:13b</code></td></tr>
+                  <tr><td><strong>New model name</strong></td><td>Unique local model name (no spaces recommended).</td><td><code>citl-policycoach-v1</code></td></tr>
+                  <tr><td><strong>SYSTEM prompt</strong></td><td>Behavior rules for your assistant.</td><td>See template below</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="box do">
+              Keep model names lowercase with dashes, e.g. <code>citl-xyz-v1</code>.
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head">
+            <span class="badge">4</span>
+            <span class="step-title">Write Modelfile</span>
+            <span class="mins">1 min</span>
+          </div>
+          <div class="step-body">
+            <ul>
+              <li>Click <strong>Write Modelfile</strong>.</li>
+              <li>Watch the model log panel for confirmation.</li>
+            </ul>
+            <div class="box ok">
+              Expected log lines include:
+              <pre>Wrote Modelfile: .../Modelfile.citl-policycoach-v1
+[SAVE] FROM=olmo2:13b  MODEL=citl-policycoach-v1</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head">
+            <span class="badge">5</span>
+            <span class="step-title">Create the custom model in Ollama</span>
+            <span class="mins">4-8 min</span>
+          </div>
+          <div class="step-body">
+            <ul>
+              <li>Click <strong>Ollama: Create/Update</strong>.</li>
+              <li>Wait for completion in the same log pane.</li>
+            </ul>
+            <div class="box do">
+              <strong>Ollama execution flow</strong>
+              <div class="flow">
+                <div class="flow-step"><span class="num">1</span><span>Build from your Modelfile and wait for completion.</span></div>
+                <div class="flow-step"><span class="num">2</span><span>Confirm the model appears in <code>ollama list</code>.</span></div>
+                <div class="flow-step"><span class="num">3</span><span>Verify details with <code>ollama show &lt;model&gt;:latest</code>.</span></div>
+              </div>
+              <pre>ollama create citl-policycoach-v1 -f ~/CITL_Modelfiles/Modelfile.citl-policycoach-v1
+ollama list
+ollama show citl-policycoach-v1:latest</pre>
+            </div>
+            <div class="box ok">
+              <strong>Expected log progression</strong>
+              <pre>[CREATE] model=citl-policycoach-v1  modelfile=...
+[VERIFY] Graft saved and available: citl-policycoach-v1:latest</pre>
+            </div>
+            <div class="box warn">
+              <strong>If it stalls</strong>
+              Run <strong>Ollama: List</strong> and confirm whether model appears.
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head">
+            <span class="badge">6</span>
+            <span class="step-title">Set as operational and test</span>
+            <span class="mins">2 min</span>
+          </div>
+          <div class="step-body">
+            <ul>
+              <li>Click <strong>Set As Operational</strong> (or select model in Operational model dropdown).</li>
+              <li>Go to <strong>Factbook</strong> tab.</li>
+              <li>Ask a simple question and submit <strong>Ask Factbook</strong>.</li>
+            </ul>
+            <div class="box ok">
+              Success: response returns and no \"model not installed\" error appears.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">SYSTEM Prompt Starter (Copy/Edit)</div>
+      <div class="body">
+        <pre>You are CITL Assistant, a professional academic support and fact-checking assistant.
+
+Operational rules:
+1. Use only verified information from supplied local context.
+2. If context is weak or missing, say you do not have enough verified context.
+3. Do not invent facts, names, dates, or citations.
+4. Keep answers concise and structured.
+5. Include source identifiers when available.</pre>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">Quick Troubleshooting (Fast Fixes)</div>
+      <div class="body">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Symptom</th><th>Likely Cause</th><th>Fix</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>\"ollama not found in PATH\"</td>
+                <td>Ollama CLI not available in current shell/OS path.</td>
+                <td>Install Ollama or reopen terminal/session so <code>ollama</code> is in PATH.</td>
+              </tr>
+              <tr>
+                <td>\"Base model is empty\"</td>
+                <td>No FROM model selected.</td>
+                <td>Select <strong>Base model (FROM)</strong>, then run <strong>Ollama: Pull FROM</strong>.</td>
+              </tr>
+              <tr>
+                <td>Create works but model not selectable</td>
+                <td>Model list not refreshed yet.</td>
+                <td>Click <strong>Refresh Models</strong> and then reselect model.</td>
+              </tr>
+              <tr>
+                <td>Model builds but answers look generic</td>
+                <td>SYSTEM prompt too weak or missing.</td>
+                <td>Edit SYSTEM prompt, click <strong>Write Modelfile</strong>, then <strong>Create/Update</strong>.</td>
+              </tr>
+              <tr>
+                <td>Wrong output source behavior</td>
+                <td>Old model still operational.</td>
+                <td>Set new model as operational and retry.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="box risk">
+          If answers show cross-entity contamination or no citations in reliability modes, treat as release blocker and escalate.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">Terminal Fallback (If GUI Is Unavailable)</div>
+      <div class="body">
+        <pre># 1) Pull base model (if needed)
+ollama pull olmo2:13b
+
+# 2) Create your Modelfile
+cat > ~/CITL_Modelfiles/Modelfile.citl-policycoach-v1 <<'EOF'
+FROM olmo2:13b
+SYSTEM """
+You are CITL Policy Coach...
+"""
+EOF
+
+# 3) Build custom model
+ollama create citl-policycoach-v1 -f ~/CITL_Modelfiles/Modelfile.citl-policycoach-v1
+
+# 4) Verify
+ollama list
+ollama show citl-policycoach-v1:latest</pre>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">Final 60-Second Validation</div>
+      <div class="body checklist">
+        <label><input type="checkbox"> My model appears in <code>ollama list</code>.</label>
+        <label><input type="checkbox"> I selected it as Operational model in CITL.</label>
+        <label><input type="checkbox"> Factbook tab answered one test question using this model.</label>
+        <label><input type="checkbox"> I saved the model name and base model in team notes.</label>
+      </div>
+    </section>
+
+    <p class="footer">Document owner: CITL Engineering. Recommended usage: onboarding, lab setup, and handoff to instructional technologists.</p>
+  </main>
+</body>
+</html>

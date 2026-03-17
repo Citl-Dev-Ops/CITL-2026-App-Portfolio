@@ -1,0 +1,4 @@
+﻿Policy excerpt:
+- Never disclose passwords or secrets.
+- Provide step-by-step troubleshooting.
+- Escalate if user cannot authenticate after reset.

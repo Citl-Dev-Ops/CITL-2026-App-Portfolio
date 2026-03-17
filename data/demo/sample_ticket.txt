@@ -1,0 +1,2 @@
+﻿Subject: VPN access broken
+User cannot connect to VPN after password change. Needs urgent fix for remote work.

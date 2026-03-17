@@ -1,0 +1,153 @@
+import argparse
+# --- AUTO-DEFAULT ARGS (GUI-SAFE) ---
+import sys
+from pathlib import Path as _Path
+_ROOT = _Path(__file__).resolve().parent
+_DEFAULT_SRC = str(_ROOT / "library")
+_DEFAULT_OUT = str(_ROOT / "corpus_embeddings.json")
+if "--src" not in sys.argv:
+    sys.argv += ["--src", _DEFAULT_SRC]
+if "--out" not in sys.argv:
+    sys.argv += ["--out", _DEFAULT_OUT]
+
+import json
+from pathlib import Path
+
+import numpy as np
+import requests
+from tqdm import tqdm
+
+EMBED_MODEL = "nomic-embed-text"
+EMBED_URL = "http://localhost:11434/api/embed"
+
+
+def embed(text: str) -> np.ndarray:
+    """
+    Call Ollama /api/embed and return ONE normalized embedding vector.
+    Compatible with your existing build_factbook_index.py behavior.
+    """
+    r = requests.post(EMBED_URL, json={"model": EMBED_MODEL, "input": text})
+    r.raise_for_status()
+    out = r.json()
+
+    vec = None
+    if isinstance(out, dict):
+        # Current Ollama /api/embed usually returns {"embedding": [...]}
+        vec = out.get("embedding")
+        if vec is None:
+            # But we also support {"embeddings": [[...]]}
+            embs = out.get("embeddings")
+            if isinstance(embs, list) and embs:
+                vec = embs[0]
+    else:
+        raise RuntimeError(f"Unexpected embed response type: {type(out)}: {out}")
+
+    if vec is None:
+        raise RuntimeError(f"Could not find 'embedding' in embed response: {out}")
+
+    v = np.asarray(vec, dtype=np.float32)
+    v /= (np.linalg.norm(v) + 1e-8)
+    return v
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Build embedding index for a single text file (OpenStax, dictionary, etc.)."
+    )
+    parser.add_argument(
+        "--src",
+        required=True,
+        help="Source .txt file (e.g. 'Nursing Fundamentals 2e.txt')",
+    )
+    parser.add_argument(
+        "--out",
+        required=True,
+        help="Output JSON file (e.g. 'nursing_embeddings.json')",
+    )
+    parser.add_argument(
+        "--chunk",
+        type=int,
+        default=1500,
+        help="Chunk size in characters (default: 1500)",
+    )
+    args = parser.parse_args()
+
+    src_path = Path(args.src)
+    out_path = Path(args.out)
+
+    if not src_path.exists():
+        raise FileNotFoundError(f"Source file not found: {src_path}")
+
+
+    # --- CITL DIR-SAFE SRC PATCH ---
+
+
+    if src_path.is_dir():
+
+
+        parts = []
+
+
+        for fp in sorted(src_path.rglob('*.txt')):
+
+
+            try:
+
+
+                parts.append(fp.read_text(encoding='utf-8', errors='ignore'))
+
+
+            except Exception:
+
+
+                pass
+
+
+        raw = '
+
+'.join(parts)
+
+
+    else:
+
+
+        if src_path.is_dir():
+        parts=[]
+        for fp in sorted(src_path.rglob("*.txt")):
+            try:
+                parts.append(fp.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                pass
+        raw="\n\n".join(parts)
+    else:
+        if src_path.is_dir():
+        parts=[]
+        for fp in sorted(src_path.rglob("*.txt")):
+            try:
+                parts.append(fp.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                pass
+        raw="\n\n".join(parts)
+    else:
+        raw = src_path.read_text(encoding="utf-8", errors="ignore")
+
+    chunks = []
+    for i in range(0, len(raw), args.chunk):
+        text = raw[i : i + args.chunk]
+        chunks.append({"i": len(chunks), "text": text})
+
+    print(f"Embedding {len(chunks)} chunks from {src_path.name}...")
+
+    all_vecs = []
+    for c in tqdm(chunks):
+        v = embed(c["text"])
+        all_vecs.append(v.tolist())
+
+    data = {"embeddings": all_vecs, "chunks": chunks}
+    out_path.write_text(json.dumps(data), encoding="utf-8")
+
+    print(f"Wrote embeddings for {len(chunks)} chunks to {out_path}")
+
+
+if __name__ == "__main__":
+    main()

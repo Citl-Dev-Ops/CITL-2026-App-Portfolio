@@ -1,0 +1,4 @@
+requests
+python-docx
+openpyxl
+pandas

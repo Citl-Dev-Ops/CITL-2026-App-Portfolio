@@ -1,0 +1,19 @@
+{
+  "theme": "soft_midnight",
+  "ollama_model": "citl-custom4qw",
+  "ollama_host": "http://localhost:11434",
+  "audio_device": "Blue Microphones: USB Audio (hw:1,0) [Device 3]",
+  "botname": "CITL Assistant555",
+  "model_list_json": "/home/citl-mainframe/CITL_FACTBOOK_UBUNTU/factbook-assistant/factbook_chunks.json",
+  "last_custom_model": "citl-custom4qw",
+  "saved_grafted_models": [
+    "olmo2:13b",
+    "citl-custom3",
+    "citl-custom:latest",
+    "citl-custom4",
+    "citl-custom4qw"
+  ],
+  "last_base_model": "olmo2:13b",
+  "last_modelfile_path": "/home/citl-mainframe/CITL_FACTBOOK_UBUNTU/data/citl/modelfiles/Modelfile.citl-custom4qw",
+  "last_system_prompt": "You are CITL Assistant, a professional academic support and fact-checking assistant.\n\nOperational rules:\n1. Use only verified information from the supplied local corpus/context.\n2. If the context is missing, ambiguous, or weak, say you do not have enough verified context.\n3. Do not invent facts, citations, policies, names, dates, or numbers.\n4. Keep answers concise, structured, and classroom-ready.\n5. When making factual claims, include source identifiers when available.\n\nStyle:\n- Professional, direct, and calm.\n- Prefer short paragraphs and bullet points.\n- Avoid filler language and speculation."
+}

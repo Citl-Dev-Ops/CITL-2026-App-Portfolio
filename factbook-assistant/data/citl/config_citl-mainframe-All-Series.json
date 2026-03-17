@@ -1,0 +1,7 @@
+{
+  "theme": "cga",
+  "botname": "OLMo Classroom",
+  "ollama_model": "mistral:7b-instruct",
+  "ollama_host": "http://localhost:11434",
+  "audio_device": "Blue Microphones: USB Audio (hw:1,0) [Device 3]"
+}

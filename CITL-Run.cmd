@@ -1,3 +1,4 @@
 @echo off
-cd /d "%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\Run-CITL.ps1"
+setlocal
+call "%~dp0RUN_FACTBOOK_WINDOWS.cmd" %*
+exit /b %ERRORLEVEL%

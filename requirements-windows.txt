@@ -1,0 +1,4 @@
+-r requirements-base.txt
+-r requirements-transcribe.txt
+-r requirements-translate.txt
+pywin32

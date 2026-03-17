@@ -1,0 +1,8 @@
+{
+  "host": "http://127.0.0.1:11434",
+  "embed_model": "nomic-embed-text:latest",
+  "chunks": 5498,
+  "emb_dim": 768,
+  "factbook_path": "/home/citl-mainframe/CITL/CITL_FACTBOOK_UBUNTU/factbook-assistant/factbook.txt",
+  "created": "2026-02-19T00:05:35"
+}
