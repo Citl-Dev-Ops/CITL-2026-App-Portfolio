@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 CITL LLMOps Presentation Suite  v1.1
 ======================================
@@ -27,7 +27,7 @@ try:
     import tkinter as tk
     from tkinter import ttk, messagebox
 except ImportError:
-    print("tkinter not available — install python3-tk (Ubuntu) or use bundled Python (Windows).")
+    print("tkinter not available â€” install python3-tk (Ubuntu) or use bundled Python (Windows).")
     sys.exit(1)
 
 try:
@@ -36,12 +36,12 @@ try:
 except ImportError:
     _HAS_PSUTIL = False
 
-# ── Identity ──────────────────────────────────────────────────────────────────
+# â”€â”€ Identity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 SUITE_NAME    = "CITL LLMOps Presentation Suite"
 SUITE_VERSION = "v1.1"
-SUITE_TAGLINE = "Student showcase  ·  AI career readiness  ·  Human-in-the-loop LLMOps"
+SUITE_TAGLINE = "Student showcase  Â·  AI career readiness  Â·  Human-in-the-loop LLMOps"
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# â”€â”€ Paths â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _HERE = Path(__file__).parent   # factbook-assistant/
 if getattr(sys, "frozen", False):
     # Running as a PyInstaller EXE.  Honour CITL_REPO env if set; otherwise
@@ -54,7 +54,7 @@ else:
 # Suppress console windows on Windows subprocess calls
 _NO_WIN = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
 
-# ── Colors ────────────────────────────────────────────────────────────────────
+# â”€â”€ Colors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 C: Dict[str, str] = {
     "bg":         "#140a0a",
     "panel":      "#1e0f0f",
@@ -80,9 +80,9 @@ C: Dict[str, str] = {
 
 _F = "Segoe UI" if sys.platform == "win32" else "Ubuntu"
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # Drive / path discovery
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def _windows_scan_roots() -> List[Path]:
     roots: List[Path] = []
@@ -109,7 +109,7 @@ def _windows_scan_roots() -> List[Path]:
 
 def _scan_drives(folder_hints: List[str], key_rel: str) -> Optional[Path]:
     """
-    Scan all drive letters (D–Z) for any folder whose name matches one of
+    Scan all drive letters (Dâ€“Z) for any folder whose name matches one of
     folder_hints and that contains key_rel inside it.
     Handles USB drives that may appear on different letters on different machines.
     """
@@ -191,9 +191,9 @@ def _find_ai_hub() -> Optional[Path]:
     return _scan_drives(hints, "app/hub.py")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # System / Ollama probes
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def _check_ollama(host: str = "localhost", port: int = 11434) -> dict:
     result: dict = {"running": False, "version": "", "models": []}
@@ -277,17 +277,17 @@ def _get_cpu_info() -> str:
         cores = _psutil.cpu_count(logical=False)
         threads = _psutil.cpu_count(logical=True)
         pct = _psutil.cpu_percent(interval=0.3)
-        return f"{platform.processor() or 'CPU'}  ·  {cores}c/{threads}t  ·  {pct:.0f}% load"
+        return f"{platform.processor() or 'CPU'}  Â·  {cores}c/{threads}t  Â·  {pct:.0f}% load"
     return platform.processor() or "Unknown CPU"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # Model cookbook
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 MODEL_COOKBOOK: List[dict] = [
     {
-        "tier": "Micro  (≤4 GB VRAM or CPU-only)",
+        "tier": "Micro  (â‰¤4 GB VRAM or CPU-only)",
         "color": "warn",
         "models": ["llama3.2:1b", "tinyllama:1b", "phi3:mini", "moondream2"],
         "best_for": [
@@ -298,7 +298,7 @@ MODEL_COOKBOOK: List[dict] = [
         "avoid_for": "Long document synthesis, complex reasoning, multilingual output",
     },
     {
-        "tier": "Standard  (4–8 GB VRAM)",
+        "tier": "Standard  (4â€“8 GB VRAM)",
         "color": "good",
         "models": ["llama3.2:3b", "gemma2:2b", "qwen2.5:3b", "mistral:7b-q4"],
         "best_for": [
@@ -309,20 +309,20 @@ MODEL_COOKBOOK: List[dict] = [
         "avoid_for": "Complex multi-step reasoning, very long documents",
     },
     {
-        "tier": "Research  (8–16 GB VRAM)",
+        "tier": "Research  (8â€“16 GB VRAM)",
         "color": "good",
         "models": ["llama3.1:8b", "mistral:7b", "qwen2.5:7b", "gemma2:9b",
-                   "olmo2:7b ★AllenAI", "tulu3:8b ★AllenAI"],
+                   "olmo2:7b â˜…AllenAI", "tulu3:8b â˜…AllenAI"],
         "best_for": [
             "Full Factbook research synthesis with long context",
             "Multilingual Q&A (qwen2.5 excels here)",
             "Academic Advisor degree audit reasoning",
-            "AllenAI OLMo / Tulu — open-weights, ideal for education transparency",
+            "AllenAI OLMo / Tulu â€” open-weights, ideal for education transparency",
         ],
         "avoid_for": "Real-time responses on shared GPU; use quantized (q4/q5) variants",
     },
     {
-        "tier": "Institutional / Archival  (16–24 GB VRAM)",
+        "tier": "Institutional / Archival  (16â€“24 GB VRAM)",
         "color": "accent",
         "models": ["qwen2.5:14b", "mistral:12b", "llama3.1:13b", "gemma2:27b-q4"],
         "best_for": [
@@ -331,10 +331,10 @@ MODEL_COOKBOOK: List[dict] = [
             "Long-context document comparison and synthesis",
             "Department-level AI advising systems",
         ],
-        "avoid_for": "Single-machine student demos — resource intensive",
+        "avoid_for": "Single-machine student demos â€” resource intensive",
     },
     {
-        "tier": "Multimodal Vision+Text  (any VRAM ≥6 GB)",
+        "tier": "Multimodal Vision+Text  (any VRAM â‰¥6 GB)",
         "color": "accent_hi",
         "models": ["llava:7b", "llava:13b", "llava-phi3", "gemma3", "moondream2"],
         "best_for": [
@@ -343,7 +343,7 @@ MODEL_COOKBOOK: List[dict] = [
             "Lab equipment identification and troubleshooting",
             "Slide deck and whiteboard OCR + explanation",
         ],
-        "avoid_for": "Audio/video — multimodal means image+text only (not speech)",
+        "avoid_for": "Audio/video â€” multimodal means image+text only (not speech)",
     },
     {
         "tier": "Embedding / Retrieval  (CPU-friendly)",
@@ -353,9 +353,9 @@ MODEL_COOKBOOK: List[dict] = [
             "Factbook semantic search (the RAG 'find' step)",
             "Academic Advisor document similarity",
             "Building searchable knowledge bases",
-            "NOT for generating text — for finding relevant passages",
+            "NOT for generating text â€” for finding relevant passages",
         ],
-        "avoid_for": "Direct conversation or generation — these are embeddings only",
+        "avoid_for": "Direct conversation or generation â€” these are embeddings only",
     },
 ]
 
@@ -365,7 +365,7 @@ ALLENAI_MODELS: List[dict] = [
         "full": "AllenAI OLMo 2 (7B)",
         "pull": "ollama pull olmo2:7b",
         "why": (
-            "Fully open weights — training data, code, and checkpoints all public. "
+            "Fully open weights â€” training data, code, and checkpoints all public. "
             "Ideal for education transparency: students can inspect exactly what the model learned."
         ),
     },
@@ -375,15 +375,15 @@ ALLENAI_MODELS: List[dict] = [
         "pull": "ollama pull tulu3",
         "why": (
             "Instruction-tuned on OLMo. Strong at following multi-step directions, "
-            "format compliance, and Q&A — great for advising and research workflows."
+            "format compliance, and Q&A â€” great for advising and research workflows."
         ),
     },
 ]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # App definitions
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def _build_apps() -> List[dict]:
     studio  = _find_llm_studio()
@@ -396,38 +396,38 @@ def _build_apps() -> List[dict]:
     advisor_launcher    = (advisor / "scripts" / "Run-CITLAdvisor.ps1") if advisor else None
 
     return [
-        # ── 1. Factbook ──────────────────────────────────────────────────────
+        # â”€â”€ 1. Factbook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         {
             "id": "factbook",
             "name": "Factbook",
             "author": "Abdo Mohammad",
             "tagline": "AI Study, Research, Transcription & Translation",
-            "icon": "📚",
+            "icon": "ðŸ“š",
             "description": (
                 "Factbook is a general-purpose LLM research tool for any text file or document "
                 "corpus. Students ask natural-language questions about indexed textbooks, course "
                 "materials, or custom knowledge bases, and receive synthesized, cited answers "
-                "via a local Ollama LLM — no internet required.\n\n"
-                "🎙 Transcription (citl_transcribe_lecture.py): Records live audio via "
+                "via a local Ollama LLM â€” no internet required.\n\n"
+                "ðŸŽ™ Transcription (citl_transcribe_lecture.py): Records live audio via "
                 "sounddevice, transcribes offline using Whisper (faster-whisper), then "
                 "summarizes the lecture with an Ollama LLM. Saves transcripts to Documents.\n\n"
-                "🌐 Translation (citl_translation.py): Fully offline translation via "
+                "ðŸŒ Translation (citl_translation.py): Fully offline translation via "
                 "Argos Translate. Supports 30+ language pairs (~100 MB per pair, "
                 "downloaded once). Zero cloud dependency.\n\n"
-                "🔊 Text-to-Speech (citl_tts.py): Reads text aloud via pyttsx3 — "
+                "ðŸ”Š Text-to-Speech (citl_tts.py): Reads text aloud via pyttsx3 â€” "
                 "no internet, no API key, adjustable rate and volume.\n\n"
-                "♿ Accessibility Impact: Transcription + Translation + TTS together make "
+                "â™¿ Accessibility Impact: Transcription + Translation + TTS together make "
                 "classroom content accessible to students with hearing impairments, language "
-                "barriers, or reading difficulties — fully on-premises, FERPA-compliant."
+                "barriers, or reading difficulties â€” fully on-premises, FERPA-compliant."
             ),
             "llm_tech": [
                 ("Models",        "llama3.2, gemma3, mistral (user-configurable)"),
-                ("Provider",      "Ollama — 100% local, zero cloud dependency"),
+                ("Provider",      "Ollama â€” 100% local, zero cloud dependency"),
                 ("Architecture",  "Hybrid RAG: JSONL keyword index + Ollama embeddings"),
-                ("Pipeline",      "Index → Retrieve (kw+embed) → Merge → Synthesize → Cite"),
-                ("Transcription", "Whisper (faster-whisper) — runs CPU or GPU, fully offline"),
-                ("Translation",   "Argos Translate — offline neural MT, 30+ language pairs"),
-                ("TTS",           "pyttsx3 — system TTS engine, no API needed"),
+                ("Pipeline",      "Index â†’ Retrieve (kw+embed) â†’ Merge â†’ Synthesize â†’ Cite"),
+                ("Transcription", "Whisper (faster-whisper) â€” runs CPU or GPU, fully offline"),
+                ("Translation",   "Argos Translate â€” offline neural MT, 30+ language pairs"),
+                ("TTS",           "pyttsx3 â€” system TTS engine, no API needed"),
                 ("Embeddings",    "nomic-embed-text via Ollama /api/embed"),
             ],
             "career_skills": [
@@ -441,7 +441,7 @@ def _build_apps() -> List[dict]:
                 "Cross-platform Python GUI development (tkinter/ttk)",
                 "Human-in-the-loop answer validation workflows",
             ],
-            "tech_stack": "Python 3.11  ·  Ollama  ·  Whisper  ·  Argos Translate  ·  pyttsx3  ·  SQLite",
+            "tech_stack": "Python 3.11  Â·  Ollama  Â·  Whisper  Â·  Argos Translate  Â·  pyttsx3  Â·  SQLite",
             "repo_path":    REPO,
             "launcher_win": REPO / "RUN_FACTBOOK_WINDOWS.cmd",
             "launcher_nix": REPO / "RUN_FACTBOOK.sh",
@@ -450,34 +450,34 @@ def _build_apps() -> List[dict]:
             "github_url":   "https://github.com/Citl-Dev-Ops/CITL---Desktop-LLM-EZ-Install-Kits",
         },
 
-        # ── 2. LLM Studio Kit ─────────────────────────────────────────────────
+        # â”€â”€ 2. LLM Studio Kit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         {
             "id": "llm_studio",
             "name": "LLM Studio Kit",
             "author": "Abdo Mohamed, Wahaj al Obid, Mason Jones",
             "tagline": "Offline LLM Teaching Studio with Model Cookbook",
-            "icon": "🤖",
+            "icon": "ðŸ¤–",
             "description": (
                 "CITL LLM Studio Kit is a Windows offline teaching environment that combines "
                 "local LLM chat via Ollama, RAG over instructor documents, classroom audio "
-                "transcription, and career-focused prompt templates — all in a dark-mode "
+                "transcription, and career-focused prompt templates â€” all in a dark-mode "
                 "Tkinter GUI.\n\n"
                 "Key capabilities:\n"
-                "• Local Ollama chat with automatic health check and startup\n"
-                "• RAG over .txt documents provided by the instructor\n"
-                "• Classroom audio capture + offline Whisper transcription\n"
-                "• Career prompt templates: IT Analyst, LLMOps Automation, "
+                "â€¢ Local Ollama chat with automatic health check and startup\n"
+                "â€¢ RAG over .txt documents provided by the instructor\n"
+                "â€¢ Classroom audio capture + offline Whisper transcription\n"
+                "â€¢ Career prompt templates: IT Analyst, LLMOps Automation, "
                 "Education Designer, and more\n"
-                "• JSON blueprint exporter for custom LLM utility interfaces\n"
-                "• Privacy-preserving audit trail and room-review workflow\n"
-                "• Portable bundle export for student-made utilities\n\n"
-                f"Detected at: {studio or '(not found — insert USB with CITL-LLM-Studio-Kit)'}"
+                "â€¢ JSON blueprint exporter for custom LLM utility interfaces\n"
+                "â€¢ Privacy-preserving audit trail and room-review workflow\n"
+                "â€¢ Portable bundle export for student-made utilities\n\n"
+                f"Detected at: {studio or '(not found â€” insert USB with CITL-LLM-Studio-Kit)'}"
             ),
             "llm_tech": [
                 ("Models",        "Any Ollama model (catalog includes AllenAI OLMo, Tulu, Mistral, Qwen, Llama)"),
-                ("Provider",      "Ollama local API — automatic health check + service startup"),
+                ("Provider",      "Ollama local API â€” automatic health check + service startup"),
                 ("RAG",           "Document retrieval over instructor .txt files"),
-                ("Transcription", "Classroom audio → Whisper offline ASR → LLM summary"),
+                ("Transcription", "Classroom audio â†’ Whisper offline ASR â†’ LLM summary"),
                 ("Templates",     "6 career templates, 3 deployment templates (Docker/K8s/LLMOps)"),
                 ("Audit",         "Privacy-preserving room-review + timestamped session compiler"),
                 ("Export",        "Portable bundles to %APPDATA%\\CITL\\llm_studio\\bundles"),
@@ -492,7 +492,7 @@ def _build_apps() -> List[dict]:
                 "AI audit trail and compliance documentation",
                 "Portable AI utility development and distribution",
             ],
-            "tech_stack": "Python 3.11  ·  tkinter  ·  Ollama  ·  Whisper  ·  PowerShell",
+            "tech_stack": "Python 3.11  Â·  tkinter  Â·  Ollama  Â·  Whisper  Â·  PowerShell",
             "repo_path":    studio,
             "launcher_win": studio_launcher_win,
             "launcher_nix": None,
@@ -502,13 +502,13 @@ def _build_apps() -> List[dict]:
             "github_url":   None,
         },
 
-        # ── 3. AI Training Hub ────────────────────────────────────────────────
+        # â”€â”€ 3. AI Training Hub â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         {
             "id": "ai_hub",
             "name": "AI Training Hub",
             "author": "CITL Dev Ops",
             "tagline": "Streamlit-Based Bot Builder & LLM Sandbox",
-            "icon": "🧠",
+            "icon": "ðŸ§ ",
             "description": (
                 "The CITL AI Training Hub is a full Streamlit dashboard for building, "
                 "testing, and deploying custom AI bots. It bundles LangChain, LangGraph, "
@@ -516,20 +516,20 @@ def _build_apps() -> List[dict]:
                 "multi-agent pipelines and export them as portable utilities.\n\n"
                 "Launch opens a browser tab at http://localhost:8502 automatically.\n\n"
                 "Key capabilities:\n"
-                "• Bot builder with schema editor and runtime testing\n"
-                "• RAG engine with ChromaDB vector store\n"
-                "• Multi-agent orchestration (CrewAI, LangGraph, AutoGen)\n"
-                "• Deployment demo CLI (Docker, cloud, local)\n"
-                "• Approved model registry with safety guidelines\n"
-                "• Export engine for student-built utilities\n\n"
+                "â€¢ Bot builder with schema editor and runtime testing\n"
+                "â€¢ RAG engine with ChromaDB vector store\n"
+                "â€¢ Multi-agent orchestration (CrewAI, LangGraph, AutoGen)\n"
+                "â€¢ Deployment demo CLI (Docker, cloud, local)\n"
+                "â€¢ Approved model registry with safety guidelines\n"
+                "â€¢ Export engine for student-built utilities\n\n"
                 f"Detected at: {hub or '(not found on this machine)'}"
             ),
             "llm_tech": [
-                ("Framework",     "Streamlit web dashboard — browser UI, no frontend build step"),
-                ("Orchestration", "LangChain, LangGraph, CrewAI, AutoGen — multi-agent pipelines"),
+                ("Framework",     "Streamlit web dashboard â€” browser UI, no frontend build step"),
+                ("Orchestration", "LangChain, LangGraph, CrewAI, AutoGen â€” multi-agent pipelines"),
                 ("Vector store",  "ChromaDB with sentence-transformers embeddings"),
-                ("Models",        "Configurable via approved_models.json — Ollama, OpenAI, Anthropic"),
-                ("RAG",           "rag_engine.py — PDF/text ingestion + ChromaDB retrieval"),
+                ("Models",        "Configurable via approved_models.json â€” Ollama, OpenAI, Anthropic"),
+                ("RAG",           "rag_engine.py â€” PDF/text ingestion + ChromaDB retrieval"),
                 ("Deployment",    "Deployment demo CLI covering Docker Compose and cloud endpoints"),
                 ("Port",          "localhost:8502 (configurable via AI_TRAINING_HUB_PORT)"),
             ],
@@ -543,7 +543,7 @@ def _build_apps() -> List[dict]:
                 "Docker Compose AI service deployment",
                 "RAG pipeline with PDF document ingestion",
             ],
-            "tech_stack": "Python 3.11  ·  Streamlit  ·  LangChain  ·  ChromaDB  ·  CrewAI  ·  FastAPI",
+            "tech_stack": "Python 3.11  Â·  Streamlit  Â·  LangChain  Â·  ChromaDB  Â·  CrewAI  Â·  FastAPI",
             "repo_path":    hub,
             "launcher_win": hub_exe or hub_launcher_win,
             "launcher_nix": (hub / "hub_launcher.py") if hub else None,
@@ -552,31 +552,31 @@ def _build_apps() -> List[dict]:
             "github_url":   None,
         },
 
-        # ── 4. Academic Advisor — LAST (in progress) ──────────────────────────
+        # â”€â”€ 4. Academic Advisor â€” LAST (in progress) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         {
             "id": "academic_advisor",
             "name": "Academic Advisor",
             "author": "Wahaj Al Obid",
             "tagline": "AI Degree Audit & Student Advising  [Coming Soon]",
-            "icon": "🎓",
+            "icon": "ðŸŽ“",
             "description": (
                 "The CITL Academic Advisor is a full-stack AI advising assistant. It parses "
                 "CTCLink/SBCTC class schedule data, audits student transcripts against degree "
-                "requirements, and answers natural-language advising questions — all with Ollama "
+                "requirements, and answers natural-language advising questions â€” all with Ollama "
                 "running locally so no student data leaves the institution.\n\n"
                 "Students interact via a React 19/Vite web UI; the FastAPI backend handles "
                 "document parsing, schedule indexing, and LLM orchestration. "
                 "Human-in-the-loop confirmation gates every audit result.\n\n"
-                "⚠ This app is actively being developed. It will sync automatically from "
-                "whichever copy of the repo is found — either the local C: installation or "
+                "âš  This app is actively being developed. It will sync automatically from "
+                "whichever copy of the repo is found â€” either the local C: installation or "
                 "a USB drive with the repo. Drive letters are detected automatically.\n\n"
-                f"Currently detected at: {advisor or '(not found — check USB or local install)'}"
+                f"Currently detected at: {advisor or '(not found â€” check USB or local install)'}"
             ),
             "llm_tech": [
                 ("Models",       "qwen2.5:7b (primary), Modelfile-configurable"),
-                ("Provider",     "Ollama — fully local, on-premises"),
+                ("Provider",     "Ollama â€” fully local, on-premises"),
                 ("Architecture", "Structured document RAG + CTCLink schedule indexing"),
-                ("Pipeline",     "PDF/JSON parse → SQLite index → LLM query → React UI"),
+                ("Pipeline",     "PDF/JSON parse â†’ SQLite index â†’ LLM query â†’ React UI"),
                 ("Context",      "Multi-turn advising conversation"),
                 ("API layer",    "FastAPI REST + React 19/Vite frontend"),
             ],
@@ -589,7 +589,7 @@ def _build_apps() -> List[dict]:
                 "SQLite + JSON data pipeline construction",
                 "Vite build tooling and production deployment",
             ],
-            "tech_stack": "Python 3.11  ·  FastAPI  ·  React 19  ·  TypeScript  ·  Vite  ·  Ollama  ·  SQLite",
+            "tech_stack": "Python 3.11  Â·  FastAPI  Â·  React 19  Â·  TypeScript  Â·  Vite  Â·  Ollama  Â·  SQLite",
             "repo_path":    advisor,
             "launcher_win": advisor_launcher,
             "launcher_nix": None,
@@ -598,36 +598,36 @@ def _build_apps() -> List[dict]:
             "github_url":   "https://github.com/Citl-Dev-Ops/rtc-academic-advisor",
         },
 
-        # ── 6. Screen Recorder ──────────────────────────────────────────────
+        # â”€â”€ 6. Screen Recorder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         {
             "id": "screen_recorder",
             "name": "CITL Screen Recorder",
             "author": "Abdo Mohammad",
             "tagline": "Window-capture demo recorder for CITL apps",
-            "icon": "⏺",
+            "icon": "âº",
             "description": (
                 "GNU/LGPL-licensed screen capture tool for recording demonstration "
                 "videos of any CITL application window.\n\n"
-                "Built on FFmpeg (LGPL 2.1) — captures only the target CITL app "
+                "Built on FFmpeg (LGPL 2.1) â€” captures only the target CITL app "
                 "window, never the full desktop.\n\n"
                 "Export formats:\n"
-                "  • MP4 (H.264/AAC)  — universal, best for LMS / presentations\n"
-                "  • WebM (VP9/Opus)  — open standard, excellent quality\n"
-                "  • MKV (H.264/AAC)  — best archive container\n"
-                "  • AVI (HuffYUV)    — lossless, edit-ready master\n"
-                "  • MOV (H.264)      — Apple / Keynote compatible\n"
-                "  • GIF (animated)   — silent short loops for documentation\n\n"
+                "  â€¢ MP4 (H.264/AAC)  â€” universal, best for LMS / presentations\n"
+                "  â€¢ WebM (VP9/Opus)  â€” open standard, excellent quality\n"
+                "  â€¢ MKV (H.264/AAC)  â€” best archive container\n"
+                "  â€¢ AVI (HuffYUV)    â€” lossless, edit-ready master\n"
+                "  â€¢ MOV (H.264)      â€” Apple / Keynote compatible\n"
+                "  â€¢ GIF (animated)   â€” silent short loops for documentation\n\n"
                 "Features:\n"
-                "  • Launch any CITL app and begin recording in one click\n"
-                "  • Enumerate open CITL windows automatically\n"
-                "  • Optional DirectShow audio capture (microphone or loopback)\n"
-                "  • GIF converter from any existing recording\n"
-                "  • Headless PS1 script for automated recording pipelines\n\n"
-                "FFmpeg license: LGPL 2.1  —  https://ffmpeg.org/legal.html"
+                "  â€¢ Launch any CITL app and begin recording in one click\n"
+                "  â€¢ Enumerate open CITL windows automatically\n"
+                "  â€¢ Optional DirectShow audio capture (microphone or loopback)\n"
+                "  â€¢ GIF converter from any existing recording\n"
+                "  â€¢ Headless PS1 script for automated recording pipelines\n\n"
+                "FFmpeg license: LGPL 2.1  â€”  https://ffmpeg.org/legal.html"
             ),
             "llm_tech": [
                 ("Tool",    "FFmpeg  (LGPL 2.1)"),
-                ("Capture", "gdigrab — Windows GDI screen capture, window-specific"),
+                ("Capture", "gdigrab â€” Windows GDI screen capture, window-specific"),
                 ("Video",   "libx264, libvpx-vp9, huffyuv, gif"),
                 ("Audio",   "AAC, Opus, PCM via DirectShow"),
                 ("Control", "Python subprocess + tkinter GUI"),
@@ -639,7 +639,7 @@ def _build_apps() -> List[dict]:
                 "Lossless-to-lossy export pipelines",
                 "Windows GDI screen-capture integration",
             ],
-            "tech_stack": "Python 3.11  ·  FFmpeg (LGPL)  ·  gdigrab  ·  tkinter",
+            "tech_stack": "Python 3.11  Â·  FFmpeg (LGPL)  Â·  gdigrab  Â·  tkinter",
             "repo_path":    REPO,
             "launcher_win": REPO / "factbook-assistant" / "citl_screen_recorder.py",
             "launcher_nix": REPO / "factbook-assistant" / "citl_screen_recorder.py",
@@ -648,36 +648,36 @@ def _build_apps() -> List[dict]:
             "github_url":   "",
         },
 
-        # ── 7. Document Composer ─────────────────────────────────────────────
+        # â”€â”€ 7. Document Composer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         {
             "id": "doc_composer",
             "name": "CITL Doc Composer",
             "author": "Abdo Mohammad",
             "tagline": "AI-powered technical manual and tutorial generator",
-            "icon": "📄",
+            "icon": "ðŸ“„",
             "description": (
-                "Generates professionally styled CITL technical documents — manuals, "
+                "Generates professionally styled CITL technical documents â€” manuals, "
                 "walkthroughs, tutorials, quick-reference cards, and installation guides.\n\n"
                 "Uses the most powerful Ollama model installed on the device (ranked by "
                 "parameter count and blob size) to fill every document section from a "
                 "single topic prompt.\n\n"
                 "Typography:\n"
-                "  • Body:     Berthold Baskerville  (from CITL reader-pack)\n"
-                "  • Headings: Cheltenham Bold\n"
-                "  • Captions: Franklin Gothic Book\n"
-                "  • Fallback: Georgia (if pack fonts not installed)\n\n"
+                "  â€¢ Body:     Berthold Baskerville  (from CITL reader-pack)\n"
+                "  â€¢ Headings: Cheltenham Bold\n"
+                "  â€¢ Captions: Franklin Gothic Book\n"
+                "  â€¢ Fallback: Georgia (if pack fonts not installed)\n\n"
                 "Colors: CITL red-orange (#CC3300) + slate (#334D6E)\n\n"
                 "Export: Fully styled .docx with cover page, section headings, "
                 "red-orange rule bars, callout boxes (TIP / NOTE / WARNING), "
                 "numbered step lists, header, and footer.\n\n"
-                "Templates: Technical Manual · App Walkthrough · Training Tutorial · "
-                "Quick Reference Card · Installation Guide"
+                "Templates: Technical Manual Â· App Walkthrough Â· Training Tutorial Â· "
+                "Quick Reference Card Â· Installation Guide"
             ),
             "llm_tech": [
                 ("Model",    "Best Ollama model auto-detected by param count + blob size"),
-                ("API",      "Ollama /api/generate  —  streaming, local, zero cloud"),
+                ("API",      "Ollama /api/generate  â€”  streaming, local, zero cloud"),
                 ("Prompts",  "Per-section professional technical writing prompts"),
-                ("Output",   "python-docx  —  fully styled .docx"),
+                ("Output",   "python-docx  â€”  fully styled .docx"),
                 ("Fonts",    "Berthold Baskerville + Cheltenham + Franklin Gothic"),
             ],
             "career_skills": [
@@ -687,7 +687,7 @@ def _build_apps() -> List[dict]:
                 "CITL brand identity application in print",
                 "Prompt engineering for structured long-form output",
             ],
-            "tech_stack": "Python 3.11  ·  Ollama  ·  python-docx  ·  tkinter",
+            "tech_stack": "Python 3.11  Â·  Ollama  Â·  python-docx  Â·  tkinter",
             "repo_path":    REPO,
             "launcher_win": REPO / "factbook-assistant" / "citl_doc_composer.py",
             "launcher_nix": REPO / "factbook-assistant" / "citl_doc_composer.py",
@@ -698,9 +698,9 @@ def _build_apps() -> List[dict]:
     ]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # GUI
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class LLMOpsSuite:
     def __init__(self, root: tk.Tk):
@@ -709,7 +709,7 @@ class LLMOpsSuite:
         self._selected: int = 0        # -1 = system panel
         self._btn_widgets: List[tk.Button] = []
         self._sys_btn: Optional[tk.Button] = None
-        self._auto_var   = tk.StringVar(value="● watching")
+        self._auto_var   = tk.StringVar(value="â— watching")
         self._status_var = tk.StringVar(value="Ready.")
         self._watcher_mtime: Dict[str, float] = {}
 
@@ -743,7 +743,7 @@ class LLMOpsSuite:
         self._select_app(0)
         self.root.after(3000, self._start_watcher)
 
-    # ── ttk Style ─────────────────────────────────────────────────────────────
+    # â”€â”€ ttk Style â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _ttk_style(self):
         s = ttk.Style()
         try:
@@ -765,7 +765,7 @@ class LLMOpsSuite:
         except tk.TclError:
             pass
 
-    # ── Header ────────────────────────────────────────────────────────────────
+    # â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _build_header(self):
         hdr = tk.Frame(self.root, bg=C["panel"])
         hdr.grid(row=0, column=0, sticky="ew")
@@ -785,7 +785,7 @@ class LLMOpsSuite:
         tk.Label(right, textvariable=self._auto_var, font=(_F, 9),
                  bg=C["panel"], fg=C["faint"]).pack(anchor="e")
 
-    # ── Selector Bar ──────────────────────────────────────────────────────────
+    # â”€â”€ Selector Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _build_selector(self):
         bar = tk.Frame(self.root, bg=C["panel_alt"], padx=14, pady=10)
         bar.grid(row=1, column=0, sticky="ew")
@@ -807,7 +807,7 @@ class LLMOpsSuite:
                                                      padx=(14, 8), pady=2)
         # System & Models button
         self._sys_btn = tk.Button(bar,
-            text="  ⚙  System & Models  ",
+            text="  âš™  System & Models  ",
             font=(_F, 11, "bold"),
             bg=C["btn"], fg=C["muted"],
             activebackground=C["btn_hi"], activeforeground=C["text"],
@@ -816,7 +816,7 @@ class LLMOpsSuite:
         self._sys_btn.pack(side="left", padx=3)
         tk.Frame(self.root, bg=C["border"], height=1).grid(row=1, column=0, sticky="sew")
 
-    # ── Body ──────────────────────────────────────────────────────────────────
+    # â”€â”€ Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _build_body(self):
         body = tk.Frame(self.root, bg=C["bg"])
         body.grid(row=2, column=0, sticky="nsew")
@@ -834,14 +834,14 @@ class LLMOpsSuite:
         self._detail_frame.rowconfigure(0, weight=1)
         self._detail_frame.columnconfigure(0, weight=1)
 
-    # ── Status Bar ────────────────────────────────────────────────────────────
+    # â”€â”€ Status Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _build_statusbar(self):
         bar = tk.Frame(self.root, bg=C["panel"], padx=16, pady=5)
         bar.grid(row=3, column=0, sticky="ew")
         tk.Frame(bar, bg=C["border"], height=1).pack(side="top", fill="x", pady=(0, 4))
         tk.Label(bar, textvariable=self._status_var, font=(_F, 9),
                  bg=C["panel"], fg=C["muted"], anchor="w").pack(side="left", fill="x", expand=True)
-        tk.Button(bar, text="⟳  Refresh", font=(_F, 9),
+        tk.Button(bar, text="âŸ³  Refresh", font=(_F, 9),
                   bg=C["btn"], fg=C["muted"],
                   activebackground=C["btn_hi"], activeforeground=C["text"],
                   relief="flat", cursor="hand2", padx=8, pady=2,
@@ -849,7 +849,7 @@ class LLMOpsSuite:
                       target=self._refresh_status, daemon=True).start()
                   ).pack(side="right", padx=4)
 
-    # ── Selection ─────────────────────────────────────────────────────────────
+    # â”€â”€ Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _select_app(self, idx: int):
         self._selected = idx
         for i, btn in enumerate(self._btn_widgets):
@@ -867,9 +867,9 @@ class LLMOpsSuite:
         self._render_system_card()
         self._render_system_detail()
 
-    # ═══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # App Card + Detail
-    # ═══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     def _render_card(self, app: dict):
         for w in self._card_frame.winfo_children():
@@ -894,7 +894,7 @@ class LLMOpsSuite:
         badge = tk.Frame(inner, bg=C["tag"], padx=8, pady=4)
         badge.pack(anchor="w", pady=(0, 4))
         tk.Label(badge,
-                 text="✓  Installed" if installed else "✗  Not Found",
+                 text="âœ“  Installed" if installed else "âœ—  Not Found",
                  font=(_F, 10, "bold"),
                  bg=C["tag"], fg=C["good"] if installed else C["danger"]
                  ).pack()
@@ -919,9 +919,9 @@ class LLMOpsSuite:
                           command=cmd)
             b.pack(fill="x", pady=2)
 
-        _btn("▶  Launch App",          C["btn_accent"],  lambda: self._launch(app),         installed)
-        _btn("↻  Install / Update",     C["btn"],          lambda: self._install_update(app))
-        _btn("📂  Open Folder",          C["btn"],          lambda: self._open_folder(app),    bool(app.get("repo_path")))
+        _btn("â–¶  Launch App",          C["btn_accent"],  lambda: self._launch(app),         installed)
+        _btn("â†»  Install / Update",     C["btn"],          lambda: self._install_update(app))
+        _btn("ðŸ“‚  Open Folder",          C["btn"],          lambda: self._open_folder(app),    bool(app.get("repo_path")))
 
     def _render_detail(self, app: dict):
         for w in self._detail_frame.winfo_children():
@@ -935,9 +935,9 @@ class LLMOpsSuite:
         self._tab_llm(t2, app)
         self._tab_career(t3, app)
 
-    # ═══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # System / Ollama Panel
-    # ═══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     def _render_system_card(self):
         for w in self._card_frame.winfo_children():
@@ -947,14 +947,14 @@ class LLMOpsSuite:
         inner = tk.Frame(f, bg=C["panel"], padx=18, pady=18)
         inner.pack(fill="both", expand=True)
 
-        tk.Label(inner, text="⚙", font=(_F, 30), bg=C["panel"], fg=C["accent"]).pack(anchor="w")
+        tk.Label(inner, text="âš™", font=(_F, 30), bg=C["panel"], fg=C["accent"]).pack(anchor="w")
         tk.Label(inner, text="System & Models", font=(_F, 15, "bold"),
                  bg=C["panel"], fg=C["text"]).pack(anchor="w")
-        tk.Label(inner, text="GPU · RAM · CPU · Ollama status",
+        tk.Label(inner, text="GPU Â· RAM Â· CPU Â· Ollama status",
                  font=(_F, 9), bg=C["panel"], fg=C["muted"]).pack(anchor="w", pady=(0, 10))
         tk.Frame(inner, bg=C["border"], height=1).pack(fill="x", pady=(0, 12))
 
-        self._sys_labels: Dict[str, tk.StringVar] = {k: tk.StringVar(value="…") for k in
+        self._sys_labels: Dict[str, tk.StringVar] = {k: tk.StringVar(value="â€¦") for k in
                                                        ["gpu", "vram", "ram", "cpu", "ollama", "models"]}
 
         rows = [
@@ -975,7 +975,7 @@ class LLMOpsSuite:
                      anchor="w").pack(side="left")
 
         tk.Frame(inner, bg=C["border"], height=1).pack(fill="x", pady=10)
-        tk.Button(inner, text="⟳  Refresh System Info", font=(_F, 10, "bold"),
+        tk.Button(inner, text="âŸ³  Refresh System Info", font=(_F, 10, "bold"),
                   bg=C["btn"], fg=C["text"],
                   activebackground=C["btn_hi"], activeforeground=C["text"],
                   relief="flat", cursor="hand2", pady=7,
@@ -999,9 +999,9 @@ class LLMOpsSuite:
             self._sys_labels["ram"].set(f"{ram:.1f} GB" if ram else "Unknown")
             self._sys_labels["cpu"].set(cpu)
             if ollama["running"]:
-                self._sys_labels["ollama"].set(f"● Running  v{ollama['version']}")
+                self._sys_labels["ollama"].set(f"â— Running  v{ollama['version']}")
             else:
-                self._sys_labels["ollama"].set("○ Not running")
+                self._sys_labels["ollama"].set("â—‹ Not running")
             if ollama["models"]:
                 self._sys_labels["models"].set("\n".join(ollama["models"][:8]))
             else:
@@ -1026,12 +1026,12 @@ class LLMOpsSuite:
         _, inner = self._scrollable(frame)
         p = tk.Frame(inner, bg=C["notebk"], padx=28, pady=22)
         p.pack(fill="both", expand=True)
-        tk.Label(p, text="Model Cookbook — Which Model for Which Purpose?",
+        tk.Label(p, text="Model Cookbook â€” Which Model for Which Purpose?",
                  font=(_F, 14, "bold"), bg=C["notebk"], fg=C["accent"]
                  ).pack(anchor="w", pady=(0, 4))
         tk.Label(p,
                  text="Choose based on your available VRAM. When in doubt, start with the "
-                      "8 GB tier — it covers most CITL use cases.",
+                      "8 GB tier â€” it covers most CITL use cases.",
                  font=(_F, 10), bg=C["notebk"], fg=C["muted"],
                  wraplength=740, justify="left").pack(anchor="w", pady=(0, 16))
 
@@ -1053,7 +1053,7 @@ class LLMOpsSuite:
             for s in tier["best_for"]:
                 row = tk.Frame(card, bg=C["card"])
                 row.pack(anchor="w")
-                tk.Label(row, text="◆", font=(_F, 9), bg=C["card"], fg=C["accent"]
+                tk.Label(row, text="â—†", font=(_F, 9), bg=C["card"], fg=C["accent"]
                          ).pack(side="left", padx=(0, 6))
                 tk.Label(row, text=s, font=(_F, 10), bg=C["card"], fg=C["text"]
                          ).pack(side="left")
@@ -1065,12 +1065,12 @@ class LLMOpsSuite:
         _, inner = self._scrollable(frame)
         p = tk.Frame(inner, bg=C["notebk"], padx=28, pady=22)
         p.pack(fill="both", expand=True)
-        tk.Label(p, text="AllenAI Open Models — Best for Education",
+        tk.Label(p, text="AllenAI Open Models â€” Best for Education",
                  font=(_F, 14, "bold"), bg=C["notebk"], fg=C["accent"]
                  ).pack(anchor="w", pady=(0, 8))
         tk.Label(p,
                  text="AllenAI (Allen Institute for AI) publishes fully open-weight models "
-                      "— training data, code, and checkpoints all public. This makes them "
+                      "â€” training data, code, and checkpoints all public. This makes them "
                       "ideal for education: students can inspect exactly what the model learned "
                       "and why it gives the answers it does.",
                  font=(_F, 10), bg=C["notebk"], fg=C["muted"],
@@ -1090,7 +1090,7 @@ class LLMOpsSuite:
                      fg=C["faint"]).pack(side="left", padx=(0, 8))
             tk.Label(pull_row, text=m["pull"], font=("Consolas" if sys.platform == "win32" else "monospace", 10, "bold"),
                      bg=C["tag"], fg=C["accent"]).pack(side="left")
-            tk.Button(card, text="📋  Copy pull command", font=(_F, 9),
+            tk.Button(card, text="ðŸ“‹  Copy pull command", font=(_F, 9),
                       bg=C["btn"], fg=C["muted"],
                       activebackground=C["btn_hi"], activeforeground=C["text"],
                       relief="flat", cursor="hand2", padx=8, pady=3,
@@ -1106,7 +1106,7 @@ class LLMOpsSuite:
                       "To see what's installed:  ollama list\n"
                       "To remove a model:        ollama rm <model-name>\n\n"
                       "Models are stored in %USERPROFILE%\\.ollama\\models (Windows) "
-                      "or ~/.ollama/models (Linux). Typical size: 4–8 GB per 7B model.",
+                      "or ~/.ollama/models (Linux). Typical size: 4â€“8 GB per 7B model.",
                  font=("Consolas" if sys.platform == "win32" else "monospace", 10),
                  bg=C["notebk"], fg=C["muted"],
                  wraplength=740, justify="left").pack(anchor="w")
@@ -1133,16 +1133,16 @@ class LLMOpsSuite:
             ("Embedding Models  (For Search)",
              "Embedding models (nomic-embed-text, mxbai-embed-large) convert text into "
              "numerical vectors that capture semantic meaning. They do NOT generate text "
-             "— instead they power the 'find similar passages' step in RAG. Factbook "
+             "â€” instead they power the 'find similar passages' step in RAG. Factbook "
              "uses nomic-embed-text to find the most relevant document chunks before "
              "passing them to the LLM for synthesis."),
             ("Institutional / Archival LLMs",
-             "Larger models (14B–70B) with long context windows are used for "
-             "institutional knowledge bases — indexing policy documents, multi-year "
+             "Larger models (14Bâ€“70B) with long context windows are used for "
+             "institutional knowledge bases â€” indexing policy documents, multi-year "
              "curriculum archives, or cross-department records. They require more VRAM "
-             "(16–24+ GB) but can reason across very long documents. Smaller quantized "
+             "(16â€“24+ GB) but can reason across very long documents. Smaller quantized "
              "versions (q4/q5) reduce memory at some quality cost."),
-            ("Human-in-the-Loop — Why It Matters",
+            ("Human-in-the-Loop â€” Why It Matters",
              "No CITL application acts autonomously. Every AI-generated answer, audit, "
              "translation, or recommendation requires a human to review and approve before "
              "it is acted upon. This is LLMOps best practice: AI surfaces options and "
@@ -1157,9 +1157,9 @@ class LLMOpsSuite:
                      ).pack(anchor="w")
             tk.Frame(p, bg=C["sep"], height=1).pack(fill="x", pady=(8, 0))
 
-    # ═══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # Shared tab renderers
-    # ═══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     def _tab_about(self, frame: tk.Frame, app: dict):
         _, inner = self._scrollable(frame)
@@ -1175,7 +1175,7 @@ class LLMOpsSuite:
                  bg=C["notebk"], fg=C["warn"]).pack(anchor="w", pady=(0, 8))
         tk.Label(p,
                  text="All CITL applications require a human to review and validate every "
-                      "AI-generated output before it is acted upon. LLMs assist — they do "
+                      "AI-generated output before it is acted upon. LLMs assist â€” they do "
                       "not decide. This prepares students for real-world IT and AI roles "
                       "where accountability, auditability, and explainability matter.",
                  font=(_F, 10), bg=C["notebk"], fg=C["muted"],
@@ -1207,10 +1207,10 @@ class LLMOpsSuite:
                  bg=C["notebk"], fg=C["warn"]).pack(anchor="w", pady=(0, 8))
         tk.Label(p,
                  text="Ollama exposes a REST API at localhost:11434 with /api/generate, "
-                      "/api/chat, and /api/embed — the same interface patterns used by "
+                      "/api/chat, and /api/embed â€” the same interface patterns used by "
                       "OpenAI and Anthropic cloud APIs. Students learn real production "
                       "integration skills: streaming responses, token management, context "
-                      "sizing, and graceful offline fallback — all transferable to any "
+                      "sizing, and graceful offline fallback â€” all transferable to any "
                       "cloud or on-premises AI role.",
                  font=(_F, 10), bg=C["notebk"], fg=C["muted"],
                  wraplength=740, justify="left").pack(anchor="w")
@@ -1226,7 +1226,7 @@ class LLMOpsSuite:
         for skill in app["career_skills"]:
             row = tk.Frame(p, bg=C["notebk"])
             row.pack(anchor="w", fill="x", pady=4)
-            tk.Label(row, text="◆", font=(_F, 10, "bold"),
+            tk.Label(row, text="â—†", font=(_F, 10, "bold"),
                      bg=C["notebk"], fg=C["accent"]).pack(side="left", padx=(0, 10))
             tk.Label(row, text=skill, font=(_F, 11),
                      bg=C["notebk"], fg=C["text"]).pack(side="left")
@@ -1244,7 +1244,7 @@ class LLMOpsSuite:
                  font=(_F, 10), bg=C["notebk"], fg=C["muted"],
                  wraplength=740, justify="left").pack(anchor="w")
 
-    # ── Scrollable canvas helper (plain ttk.Scrollbar — no custom style name) ──
+    # â”€â”€ Scrollable canvas helper (plain ttk.Scrollbar â€” no custom style name) â”€â”€
     def _scrollable(self, parent: tk.Frame) -> Tuple:
         canvas = tk.Canvas(parent, bg=C["notebk"], highlightthickness=0)
         sb = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
@@ -1256,14 +1256,14 @@ class LLMOpsSuite:
         canvas.bind("<Configure>", lambda e: canvas.itemconfig(wid, width=e.width))
         inner.bind("<Configure>",  lambda e: canvas.configure(
             scrollregion=canvas.bbox("all")))
-        # Mouse-wheel scroll — bound to canvas only, not all widgets
+        # Mouse-wheel scroll â€” bound to canvas only, not all widgets
         canvas.bind("<MouseWheel>",
                     lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
         canvas.bind("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
         canvas.bind("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
         return canvas, inner
 
-    # ── Actions ───────────────────────────────────────────────────────────────
+    # â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _launch(self, app: dict):
         launcher = app.get("launcher_win") if sys.platform == "win32" else app.get("launcher_nix")
         if not launcher or not Path(launcher).exists():
@@ -1302,7 +1302,7 @@ class LLMOpsSuite:
                 subprocess.Popen(
                     ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
                      "-File", str(inst)], cwd=str(Path(inst).parent), **_NO_WIN)
-                self._set_status("Running LLM Studio installer…")
+                self._set_status("Running LLM Studio installerâ€¦")
                 return
         # Default: run UPDATE-CITL
         if sys.platform == "win32":
@@ -1310,7 +1310,7 @@ class LLMOpsSuite:
             if cmd.exists():
                 threading.Thread(target=lambda: subprocess.run(
                     ["cmd", "/c", str(cmd)], cwd=str(REPO)), daemon=True).start()
-                self._set_status("Running UPDATE-CITL.cmd …")
+                self._set_status("Running UPDATE-CITL.cmd â€¦")
             else:
                 messagebox.showwarning(SUITE_NAME, "UPDATE-CITL.cmd not found.")
         else:
@@ -1344,7 +1344,7 @@ class LLMOpsSuite:
         except Exception:
             pass
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    # â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _is_installed(self, app: dict) -> bool:
         kf = app.get("key_file")
         return bool(kf and Path(kf).exists())
@@ -1365,7 +1365,7 @@ class LLMOpsSuite:
         installed = sum(1 for a in self.apps if self._is_installed(a))
         self._set_status(f"{installed}/{len(self.apps)} apps detected on this system")
 
-    # ── Auto-watcher (30 s poll) ──────────────────────────────────────────────
+    # â”€â”€ Auto-watcher (30 s poll) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _start_watcher(self):
         threading.Thread(target=self._watch_loop, daemon=True).start()
 
@@ -1392,7 +1392,7 @@ class LLMOpsSuite:
                                 changed = True
                 if changed:
                     ts = datetime.now().strftime("%H:%M:%S")
-                    self.root.after(0, lambda: self._auto_var.set(f"● refreshed {ts}"))
+                    self.root.after(0, lambda: self._auto_var.set(f"â— refreshed {ts}"))
                     if self._selected >= 0:
                         self.root.after(0, lambda: self._select_app(self._selected))
             except Exception:
@@ -1400,17 +1400,52 @@ class LLMOpsSuite:
             time.sleep(30)
 
 
-# ── venv python path ──────────────────────────────────────────────────────────
+# â”€â”€ venv python path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _venv_python() -> str:
     venv_py = REPO / ".venv" / "Scripts" / "python.exe"
     if venv_py.exists():
         return str(venv_py)
     return sys.executable
 
+def _tk_runtime_help(err: Exception) -> str:
+    lines = [
+        f"{SUITE_NAME} cannot start because Tk/Tcl runtime is unavailable.",
+        f"Python reported: {err}",
+        "",
+        "Remediation:",
+    ]
+    if sys.platform == "win32":
+        lines.extend(
+            [
+                "1. Repair/reinstall Python and include Tcl/Tk support.",
+                "2. Verify this exists: <Python>\\tcl\\tcl8.6\\init.tcl",
+                "3. Or run the packaged CITL executable build.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "1. Install tkinter package (example: sudo apt install python3-tk).",
+                "2. Restart the app.",
+            ]
+        )
+    return "\n".join(lines)
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+
+# â”€â”€ Entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def main():
-    root = tk.Tk()
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        msg = _tk_runtime_help(exc)
+        log_path = Path(__file__).parent / "citl_llmops_crash.log"
+        try:
+            log_path.write_text(msg + "\n\n" + traceback.format_exc(), encoding="utf-8")
+        except Exception:
+            pass
+        print(msg, file=sys.stderr)
+        print(f"Details logged to: {log_path}", file=sys.stderr)
+        sys.exit(2)
     # Keep a visible window during startup so users never see a "silent hang".
     root.title(f"{SUITE_NAME} - starting...")
     root.geometry("980x640")
@@ -1432,8 +1467,8 @@ def main():
             pass
         try:
             messagebox.showerror(
-                "CITL LLMOps Suite — Startup Error",
-                f"{exc}\n\nFull trace → factbook-assistant/citl_llmops_crash.log")
+                "CITL LLMOps Suite â€” Startup Error",
+                f"{exc}\n\nFull trace â†’ factbook-assistant/citl_llmops_crash.log")
         except Exception:
             print(err, file=sys.stderr)
         try:
@@ -1445,3 +1480,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+

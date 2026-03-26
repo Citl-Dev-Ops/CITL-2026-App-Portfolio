@@ -418,6 +418,24 @@ _VERIFY_PROMPT = (
     "Use explicit menu paths, Expected Result lines, and SCREENSHOT lines."
 )
 
+_SCREENSHOT_MAP_PROMPT = (
+    "Write a Screenshot Evidence Map section for {app_name}.\n"
+    "Topic: {topic}\n"
+    "UI goal: {ui_goal}\n"
+    "Screenshot evidence notes: {screenshot_notes}\n"
+    "Attached screenshots: {screenshot_count}\n"
+    "Purpose: reserve numbered screenshot slots so trainers can paste CITL-relevant "
+    "captures after generation.\n"
+    "Format requirements:\n"
+    "1. Use top-level numbered entries for each major step cluster.\n"
+    "2. Under each entry include:\n"
+    "   Menu Path: A > B > C\n"
+    "   Expected Result: concise outcome\n"
+    "   SCREENSHOT: concise capture description\n"
+    "3. Provide at least 6 entries for walkthrough-style documents.\n"
+    "4. Ensure each SCREENSHOT line describes exactly what should be visible."
+)
+
 _UNINSTALL_PROMPT = (
     "Write an Uninstallation section for {app_name}.\n"
     "Describe how to cleanly remove the application from Windows 10/11, "
@@ -435,16 +453,18 @@ TEMPLATES: Dict[str, List[dict]] = {
         _make_section("install",      "3. Installation",      _INSTALL_PROMPT),
         _make_section("config",       "4. Configuration",     _CONFIG_PROMPT),
         _make_section("usage",        "5. Usage Guide",       _USAGE_PROMPT),
-        _make_section("features",     "6. Feature Reference", _FEATURES_PROMPT),
-        _make_section("troubleshoot", "7. Troubleshooting",   _TROUBLESHOOT_PROMPT),
-        _make_section("faq",          "8. FAQ",               _FAQ_PROMPT),
-        _make_section("license",      "9. License & Credits", _LICENSE_PROMPT),
+        _make_section("screenshot_map", "6. Screenshot Evidence Map", _SCREENSHOT_MAP_PROMPT),
+        _make_section("features",     "7. Feature Reference", _FEATURES_PROMPT),
+        _make_section("troubleshoot", "8. Troubleshooting",   _TROUBLESHOOT_PROMPT),
+        _make_section("faq",          "9. FAQ",               _FAQ_PROMPT),
+        _make_section("license",      "10. License & Credits", _LICENSE_PROMPT),
     ],
 
     "App Walkthrough": [
         _make_section("cover",        "Cover Page",         "",                   True),
         _make_section("prereqs",      "Prerequisites",      _PREREQUISITES_PROMPT),
         _make_section("walkthrough",  "Step-by-Step Walkthrough", _WALKTHROUGH_PROMPT),
+        _make_section("screenshot_map", "Screenshot Evidence Map", _SCREENSHOT_MAP_PROMPT),
         _make_section("troubleshoot", "Common Issues",      _TROUBLESHOOT_PROMPT),
         _make_section("next_steps",   "Next Steps",         _NEXT_STEPS_PROMPT),
     ],
@@ -454,6 +474,7 @@ TEMPLATES: Dict[str, List[dict]] = {
         _make_section("objectives",  "Learning Objectives", _OBJECTIVES_PROMPT),
         _make_section("background",  "Background & Context",_BACKGROUND_PROMPT),
         _make_section("walkthrough", "Step-by-Step Instructions", _WALKTHROUGH_PROMPT),
+        _make_section("screenshot_map", "Screenshot Evidence Map", _SCREENSHOT_MAP_PROMPT),
         _make_section("exercises",   "Practice Exercises",  _EXERCISES_PROMPT),
         _make_section("takeaways",   "Key Takeaways",       _TAKEAWAYS_PROMPT),
         _make_section("next_steps",  "Additional Resources",_NEXT_STEPS_PROMPT),
@@ -464,6 +485,7 @@ TEMPLATES: Dict[str, List[dict]] = {
         _make_section("overview", "App Overview",       _OVERVIEW_QREF_PROMPT),
         _make_section("commands", "Key Commands",       _COMMANDS_QREF_PROMPT),
         _make_section("tips",     "Tips & Warnings",    _TIPS_QREF_PROMPT),
+        _make_section("screenshot_map", "Screenshot Evidence Map", _SCREENSHOT_MAP_PROMPT),
     ],
 
     "Installation Guide": [
@@ -472,6 +494,7 @@ TEMPLATES: Dict[str, List[dict]] = {
         _make_section("checklist",  "Pre-Installation Checklist",_CHECKLIST_PROMPT),
         _make_section("install",    "Installation Steps",        _INSTALL_PROMPT),
         _make_section("verify",     "Post-Installation Verification", _VERIFY_PROMPT),
+        _make_section("screenshot_map", "Screenshot Evidence Map", _SCREENSHOT_MAP_PROMPT),
         _make_section("troubleshoot","Troubleshooting",          _TROUBLESHOOT_PROMPT),
         _make_section("uninstall",  "Uninstallation",            _UNINSTALL_PROMPT),
     ],

@@ -81,7 +81,10 @@ _RE_NUM = re.compile(r"^(\d+(?:\.\d+){0,4})[\).:]?\s+(.+)$")
 _RE_ALPHA = re.compile(r"^([a-zA-Z])[\).:]\s+(.+)$")
 _RE_BUL = re.compile(r"^(\s*)[-*\u2022]\s+(.+)$")
 _RE_CALL = re.compile(r"^(TIP|NOTE|WARNING):\s*(.+)$", re.IGNORECASE)
-_RE_SHOT = re.compile(r"^(SCREENSHOT(?:\s+PLACEHOLDER)?|IMAGE):\s*(.+)$", re.IGNORECASE)
+_RE_SHOT = re.compile(
+    r"^(SCREENSHOT(?:\s+PLACEHOLDER)?|IMAGE)(?:\s+#?\d+)?\s*:\s*(.+)$",
+    re.IGNORECASE,
+)
 _RE_SUBHD = re.compile(
     r"^(Menu Path|Expected Result|Validation|Troubleshooting|Context)\s*:\s*(.*)$",
     re.IGNORECASE,
@@ -108,13 +111,33 @@ def _add_list_line(doc, text: str, ordered: bool, level: int) -> None:
         doc.add_paragraph(prefix + text)
 
 
-def _render_structured_content(doc, content: str) -> None:
+def _add_numbered_screenshot(doc, shot_state: dict, caption: str) -> None:
+    shot_state["idx"] = int(shot_state.get("idx", 0)) + 1
+    number = int(shot_state["idx"])
+    text = caption.strip() if caption else "Capture this step."
+    add_screenshot_placeholder(doc, f"Screenshot {number:02d}: {text}")
+
+
+def _render_structured_content(doc, content: str, shot_state: dict) -> None:
     para_buf: List[str] = []
+    pending_major_step: Optional[str] = None
+    pending_major_has_shot = False
 
     def _flush_paragraph() -> None:
         if para_buf:
             add_body(doc, " ".join(para_buf).strip())
             para_buf.clear()
+
+    def _flush_pending_major_step() -> None:
+        nonlocal pending_major_step, pending_major_has_shot
+        if pending_major_step and not pending_major_has_shot:
+            _add_numbered_screenshot(
+                doc,
+                shot_state,
+                f"Evidence for step: {pending_major_step}",
+            )
+        pending_major_step = None
+        pending_major_has_shot = False
 
     for raw in content.splitlines():
         line = raw.rstrip()
@@ -133,7 +156,8 @@ def _render_structured_content(doc, content: str) -> None:
         m = _RE_SHOT.match(stripped)
         if m:
             _flush_paragraph()
-            add_screenshot_placeholder(doc, m.group(2).strip() or "Capture this step.")
+            _add_numbered_screenshot(doc, shot_state, m.group(2).strip() or "Capture this step.")
+            pending_major_has_shot = True
             continue
 
         m = _RE_SUBHD.match(stripped)
@@ -147,7 +171,12 @@ def _render_structured_content(doc, content: str) -> None:
         m = _RE_NUM.match(stripped)
         if m:
             _flush_paragraph()
-            depth = min(2, m.group(1).count("."))
+            step_depth = m.group(1).count(".")
+            if step_depth == 0:
+                _flush_pending_major_step()
+                pending_major_step = m.group(2).strip()
+                pending_major_has_shot = False
+            depth = min(2, step_depth)
             _add_list_line(doc, m.group(2).strip(), ordered=True, level=depth)
             continue
 
@@ -168,6 +197,7 @@ def _render_structured_content(doc, content: str) -> None:
         para_buf.append(stripped)
 
     _flush_paragraph()
+    _flush_pending_major_step()
 
 
 def _export_docx(sections: List[dict], meta: dict, out_path: str) -> None:
@@ -175,6 +205,7 @@ def _export_docx(sections: List[dict], meta: dict, out_path: str) -> None:
 
     doc = Document()
     apply_citl_styles(doc)
+    shot_state = {"idx": 0}
 
     for sec in sections:
         if sec["id"] == "cover":
@@ -188,7 +219,7 @@ def _export_docx(sections: List[dict], meta: dict, out_path: str) -> None:
             add_rule(doc)
             continue
 
-        _render_structured_content(doc, content)
+        _render_structured_content(doc, content, shot_state)
         add_rule(doc)
 
     doc.save(out_path)
@@ -758,13 +789,49 @@ class DocComposer:
         except Exception:
             pass
 
-    def _open_docs_dir(self):
+def _open_docs_dir(self):
         DOCS_DIR.mkdir(parents=True, exist_ok=True)
         self._open_path(DOCS_DIR)
 
 
+def _tk_runtime_help(err: Exception) -> str:
+    lines = [
+        f"{APP_NAME} cannot start because Tk/Tcl runtime is unavailable.",
+        f"Python reported: {err}",
+        "",
+        "Remediation:",
+    ]
+    if sys.platform == "win32":
+        lines.extend(
+            [
+                "1. Repair/reinstall Python and include Tcl/Tk support.",
+                "2. Verify this exists: <Python>\\tcl\\tcl8.6\\init.tcl",
+                "3. Or run the packaged CITL executable build.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "1. Install tkinter package (example: sudo apt install python3-tk).",
+                "2. Restart the app.",
+            ]
+        )
+    return "\n".join(lines)
+
+
 def main():
-    root = tk.Tk()
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        msg = _tk_runtime_help(exc)
+        log_path = _HERE / "citl_doc_composer_crash.log"
+        try:
+            log_path.write_text(msg + "\n\n" + traceback.format_exc(), encoding="utf-8")
+        except Exception:
+            pass
+        print(msg, file=sys.stderr)
+        print(f"Details logged to: {log_path}", file=sys.stderr)
+        sys.exit(2)
     root.withdraw()
     try:
         root.tk.call("tk", "scaling", 1.25)
@@ -786,4 +853,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
