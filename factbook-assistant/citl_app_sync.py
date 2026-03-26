@@ -31,13 +31,16 @@ from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Un
 PathLike = Union[str, Path]
 LogFn = Optional[Callable[[str], None]]
 APP_SYNC_NAME = "CITL App Sync Utility"
-APP_SYNC_VERSION = "v1.5.0"
+APP_SYNC_VERSION = "v1.6.3"
 SYNC_LAUNCHER_WINDOWS = "RUN_APP_SYNC_WINDOWS.cmd"
 SYNC_LAUNCHER_UBUNTU = "RUN_APP_SYNC_UBUNTU.sh"
+SYNC_DUPLICATE_WINDOWS = "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd"
+SYNC_DUPLICATE_UBUNTU = "COPY_THIS_USB_TO_NEXT_UBUNTU.sh"
 SYNC_LAUNCHER_README = "OPEN_SYNC_UTILITY_README.txt"
 STATE_SCHEMA_VERSION = 1
 STATE_FILE_NAME = "citl_app_sync_state.json"
 UPDATE_AVAILABLE_EPSILON_SEC = 2.0
+MODEL_SYNC_WARN_BYTES = 8 * 1024 * 1024 * 1024  # 8 GiB
 
 REPO_MARKERS: Tuple[str, ...] = (
     "factbook-assistant/factbook_assistant_gui.py",
@@ -65,9 +68,21 @@ CITL_APPS: Tuple[dict, ...] = (
             "factbook-assistant/factbook_assistant_gui.py",
             "factbook-assistant/citl_factbook_query.py",
             "factbook-assistant/citl_auto_index.py",
+            "factbook-assistant/citl_text_extract.py",
             "factbook-assistant/citl_translation.py",
             "factbook-assistant/citl_audio_ffmpeg_graceful_v2.py",
+            "factbook-assistant/citl_theme.py",
             "factbook-assistant/parsers.py",
+            "factbook-assistant/citl_screen_recorder.py",
+            "factbook-assistant/citl_doc_composer.py",
+            "factbook-assistant/citl_doc_theme.py",
+            "factbook-assistant/citl_doc_templates.py",
+            "RUN_FACTBOOK_WINDOWS.cmd",
+            "RUN_FACTBOOK.sh",
+            "scripts/windows/run.ps1",
+            "Run-CITL.ps1",
+            "scripts/windows/run_llmops.ps1",
+            "scripts/windows/record_demo.ps1",
         ],
         "version_file": "FACTBOOK_VERSION.txt",
         "launcher_win": "RUN_FACTBOOK_WINDOWS.cmd",
@@ -87,6 +102,18 @@ CITL_APPS: Tuple[dict, ...] = (
             "factbook-assistant/citl_app_sync.py",
             "RUN_APP_SYNC_WINDOWS.cmd",
             "RUN_APP_SYNC_UBUNTU.sh",
+            "RUN_APP_SYNC.sh",
+            "Run-CITL-App-Sync.ps1",
+            "requirements-windows.txt",
+            "requirements-linux.txt",
+            "scripts/windows/setup.ps1",
+            "scripts/linux/setup.sh",
+            "SYNC_CITL_APPS_TO_USB_WINDOWS.cmd",
+            "SYNC_CITL_APPS_TO_USB_UBUNTU.sh",
+            "scripts/windows/sync_usb_apps.ps1",
+            "scripts/windows/build_all_citl_exes.ps1",
+            "BUILD_ALL_CITL_EXES_WINDOWS.cmd",
+            "OPEN_SYNC_UTILITY_README.txt",
         ],
         "version_file": None,
         "launcher_win": "RUN_APP_SYNC_WINDOWS.cmd",
@@ -104,12 +131,12 @@ CITL_APPS: Tuple[dict, ...] = (
         "icon": "🤖",
         "key_files": [
             "factbook-assistant/citl_modelfile.py",
-            "factbook-assistant/llm_studio_gui.py",
+            "CITL-LLM-Studio-Kit/app/llm_studio_gui.py",
         ],
         "version_file": None,
         "launcher_win": None,
         "launcher_nix": None,
-        "repo_marker": "factbook-assistant/citl_modelfile.py",
+        "repo_marker": "CITL-LLM-Studio-Kit/app/llm_studio_gui.py",
     },
     {
         # ── Academic Advisor ─────────────────────────────────────────────────
@@ -137,6 +164,7 @@ CITL_APPS: Tuple[dict, ...] = (
         "launcher_nix": None,   # no Linux launcher yet
         "repo_marker": "api/app.py",
         "repo_path": r"C:\00 HENOSIS CODING PROJECTS\CITL PROJECTS\2026 ACADEMIC ADVISOR",
+        "repo_path_env": "CITL_ACADEMIC_ADVISOR_REPO",
     },
     {
         # ── CITL Toolkit (device/AV management) ──────────────────────────────
@@ -148,14 +176,40 @@ CITL_APPS: Tuple[dict, ...] = (
         ),
         "icon": "🖥️",
         "key_files": [
-            "CITL_Launcher.ps1",
-            "CITL_DeviceUpdater_GUI.ps1",
-            "CITL_DisplayProfile_GUI.ps1",
+            "CITL_Toolkit/CITL_Launcher.ps1",
+            "CITL_Toolkit/CITL_DeviceUpdater_GUI.ps1",
+            "CITL_Toolkit/CITL_DisplayProfile_GUI.ps1",
         ],
         "version_file": None,
-        "launcher_win": "CITL_Launcher.ps1",
+        "launcher_win": "CITL_Toolkit/CITL_Launcher.ps1",
         "launcher_nix": None,
-        "repo_marker": "CITL_Launcher.ps1",
+        "repo_marker": "CITL_Toolkit/CITL_Launcher.ps1",
+    },
+    {
+        # ── CITL LLMOps Presentation Suite ────────────────────────────────────
+        "name": "LLMOps Suite",
+        "description": (
+            "Showcase, installer, and walkthrough for the full CITL app ecosystem. "
+            "Explains LLM technology, career readiness, and human-in-the-loop "
+            "operations for each app. Maroon + gray theme. "
+            "Windows 10/11 and Ubuntu 24.04 LTS."
+        ),
+        "icon": "🎯",
+        "key_files": [
+            "factbook-assistant/citl_llmops_suite.py",
+            "RUN_LLMOPS_WINDOWS.cmd",
+            "RUN_LLMOPS.sh",
+            "scripts/windows/run_llmops.ps1",
+            "scripts/windows/build_llmops_exe.ps1",
+            "scripts/windows/build_all_citl_exes.ps1",
+            "BUILD_LLMOPS_EXE_WINDOWS.cmd",
+            "BUILD_ALL_CITL_EXES_WINDOWS.cmd",
+            "LLMOPS_SUITE_README.txt",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_LLMOPS_WINDOWS.cmd",
+        "launcher_nix": "RUN_LLMOPS.sh",
+        "repo_marker": "factbook-assistant/citl_llmops_suite.py",
     },
 )
 
@@ -548,6 +602,162 @@ def _safe_log(log_fn: LogFn, message: str) -> None:
         log_fn(message)
 
 
+def _fmt_bytes(size: int) -> str:
+    try:
+        n = float(size)
+    except Exception:
+        return "unknown size"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    idx = 0
+    while n >= 1024.0 and idx < len(units) - 1:
+        n /= 1024.0
+        idx += 1
+    return f"{n:.1f} {units[idx]}"
+
+
+def _dir_size_bytes(path: PathLike) -> int:
+    root = Path(path).expanduser()
+    if not root.exists() or not root.is_dir():
+        return 0
+    total = 0
+    for base, _dirs, files in os.walk(root):
+        base_path = Path(base)
+        for name in files:
+            fp = base_path / name
+            try:
+                total += fp.stat().st_size
+            except OSError:
+                continue
+    return total
+
+
+def candidate_ollama_model_dirs(repo_root: PathLike) -> List[Path]:
+    repo = Path(repo_root).expanduser()
+    candidates: List[Path] = []
+    env_models = (os.environ.get("OLLAMA_MODELS") or "").strip()
+    if env_models:
+        candidates.append(Path(env_models))
+    if os.name == "nt":
+        userprofile = os.environ.get("USERPROFILE") or str(Path.home())
+        localapp = os.environ.get("LOCALAPPDATA") or ""
+        candidates.extend(
+            [
+                Path(userprofile) / ".ollama" / "models",
+                Path(localapp) / "Ollama" / "models" if localapp else Path(""),
+            ]
+        )
+    else:
+        candidates.append(Path.home() / ".ollama" / "models")
+
+    candidates.extend(
+        [
+            repo / "ollama" / "models",
+            repo / "ollama",
+            repo / "models",
+        ]
+    )
+
+    out: List[Path] = []
+    seen: set = set()
+    for p in candidates:
+        if not str(p):
+            continue
+        try:
+            rp = p.expanduser().resolve()
+        except Exception:
+            rp = p.expanduser()
+        key = str(rp).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if rp.exists() and rp.is_dir():
+            out.append(rp)
+    return out
+
+
+def recommended_ollama_model_target_dir(target_repo: PathLike) -> Path:
+    target = Path(target_repo).expanduser()
+    try:
+        target = target.resolve()
+    except Exception:
+        pass
+    root = _guess_usb_root(target)
+    if root != target:
+        return root / "CITL_OLLAMA_MODELS"
+    return target / "ollama" / "models"
+
+
+def sync_external_model_store(
+    source_models_dir: PathLike,
+    target_models_dir: PathLike,
+    log_fn: LogFn = None,
+) -> Dict[str, object]:
+    src = Path(source_models_dir).expanduser().resolve()
+    dst = Path(target_models_dir).expanduser().resolve()
+    if not src.exists() or not src.is_dir():
+        raise FileNotFoundError(f"Model source directory not found: {src}")
+    if src == dst:
+        _safe_log(log_fn, f"[MODEL] source and target are the same path: {src}\n")
+        return {
+            "copied": 0,
+            "skipped": 0,
+            "errors": 0,
+            "bytes_copied": 0,
+            "elapsed_sec": 0.0,
+            "source": src,
+            "target": dst,
+        }
+
+    start = time.time()
+    copied = 0
+    skipped = 0
+    errors = 0
+    bytes_copied = 0
+    dst.mkdir(parents=True, exist_ok=True)
+
+    _safe_log(log_fn, f"[MODEL] syncing Ollama model store\n")
+    _safe_log(log_fn, f"[MODEL] source={src}\n")
+    _safe_log(log_fn, f"[MODEL] target={dst}\n")
+
+    for root, _dirs, files in os.walk(src):
+        root_path = Path(root)
+        rel_root = root_path.relative_to(src)
+        out_dir = dst / rel_root
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for name in files:
+            sp = root_path / name
+            dp = out_dir / name
+            try:
+                if _needs_copy(sp, dp):
+                    shutil.copy2(str(sp), str(dp))
+                    copied += 1
+                    try:
+                        bytes_copied += sp.stat().st_size
+                    except OSError:
+                        pass
+                else:
+                    skipped += 1
+            except Exception as exc:
+                errors += 1
+                _safe_log(log_fn, f"[MODEL][ERR] {sp} -> {dp}: {exc}\n")
+
+    elapsed = time.time() - start
+    _safe_log(
+        log_fn,
+        f"[MODEL][DONE] copied={copied} skipped={skipped} errors={errors} "
+        f"bytes_copied={bytes_copied} ({_fmt_bytes(bytes_copied)}) elapsed={elapsed:.1f}s\n",
+    )
+    return {
+        "copied": copied,
+        "skipped": skipped,
+        "errors": errors,
+        "bytes_copied": bytes_copied,
+        "elapsed_sec": elapsed,
+        "source": src,
+        "target": dst,
+    }
+
+
 def _state_dir() -> Path:
     if os.name == "nt":
         base = Path(os.environ.get("APPDATA") or (Path.home() / "AppData" / "Roaming"))
@@ -620,6 +830,12 @@ def _is_external_mount_path(path: Path) -> bool:
     low = str(path).lower()
     if os.name == "nt":
         return False
+    # WSL-mounted Windows fixed drives (/mnt/c, /mnt/d, ...) are not external media.
+    parts = path.parts
+    if len(parts) >= 3 and parts[1].lower() == "mnt":
+        letter = parts[2].lower()
+        if len(letter) == 1 and letter.isalpha():
+            return False
     prefixes = ("/media/", "/run/media/", "/mnt/", "/volumes/")
     return any(low.startswith(p) for p in prefixes)
 
@@ -994,7 +1210,7 @@ def detect_source_repo(source_arg: str = "auto", default_source: Optional[Path] 
     return SourceDetection(path=best_repo, reason="most recently updated local repo", freshness_ts=best_ts)
 
 
-def _windows_drive_roots() -> List[Path]:
+def _windows_drive_roots_by_type(allowed_types: Tuple[int, ...]) -> List[Path]:
     roots: List[Path] = []
     try:
         import ctypes
@@ -1010,11 +1226,20 @@ def _windows_drive_roots() -> List[Path]:
             dtype = ctypes.windll.kernel32.GetDriveTypeW(ctypes.c_wchar_p(drive))
         except Exception:
             continue
-        # DRIVE_REMOVABLE=2, DRIVE_FIXED=3
-        if dtype not in (2, 3):
+        if dtype not in allowed_types:
             continue
         roots.append(Path(drive))
     return roots
+
+
+def _windows_drive_roots() -> List[Path]:
+    # DRIVE_REMOVABLE=2, DRIVE_FIXED=3
+    return _windows_drive_roots_by_type((2, 3))
+
+
+def _windows_removable_roots() -> List[Path]:
+    # DRIVE_REMOVABLE=2
+    return _windows_drive_roots_by_type((2,))
 
 
 def scan_roots() -> List[Path]:
@@ -1111,20 +1336,15 @@ def _score_candidate(path: Path, source_name: str) -> Tuple[int, Tuple[str, ...]
     return score, tuple(hits), has_git
 
 
-def discover_sync_targets(source_repo: PathLike, max_depth: int = 3) -> List[SyncTarget]:
+def _discover_sync_targets_from_roots(
+    source_repo: PathLike,
+    roots: Sequence[Path],
+    max_depth: int = 3,
+) -> List[SyncTarget]:
     src = Path(source_repo).expanduser().resolve()
     src_name = src.name
     best: Dict[str, SyncTarget] = {}
     checked: set = set()
-
-    roots = scan_roots()
-    if os.name == "nt":
-        src_drive = (src.drive or src.anchor or "").lower()
-        other_roots = [
-            root for root in roots if (root.drive or root.anchor or "").lower() != src_drive
-        ]
-        if other_roots:
-            roots = other_roots
 
     def maybe_add(item: SyncTarget) -> None:
         key = str(item.path)
@@ -1191,6 +1411,575 @@ def discover_sync_targets(source_repo: PathLike, max_depth: int = 3) -> List[Syn
         )
     )
     return out
+
+
+def discover_sync_targets(source_repo: PathLike, max_depth: int = 3) -> List[SyncTarget]:
+    src = Path(source_repo).expanduser().resolve()
+    roots = scan_roots()
+    if os.name == "nt":
+        src_drive = (src.drive or src.anchor or "").lower()
+        other_roots = [
+            root for root in roots if (root.drive or root.anchor or "").lower() != src_drive
+        ]
+        if other_roots:
+            roots = other_roots
+    return _discover_sync_targets_from_roots(src, roots, max_depth=max_depth)
+
+
+def _resolve_candidate_repo_path(raw: str, source_repo: Path) -> Optional[Path]:
+    val = (raw or "").strip()
+    if not val:
+        return None
+    val = os.path.expandvars(os.path.expanduser(val))
+    p = Path(val)
+    if not p.is_absolute():
+        p = source_repo / p
+    try:
+        return p.resolve()
+    except Exception:
+        return p
+
+
+def resolve_app_source_root(app: dict, source_repo: PathLike) -> Path:
+    """
+    Resolve the best source root for an app:
+    1) env var override (repo_path_env)
+    2) explicit repo_path
+    3) fallback to main source repo
+    """
+    src = Path(source_repo).expanduser()
+    try:
+        src = src.resolve()
+    except Exception:
+        pass
+
+    marker = str(app.get("repo_marker") or "").strip()
+    env_key = str(app.get("repo_path_env") or "").strip()
+    candidates: List[str] = []
+
+    if env_key:
+        env_val = (os.environ.get(env_key) or "").strip()
+        if env_val:
+            candidates.append(env_val)
+
+    repo_path = app.get("repo_path")
+    if isinstance(repo_path, str) and repo_path.strip():
+        candidates.append(repo_path)
+
+    for raw in candidates:
+        p = _resolve_candidate_repo_path(raw, src)
+        if p is None or not p.exists():
+            continue
+        if marker and not (p / marker).exists():
+            continue
+        return p
+
+    if marker and (src / marker).exists():
+        return src
+    return src
+
+
+def sync_registered_app_key_files(
+    source_repo: PathLike,
+    target_repo: PathLike,
+    log_fn: LogFn = None,
+) -> Dict[str, Dict[str, int]]:
+    """
+    Sync key_files for every app entry in CITL_APPS.
+    This captures files from app-specific repos when repo_path/repo_path_env is set.
+    """
+    src = Path(source_repo).expanduser().resolve()
+    dst = Path(target_repo).expanduser().resolve()
+    summary: Dict[str, Dict[str, int]] = {}
+
+    def _copy_one(src_path: Path, dst_path: Path) -> Tuple[int, int]:
+        copied = 0
+        skipped = 0
+        if src_path.is_dir():
+            for root, _dirs, files in os.walk(src_path):
+                root_path = Path(root)
+                rel_root = root_path.relative_to(src_path)
+                out_dir = dst_path / rel_root
+                out_dir.mkdir(parents=True, exist_ok=True)
+                for name in files:
+                    s = root_path / name
+                    d = out_dir / name
+                    if _needs_copy(s, d):
+                        shutil.copy2(s, d)
+                        copied += 1
+                    else:
+                        skipped += 1
+            return copied, skipped
+
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        if _needs_copy(src_path, dst_path):
+            shutil.copy2(src_path, dst_path)
+            copied += 1
+        else:
+            skipped += 1
+        return copied, skipped
+
+    for app in CITL_APPS:
+        app_name = str(app.get("name") or "Unnamed App")
+        key_files = app.get("key_files") or []
+        if not key_files:
+            continue
+        app_src = resolve_app_source_root(app, src)
+        copied = 0
+        skipped = 0
+        missing = 0
+        errors = 0
+
+        _safe_log(log_fn, f"[APP-SYNC] {app_name}: source={app_src}\n")
+        for rel in key_files:
+            src_p = app_src / rel
+            dst_p = dst / rel
+            if not src_p.exists():
+                missing += 1
+                _safe_log(log_fn, f"[APP-SYNC][MISS] {app_name}: {src_p}\n")
+                continue
+            try:
+                c, s = _copy_one(src_p, dst_p)
+                copied += c
+                skipped += s
+            except Exception as e:
+                errors += 1
+                _safe_log(log_fn, f"[APP-SYNC][ERR] {app_name}: {src_p} -> {dst_p} ({e})\n")
+
+        summary[app_name] = {
+            "copied": copied,
+            "skipped": skipped,
+            "missing": missing,
+            "errors": errors,
+        }
+        _safe_log(
+            log_fn,
+            f"[APP-SYNC] {app_name}: copied={copied} skipped={skipped} missing={missing} errors={errors}\n",
+        )
+
+    return summary
+
+
+def _select_best_usb_target_for_push(
+    source_repo: Path,
+    include_data: bool = False,
+    include_models: bool = False,
+) -> Optional[Tuple[SyncTarget, RepoComparison]]:
+    src = Path(source_repo).expanduser().resolve()
+    targets: List[SyncTarget] = []
+
+    if os.name == "nt":
+        removable_roots = _windows_removable_roots()
+        src_drive = (src.drive or src.anchor or "").lower()
+        removable_roots = [
+            root for root in removable_roots if (root.drive or root.anchor or "").lower() != src_drive
+        ]
+        if removable_roots:
+            targets = _discover_sync_targets_from_roots(src, removable_roots, max_depth=3)
+
+    if not targets:
+        targets = discover_sync_targets(src)
+    if not targets:
+        return None
+
+    priority = {
+        "push_source_to_target": 0,
+        "current": 1,
+        "review": 2,
+        "pull_target_to_source": 3,
+    }
+    ranked: List[Tuple[int, int, int, str, SyncTarget, RepoComparison]] = []
+    for t in targets:
+        comp = compare_repo_freshness(
+            src,
+            t.path,
+            include_data=include_data,
+            include_models=include_models,
+        )
+        ranked.append(
+            (
+                priority.get(comp.recommendation, 9),
+                0 if t.remembered else 1,
+                -t.score,
+                str(t.path).lower(),
+                t,
+                comp,
+            )
+        )
+    ranked.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
+    best = ranked[0]
+    return best[4], best[5]
+
+
+def _resolve_phone_serial(phone_arg: str = "auto") -> Tuple[Optional[str], str]:
+    devices = connected_phone_devices()
+    if not devices:
+        return None, "No Android phone detected over ADB."
+
+    raw = (phone_arg or "auto").strip()
+    if not raw or raw.lower() in ("auto", "first"):
+        dev = devices[0]
+        return dev.serial, f"Auto-selected phone: {dev.serial}"
+
+    for dev in devices:
+        if dev.serial == raw:
+            return dev.serial, f"Using requested phone: {dev.serial}"
+    return None, f"Requested phone serial not found: {raw}"
+
+
+def _push_repo_copy_to_phone(
+    repo_path: PathLike,
+    phone_arg: str = "auto",
+    include_data: bool = False,
+    include_models: bool = False,
+) -> int:
+    serial, note = _resolve_phone_serial(phone_arg)
+    if not serial:
+        print(f"[PHONE][ERROR] {note}")
+        return 1
+
+    repo = Path(repo_path).expanduser().resolve()
+    print(f"[PHONE] {note}")
+    print(f"[PHONE] exporting repo copy: {repo}")
+    try:
+        result = push_repo_archive_to_phone(
+            repo,
+            serial,
+            include_data=include_data,
+            include_models=include_models,
+            log_fn=lambda s: print(s, end=""),
+        )
+    except Exception as e:
+        print(f"[PHONE][ERROR] export failed: {e}")
+        return 1
+
+    print(
+        f"[PHONE][DONE] files={result['file_count']} bytes={result['byte_count']} "
+        f"remote={result['remote_path']} elapsed={result['elapsed_sec']:.1f}s"
+    )
+    return 0
+
+
+def _run_sync_best_usb(args: argparse.Namespace, source: SourceDetection) -> int:
+    print(f"[SOURCE] {source.path} ({source.reason})")
+    model_source_arg = (getattr(args, "ollama_model_source", "") or "").strip()
+    model_target_arg = (getattr(args, "ollama_model_target", "") or "").strip()
+    if bool(args.include_models) and (not model_source_arg or not model_target_arg):
+        print(
+            "[WARN] --include-models set without both --ollama-model-source and "
+            "--ollama-model-target; external Ollama model store copy will be skipped "
+            "(repo-local models/ollama folders still sync)."
+        )
+    explicit_target_arg = (getattr(args, "target_path", "") or "").strip()
+    target_path: Optional[Path] = None
+    if explicit_target_arg:
+        target_path = _normalize_repo_path(explicit_target_arg)
+        if target_path is None:
+            print(f"[ERROR] Invalid --target-path: {explicit_target_arg}")
+            return 2
+        try:
+            target_path = target_path.resolve()
+        except Exception:
+            pass
+        if not target_path.exists():
+            try:
+                target_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                print(f"[ERROR] Could not create --target-path {target_path}: {e}")
+                return 2
+        comparison = compare_repo_freshness(
+            source.path,
+            target_path,
+            include_data=bool(args.include_data),
+            include_models=bool(args.include_models),
+        )
+        print(f"[TARGET] {target_path} (explicit --target-path)")
+    else:
+        chosen = _select_best_usb_target_for_push(
+            source.path,
+            include_data=bool(args.include_data),
+            include_models=bool(args.include_models),
+        )
+        if chosen is None:
+            print("[ERROR] No compatible USB/external CITL target was detected.")
+            return 2
+        target, comparison = chosen
+        target_path = target.path
+        print(f"[TARGET] {target_path}")
+
+    assert target_path is not None
+    print(f"[TARGET] recommendation={comparison.recommendation} ({comparison.summary})")
+    if comparison.recommendation == "pull_target_to_source":
+        print(
+            "[WARN] Selected target appears newer than this PC copy; "
+            "continuing with PC -> USB push because --sync-best-usb was requested."
+        )
+
+    total_errors = 0
+    if bool(getattr(args, "full_repo_sync", False)):
+        result = sync_repo(
+            source.path,
+            target_path,
+            include_data=bool(args.include_data),
+            include_models=bool(args.include_models),
+            model_source_dir=(model_source_arg or None),
+            model_target_dir=(model_target_arg or None),
+            log_fn=lambda s: print(s, end=""),
+        )
+        mode = "rsync" if result.used_rsync else "python-copy"
+        print(
+            f"[DONE] repo-sync mode={mode} copied={result.copied} skipped={result.skipped} "
+            f"errors={result.errors} elapsed={result.elapsed_sec:.1f}s"
+        )
+        total_errors += int(result.errors)
+    else:
+        install_sync_launchers(target_path, log_fn=lambda s: print(s, end=""))
+        print("[DONE] full repo sync skipped (app key-file update mode).")
+
+    if not bool(getattr(args, "no_app_key_sync", False)):
+        app_summary = sync_registered_app_key_files(
+            source.path,
+            target_path,
+            log_fn=lambda s: print(s, end=""),
+        )
+        total_copied = sum(v.get("copied", 0) for v in app_summary.values())
+        total_missing = sum(v.get("missing", 0) for v in app_summary.values())
+        app_errors = sum(v.get("errors", 0) for v in app_summary.values())
+        total_errors += app_errors
+        print(
+            f"[DONE] app-key-sync apps={len(app_summary)} copied={total_copied} "
+            f"missing={total_missing} errors={app_errors}"
+        )
+
+    try:
+        port_to_ubuntu(target_path, log_fn=lambda s: print(s, end=""))
+    except Exception as e:
+        total_errors += 1
+        print(f"[WARN] Ubuntu port step failed on target: {e}")
+
+    if bool(getattr(args, "push_target_to_phone", False)):
+        total_errors += _push_repo_copy_to_phone(
+            target_path,
+            phone_arg=str(getattr(args, "phone_serial", "auto") or "auto"),
+            include_data=bool(args.include_data),
+            include_models=bool(args.include_models),
+        )
+
+    return 0 if total_errors == 0 else 1
+
+
+def _path_root_key(path: PathLike) -> str:
+    p = Path(path).expanduser()
+    try:
+        p = p.resolve()
+    except Exception:
+        pass
+    if os.name == "nt":
+        return (p.drive or p.anchor or str(p)).lower().rstrip("\\/")
+    root = _guess_usb_root(p)
+    try:
+        root = root.resolve()
+    except Exception:
+        pass
+    return str(root).lower().rstrip("/")
+
+
+def _is_removable_source_repo(path: PathLike) -> bool:
+    p = Path(path).expanduser()
+    try:
+        p = p.resolve()
+    except Exception:
+        pass
+
+    if os.name == "nt":
+        drive = (p.drive or p.anchor or "").lower()
+        if not drive:
+            return False
+        removable = {(r.drive or r.anchor or "").lower() for r in _windows_removable_roots()}
+        return drive in removable
+
+    return _is_external_mount_path(p)
+
+
+def _discover_duplicate_targets(source_repo: PathLike) -> List[SyncTarget]:
+    src = Path(source_repo).expanduser().resolve()
+    if os.name == "nt":
+        removable = _windows_removable_roots()
+        if removable:
+            return _discover_sync_targets_from_roots(src, removable, max_depth=3)
+    return discover_sync_targets(src)
+
+
+def _pick_duplicate_target(
+    from_path: Path,
+    candidates: Sequence[SyncTarget],
+    include_data: bool = False,
+    include_models: bool = False,
+) -> Optional[Tuple[Path, RepoComparison]]:
+    if not candidates:
+        return None
+
+    priority = {
+        "push_source_to_target": 0,
+        "current": 1,
+        "review": 2,
+        "pull_target_to_source": 3,
+    }
+    from_root = _path_root_key(from_path)
+    ranked: List[Tuple[int, int, int, int, float, str, Path, RepoComparison]] = []
+    for t in candidates:
+        comp = compare_repo_freshness(
+            from_path,
+            t.path,
+            include_data=include_data,
+            include_models=include_models,
+        )
+        same_root = 1 if _path_root_key(t.path) == from_root else 0
+        freshness = _repo_freshness(t.path)
+        ranked.append(
+            (
+                same_root,
+                priority.get(comp.recommendation, 9),
+                0 if t.remembered else 1,
+                -t.score,
+                -freshness,
+                str(t.path).lower(),
+                t.path,
+                comp,
+            )
+        )
+
+    ranked.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4], x[5]))
+    best = ranked[0]
+    return best[6], best[7]
+
+
+def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int:
+    print(f"[SOURCE] {source.path} ({source.reason})")
+    source_repo = Path(source.path).expanduser().resolve()
+    targets = _discover_duplicate_targets(source_repo)
+    by_path = {str(t.path): t for t in targets}
+    from_arg = (getattr(args, "duplicate_from", "") or "").strip()
+    to_arg = (getattr(args, "duplicate_to", "") or "").strip()
+    from_path = _normalize_repo_path(from_arg) if from_arg else None
+    to_path = _normalize_repo_path(to_arg) if to_arg else None
+
+    if from_path is not None:
+        if from_path != source_repo and str(from_path) not in by_path:
+            print(f"[ERROR] --duplicate-from not detected as a target: {from_path}")
+            return 2
+        if not _has_repo_marker(from_path):
+            print(f"[ERROR] --duplicate-from is not a CITL repo: {from_path}")
+            return 2
+    if to_path and str(to_path) not in by_path:
+        print(f"[ERROR] --duplicate-to not detected as a target: {to_path}")
+        return 2
+
+    if from_path is None:
+        if _is_removable_source_repo(source_repo) and _has_repo_marker(source_repo):
+            from_path = source_repo
+            print(f"[DUPLICATE] auto-source=this USB ({from_path})")
+        else:
+            if not targets:
+                print("[ERROR] No external CITL targets were detected for duplication.")
+                return 2
+            ranked = sorted(targets, key=lambda t: (_repo_freshness(t.path), t.score), reverse=True)
+            from_path = ranked[0].path
+            print(f"[DUPLICATE] auto-source=best detected target ({from_path})")
+
+    assert from_path is not None
+
+    if to_path is None:
+        candidates = [t for t in targets if t.path != from_path]
+        picked = _pick_duplicate_target(
+            from_path,
+            candidates,
+            include_data=bool(args.include_data),
+            include_models=bool(args.include_models),
+        )
+        if picked is None:
+            print(
+                "[ERROR] Need at least one additional USB/external CITL target to duplicate to. "
+                "Connect another CITL USB and try again."
+            )
+            return 2
+        to_path, auto_comp = picked
+        print(f"[DUPLICATE] auto-target=next detected target ({to_path})")
+    else:
+        auto_comp = compare_repo_freshness(
+            from_path,
+            to_path,
+            include_data=bool(args.include_data),
+            include_models=bool(args.include_models),
+        )
+
+    if from_path == to_path:
+        print("[ERROR] Source and destination USB paths are the same.")
+        return 2
+
+    if _path_root_key(from_path) == _path_root_key(to_path):
+        print("[WARN] Source and destination appear to be on the same drive root; continuing anyway.")
+
+    model_source_arg = (getattr(args, "ollama_model_source", "") or "").strip()
+    model_target_arg = (getattr(args, "ollama_model_target", "") or "").strip()
+    if bool(args.include_models) and (not model_source_arg or not model_target_arg):
+        print(
+            "[WARN] --include-models set without both --ollama-model-source and "
+            "--ollama-model-target; external Ollama model store copy will be skipped "
+            "(repo-local models/ollama folders still sync)."
+        )
+
+    print(f"[DUPLICATE] from={from_path}")
+    print(f"[DUPLICATE] to={to_path}")
+    print(f"[DUPLICATE] recommendation={auto_comp.recommendation} ({auto_comp.summary})")
+
+    result = sync_repo(
+        from_path,
+        to_path,
+        include_data=bool(args.include_data),
+        include_models=bool(args.include_models),
+        model_source_dir=(model_source_arg or None),
+        model_target_dir=(model_target_arg or None),
+        log_fn=lambda s: print(s, end=""),
+    )
+    mode = "rsync" if result.used_rsync else "python-copy"
+    print(
+        f"[DONE] USB duplicate mode={mode} copied={result.copied} skipped={result.skipped} "
+        f"errors={result.errors} elapsed={result.elapsed_sec:.1f}s"
+    )
+
+    if not bool(getattr(args, "no_app_key_sync", False)):
+        app_summary = sync_registered_app_key_files(
+            source.path,
+            to_path,
+            log_fn=lambda s: print(s, end=""),
+        )
+        total_copied = sum(v.get("copied", 0) for v in app_summary.values())
+        total_missing = sum(v.get("missing", 0) for v in app_summary.values())
+        app_errors = sum(v.get("errors", 0) for v in app_summary.values())
+        print(
+            f"[DONE] app-key-overlay apps={len(app_summary)} copied={total_copied} "
+            f"missing={total_missing} errors={app_errors}"
+        )
+        total_errors = int(result.errors) + int(app_errors)
+    else:
+        total_errors = int(result.errors)
+
+    try:
+        port_to_ubuntu(to_path, log_fn=lambda s: print(s, end=""))
+    except Exception as e:
+        total_errors += 1
+        print(f"[WARN] Ubuntu port step failed on duplicate target: {e}")
+
+    if bool(getattr(args, "push_target_to_phone", False)):
+        total_errors += _push_repo_copy_to_phone(
+            to_path,
+            phone_arg=str(getattr(args, "phone_serial", "auto") or "auto"),
+            include_data=bool(args.include_data),
+            include_models=bool(args.include_models),
+        )
+
+    return 0 if total_errors == 0 else 1
 
 
 # ── GitHub / git automation ───────────────────────────────────────────────────
@@ -1353,13 +2142,69 @@ def git_commit_and_push(
         lines.append(f"git commit: rc={rc} — {out or err}")
         if rc != 0:
             return False, "\n".join(lines)
+    else:
+        lines.append("Working tree clean — no new commit needed.")
 
-    rc, out, err = _git_run(root, "push", "origin", branch, timeout=60)
+    # Refresh remote refs, then determine ahead/behind.
+    _git_run(root, "fetch", "--quiet", timeout=20)
+    rc_ab, ab, _ = _git_run(root, "rev-list", "--left-right", "--count", f"HEAD...origin/{branch}")
+    ahead = behind = 0
+    if rc_ab == 0 and ab:
+        parts = ab.split()
+        if len(parts) == 2:
+            try:
+                ahead = int(parts[0])
+                behind = int(parts[1])
+            except ValueError:
+                pass
+
+    # If behind/diverged, attempt rebase first so push can succeed.
+    if behind > 0:
+        lines.append(f"Local branch is behind remote by {behind}; attempting pull --rebase first.")
+        rc, out, err = _git_run(root, "pull", "--rebase", "--autostash", "origin", branch, timeout=180)
+        lines.append(f"git pull --rebase origin {branch}: rc={rc}")
+        if out:
+            lines.append(out)
+        if err:
+            lines.append(err)
+        if rc != 0:
+            lines.append(
+                "Rebase/pull failed before push. Resolve conflicts in this repo, then retry push."
+            )
+            return False, "\n".join(lines)
+
+        rc_ab, ab, _ = _git_run(root, "rev-list", "--left-right", "--count", f"HEAD...origin/{branch}")
+        ahead = behind = 0
+        if rc_ab == 0 and ab:
+            parts = ab.split()
+            if len(parts) == 2:
+                try:
+                    ahead = int(parts[0])
+                    behind = int(parts[1])
+                except ValueError:
+                    pass
+
+    if not status["dirty"] and ahead == 0:
+        lines.append("Already up to date with remote — nothing to push.")
+        return True, "\n".join(lines)
+
+    rc, out, err = _git_run(root, "push", "origin", branch, timeout=90)
     lines.append(f"git push origin {branch}: rc={rc}")
     if out:
         lines.append(out)
     if err:
         lines.append(err)
+        # Surface auth errors clearly
+        if any(k in err.lower() for k in ("authentication", "credential", "permission denied",
+                                           "could not read", "403", "401", "token")):
+            lines.append(
+                "\n[AUTH HELP] Push requires GitHub authentication.\n"
+                "Options:\n"
+                "  1. Run in terminal: git config --global credential.helper manager\n"
+                "  2. Use a Personal Access Token (PAT) as your password.\n"
+                "  3. Set up an SSH key: ssh-keygen then add ~/.ssh/id_ed25519.pub to GitHub.\n"
+                "  4. Run: gh auth login  (if GitHub CLI is installed)"
+            )
 
     success = rc == 0
     return success, "\n".join(lines)
@@ -1387,12 +2232,14 @@ def git_pull_repo(
     status = git_status_for_repo(root)
     branch = status.get("branch", "main")
 
-    rc, out, err = _git_run(root, "pull", "origin", branch, "--ff-only", timeout=60)
-    lines: List[str] = [f"git pull origin {branch}: rc={rc}"]
+    rc, out, err = _git_run(root, "pull", "--rebase", "--autostash", "origin", branch, timeout=180)
+    lines: List[str] = [f"git pull --rebase origin {branch}: rc={rc}"]
     if out:
         lines.append(out)
     if err:
         lines.append(err)
+    if rc != 0:
+        lines.append("Pull failed. If there are conflicts, resolve them and run pull again.")
 
     return rc == 0, "\n".join(lines)
 
@@ -1404,8 +2251,7 @@ def git_status_all_apps(source_repo: Path) -> Dict[str, Dict]:
     """
     results: Dict[str, Dict] = {}
     for app in CITL_APPS:
-        rp = app.get("repo_path")
-        root = Path(rp) if rp and Path(rp).exists() else source_repo
+        root = resolve_app_source_root(app, source_repo)
         results[app["name"]] = git_status_for_repo(root)
     return results
 
@@ -1624,6 +2470,20 @@ def sync_ubuntu_launchers(repo: Path) -> Tuple[bool, str]:
             "# Auto-generated by CITL App Sync\n"
             'exec bash "$(dirname "${BASH_SOURCE[0]}")/RUN_APP_SYNC.sh" "$@"\n'
         ),
+        "RUN_LLMOPS.sh": (
+            "#!/usr/bin/env bash\n"
+            "# Auto-generated by CITL App Sync\n"
+            'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+            'VENV="$DIR/.venv"\n'
+            'if [[ ! -d "$VENV" ]]; then bash "$DIR/scripts/linux/setup.sh"; fi\n'
+            'source "$VENV/bin/activate"\n'
+            'SCRIPT1="$DIR/factbook-assistant/citl_llmops_suite.py"\n'
+            'SCRIPT2="$DIR/citl_llmops_suite.py"\n'
+            'SCRIPT=""\n'
+            'if [[ -f "$SCRIPT1" ]]; then SCRIPT="$SCRIPT1"; elif [[ -f "$SCRIPT2" ]]; then SCRIPT="$SCRIPT2"; fi\n'
+            'if [[ -z "$SCRIPT" ]]; then echo "ERROR: LLMOps suite not found"; exit 1; fi\n'
+            'if command -v python3 >/dev/null 2>&1; then exec python3 "$SCRIPT"; else exec python "$SCRIPT"; fi\n'
+        ),
     }
 
     updated: List[str] = []
@@ -1653,6 +2513,153 @@ def sync_ubuntu_launchers(repo: Path) -> Tuple[bool, str]:
     return changed, " | ".join(msg_parts) if msg_parts else "Launchers already up to date."
 
 
+def _slugify_name(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (text or "app").strip().lower()).strip("-")
+    return slug or "app"
+
+
+def _bootstrap_entry_rel(app: dict) -> str:
+    rel = str(app.get("repo_marker") or "").strip()
+    if rel:
+        return rel.replace("\\", "/")
+    keys = app.get("key_files") or []
+    for item in keys:
+        if str(item).strip():
+            return str(item).replace("\\", "/")
+    return ""
+
+
+def _render_bootstrap_cmd(entry_rel: str, app_name: str) -> str:
+    entry_win = entry_rel.replace("/", "\\")
+    ext = Path(entry_rel).suffix.lower()
+    base = (
+        "@echo off\n"
+        "setlocal\n"
+        'set "HERE=%~dp0\\..\\.."\n'
+        f'set "TARGET=%HERE%\\{entry_win}"\n'
+        'if not exist "%TARGET%" (\n'
+        f'  echo {app_name}: entry not found: %TARGET%\n'
+        "  pause\n"
+        "  exit /b 1\n"
+        ")\n"
+    )
+    if ext in (".cmd", ".bat", ".exe"):
+        run = '"%TARGET%" %*\n'
+    elif ext == ".ps1":
+        run = 'powershell -NoProfile -ExecutionPolicy Bypass -File "%TARGET%" %*\n'
+    elif ext == ".py":
+        run = (
+            'if exist "%HERE%\\.venv\\Scripts\\python.exe" (\n'
+            '  "%HERE%\\.venv\\Scripts\\python.exe" "%TARGET%" %*\n'
+            ") else (\n"
+            "  where py >nul 2>&1\n"
+            "  if %ERRORLEVEL%==0 (\n"
+            "    py -3 \"%TARGET%\" %*\n"
+            "  ) else (\n"
+            "    python \"%TARGET%\" %*\n"
+            "  )\n"
+            ")\n"
+        )
+    else:
+        run = 'powershell -NoProfile -Command "Start-Process \\"%HERE%\\""\n'
+    return base + run + "exit /b %ERRORLEVEL%\n"
+
+
+def _render_bootstrap_sh(entry_rel: str, app_name: str) -> str:
+    ext = Path(entry_rel).suffix.lower()
+    base = (
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"\n'
+        f'TARGET="$HERE/{entry_rel}"\n'
+        'if [[ ! -e "$TARGET" ]]; then\n'
+        f'  echo "{app_name}: entry not found: $TARGET"\n'
+        "  exit 1\n"
+        "fi\n"
+    )
+    if ext == ".sh":
+        run = 'exec bash "$TARGET" "$@"\n'
+    elif ext == ".py":
+        run = (
+            'if [[ -x "$HERE/.venv/bin/python3" ]]; then\n'
+            '  exec "$HERE/.venv/bin/python3" "$TARGET" "$@"\n'
+            "fi\n"
+            'if command -v python3 >/dev/null 2>&1; then exec python3 "$TARGET" "$@"; fi\n'
+            'exec python "$TARGET" "$@"\n'
+        )
+    else:
+        run = (
+            f'echo "{app_name}: no Ubuntu-native launcher for {entry_rel}"\n'
+            "echo \"Use this as a placeholder and run the Windows launcher on Windows hosts.\"\n"
+            "exit 2\n"
+        )
+    return base + run
+
+
+def sync_device_agnostic_bootstraps(repo: Path) -> Tuple[bool, str]:
+    """
+    Generate fallback launchers for apps missing an explicit Windows or Ubuntu launcher.
+    This keeps USB copies runnable even when app-specific wrappers are absent.
+    """
+    win_dir = repo / "bootstrap" / "windows"
+    nix_dir = repo / "bootstrap" / "linux"
+    win_dir.mkdir(parents=True, exist_ok=True)
+    nix_dir.mkdir(parents=True, exist_ok=True)
+
+    updated: List[str] = []
+    skipped: List[str] = []
+
+    for app in CITL_APPS:
+        app_name = str(app.get("name") or "App")
+        slug = _slugify_name(app_name)
+        entry_rel = _bootstrap_entry_rel(app)
+        if not entry_rel:
+            skipped.append(f"{app_name}(no-entry)")
+            continue
+
+        win_launcher = str(app.get("launcher_win") or "").strip()
+        win_missing = not win_launcher or not (repo / win_launcher).exists()
+        if win_missing:
+            out = win_dir / f"Run-{slug}.cmd"
+            content = _render_bootstrap_cmd(entry_rel, app_name)
+            old = out.read_text(encoding="utf-8") if out.exists() else ""
+            if old != content:
+                out.write_text(content, encoding="utf-8")
+                updated.append(out.as_posix())
+
+        nix_launcher = str(app.get("launcher_nix") or "").strip()
+        nix_missing = not nix_launcher or not (repo / nix_launcher).exists()
+        if nix_missing:
+            out = nix_dir / f"run-{slug}.sh"
+            content = _render_bootstrap_sh(entry_rel, app_name)
+            old = out.read_text(encoding="utf-8") if out.exists() else ""
+            if old != content:
+                out.write_text(content, encoding="utf-8")
+                if os.name != "nt":
+                    out.chmod(0o755)
+                updated.append(out.as_posix())
+
+    readme = repo / "bootstrap" / "README.txt"
+    readme_text = (
+        "CITL device-agnostic bootstrap launchers\n"
+        "======================================\n\n"
+        "These fallback scripts are auto-generated by CITL App Sync.\n"
+        "They exist for apps that do not yet ship native launchers on both Windows and Ubuntu.\n\n"
+        "Windows fallback folder: bootstrap/windows\n"
+        "Ubuntu fallback folder:  bootstrap/linux\n"
+    )
+    old_readme = readme.read_text(encoding="utf-8") if readme.exists() else ""
+    if old_readme != readme_text:
+        readme.write_text(readme_text, encoding="utf-8")
+        updated.append(readme.as_posix())
+
+    if updated:
+        return True, f"Generated/updated {len(updated)} bootstrap file(s)."
+    if skipped:
+        return False, "No bootstrap updates needed."
+    return False, "Bootstrap launchers already up to date."
+
+
 def port_to_ubuntu(repo: Path, log_fn: LogFn = None) -> Dict[str, str]:
     """
     Run all Ubuntu porting checks on `repo` and return a dict of
@@ -1663,6 +2670,7 @@ def port_to_ubuntu(repo: Path, log_fn: LogFn = None) -> Dict[str, str]:
         ("requirements-linux.txt", sync_requirements_linux),
         ("scripts/linux/setup.sh", sync_linux_setup_script),
         ("Ubuntu launchers", sync_ubuntu_launchers),
+        ("Device-agnostic bootstraps", sync_device_agnostic_bootstraps),
     ]
     for label, fn in checks:
         try:
@@ -1794,6 +2802,45 @@ exec bash "$TARGET/RUN_APP_SYNC.sh" "$@"
 """
 
 
+def _render_duplicate_launcher_sh() -> str:
+    return """#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET=""
+
+pick() {
+  local p="$1"
+  if [ -f "$p/RUN_APP_SYNC.sh" ]; then
+    TARGET="$p"
+    return 0
+  fi
+  return 1
+}
+
+pick "$ROOT" || true
+pick "$ROOT/CITL_FACTBOOK_UBUNTU" || true
+pick "$ROOT/CITL" || true
+pick "$ROOT/PORTABLE_APPS/CITL" || true
+
+if [ -z "$TARGET" ]; then
+  for d in "$ROOT"/*; do
+    [ -d "$d" ] || continue
+    if pick "$d"; then
+      break
+    fi
+  done
+fi
+
+if [ -z "$TARGET" ]; then
+  echo "Could not find RUN_APP_SYNC.sh under: $ROOT"
+  exit 1
+fi
+
+exec bash "$TARGET/RUN_APP_SYNC.sh" --source "$TARGET" --duplicate-usb --duplicate-from "$TARGET" "$@"
+"""
+
+
 def _render_sync_launcher_cmd() -> str:
     return r"""@echo off
 setlocal enableextensions
@@ -1826,14 +2873,59 @@ exit /b %ERRORLEVEL%
 """
 
 
+def _render_duplicate_launcher_cmd() -> str:
+    return r"""@echo off
+setlocal enableextensions
+set "ROOT=%~dp0"
+set "TARGET="
+
+if exist "%ROOT%Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%"
+if not defined TARGET if exist "%ROOT%CITL_FACTBOOK_UBUNTU\Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%CITL_FACTBOOK_UBUNTU\"
+if not defined TARGET if exist "%ROOT%CITL\Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%CITL\"
+if not defined TARGET if exist "%ROOT%PORTABLE_APPS\CITL\Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%PORTABLE_APPS\CITL\"
+
+if not defined TARGET (
+  for /d %%D in ("%ROOT%*") do (
+    if exist "%%~fD\Run-CITL-App-Sync.ps1" (
+      set "TARGET=%%~fD\"
+      goto :found
+    )
+  )
+)
+
+:found
+if not defined TARGET (
+  echo Could not find Run-CITL-App-Sync.ps1 under %ROOT%
+  pause
+  exit /b 1
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%TARGET%Run-CITL-App-Sync.ps1" --source "%TARGET%" --duplicate-usb --duplicate-from "%TARGET%" %*
+exit /b %ERRORLEVEL%
+"""
+
+
 def _render_sync_launcher_readme() -> str:
     return (
         "CITL Sync Utility Launchers\n"
         "===========================\n\n"
         "Ubuntu launcher: RUN_APP_SYNC_UBUNTU.sh\n"
         "Windows launcher: RUN_APP_SYNC_WINDOWS.cmd\n\n"
+        "Self-duplicate launchers (USB -> next USB):\n"
+        "  Ubuntu: COPY_THIS_USB_TO_NEXT_UBUNTU.sh\n"
+        "  Windows: COPY_THIS_USB_TO_NEXT_WINDOWS.cmd\n\n"
         "These launchers search this USB drive for the CITL repo and then open the\n"
-        "cross-platform sync utility.\n"
+        "cross-platform sync utility.\n\n"
+        "Default sync behavior is time-considerate: full repo delta copy while excluding\n"
+        "large model/data/media folders unless explicitly requested.\n\n"
+        "Headless options:\n"
+        "  --sync-best-usb                 Auto-pick best USB target and sync PC -> USB\n"
+        "  --duplicate-usb                 Duplicate one USB copy to another\n"
+        "  --duplicate-from <path>         Source USB path for duplicate mode\n"
+        "  --duplicate-to <path>           Destination USB path for duplicate mode\n"
+        "  --include-models                Include repo models/ollama folders\n"
+        "  --ollama-model-source <path>    Optional external Ollama model source directory\n"
+        "  --ollama-model-target <path>    Optional external Ollama model target directory\n"
     )
 
 
@@ -1869,23 +2961,32 @@ def install_sync_launchers(target_repo: PathLike, log_fn: LogFn = None) -> List[
         if dtype == 2 and usb_root != target:
             locations.insert(0, usb_root)
     else:
-        locations = [usb_root]
-        if usb_root != target:
-            locations.append(target)
+        if _is_external_mount_path(target):
+            locations = [usb_root]
+            if usb_root != target:
+                locations.append(target)
+        else:
+            locations = [target]
 
     written: List[Path] = []
     for loc in locations:
         sh_path = loc / SYNC_LAUNCHER_UBUNTU
         cmd_path = loc / SYNC_LAUNCHER_WINDOWS
+        dup_sh_path = loc / SYNC_DUPLICATE_UBUNTU
+        dup_cmd_path = loc / SYNC_DUPLICATE_WINDOWS
         readme_path = loc / SYNC_LAUNCHER_README
 
         _write_launcher(sh_path, _render_sync_launcher_sh(), make_executable=True)
         _write_launcher(cmd_path, _render_sync_launcher_cmd(), make_executable=False)
+        _write_launcher(dup_sh_path, _render_duplicate_launcher_sh(), make_executable=True)
+        _write_launcher(dup_cmd_path, _render_duplicate_launcher_cmd(), make_executable=False)
         _write_launcher(readme_path, _render_sync_launcher_readme(), make_executable=False)
 
-        written.extend([sh_path, cmd_path, readme_path])
+        written.extend([sh_path, cmd_path, dup_sh_path, dup_cmd_path, readme_path])
         _safe_log(log_fn, f"[LAUNCHER] wrote {sh_path}\n")
         _safe_log(log_fn, f"[LAUNCHER] wrote {cmd_path}\n")
+        _safe_log(log_fn, f"[LAUNCHER] wrote {dup_sh_path}\n")
+        _safe_log(log_fn, f"[LAUNCHER] wrote {dup_cmd_path}\n")
         _safe_log(log_fn, f"[LAUNCHER] wrote {readme_path}\n")
 
     return written
@@ -2031,6 +3132,8 @@ def sync_repo(
     target_repo: PathLike,
     include_data: bool = False,
     include_models: bool = False,
+    model_source_dir: Optional[PathLike] = None,
+    model_target_dir: Optional[PathLike] = None,
     log_fn: LogFn = None,
 ) -> SyncResult:
     src = Path(source_repo).expanduser().resolve()
@@ -2071,6 +3174,16 @@ def sync_repo(
         except Exception as e:
             _safe_log(log_fn, f"[WARN] Ubuntu port ({label}) failed: {e}\n")
 
+    if include_models and model_source_dir and model_target_dir:
+        try:
+            sync_external_model_store(
+                model_source_dir,
+                model_target_dir,
+                log_fn=log_fn,
+            )
+        except Exception as e:
+            _safe_log(log_fn, f"[WARN] external model sync failed: {e}\n")
+
     return result
 
 
@@ -2088,11 +3201,12 @@ def open_in_file_manager(path: PathLike) -> None:
 class SyncGUI:
     def __init__(self, source_repo: PathLike, source_reason: str = "", source_freshness_ts: float = 0.0):
         import tkinter as tk
-        from tkinter import messagebox, scrolledtext
+        from tkinter import filedialog, messagebox, scrolledtext
 
         self.tk = tk
         self.messagebox = messagebox
         self.scrolledtext = scrolledtext
+        self.filedialog = filedialog
 
         self.colors = {
             "bg": "#07101c",
@@ -2127,8 +3241,22 @@ class SyncGUI:
         self.root.minsize(1080, 760)
         self.root.configure(bg=self.colors["bg"])
         self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_rowconfigure(2, weight=3)
-        self.root.grid_rowconfigure(6, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
+
+        # Scrollable outer layout so the full dashboard is reachable on smaller screens.
+        self.main_canvas = tk.Canvas(self.root, bg=self.colors["bg"], highlightthickness=0, bd=0)
+        self.main_scroll = tk.Scrollbar(self.root, orient="vertical", command=self.main_canvas.yview)
+        self.main_canvas.configure(yscrollcommand=self.main_scroll.set)
+        self.main_canvas.grid(row=0, column=0, sticky="nsew")
+        self.main_scroll.grid(row=0, column=1, sticky="ns")
+
+        self.main_frame = tk.Frame(self.main_canvas, bg=self.colors["bg"])
+        self.main_window = self.main_canvas.create_window((0, 0), window=self.main_frame, anchor="nw")
+        self.main_frame.bind("<Configure>", self._sync_main_scrollregion)
+        self.main_canvas.bind("<Configure>", self._on_main_canvas_configure)
+        self.root.bind_all("<MouseWheel>", self._on_main_mousewheel)
+        self.root.bind_all("<Button-4>", self._on_main_mousewheel)
+        self.root.bind_all("<Button-5>", self._on_main_mousewheel)
 
         self.status_var = tk.StringVar(value="Ready.")
         self.target_var = tk.StringVar(value="")
@@ -2154,6 +3282,7 @@ class SyncGUI:
         self.detail_device_var = tk.StringVar(value="No phone selected")
 
         self._git_statuses: Dict[str, Dict] = {}   # populated by _refresh_git_statuses
+        self._git_accounts: List[Dict[str, str]] = []
         self._build_ui()
         self.refresh_targets()
         # Fetch git statuses in background at startup
@@ -2226,6 +3355,54 @@ class SyncGUI:
         btn.configure(state=state)
         return btn
 
+    def _sync_main_scrollregion(self, _event=None) -> None:
+        self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all"))
+
+    def _on_main_canvas_configure(self, event) -> None:
+        self.main_canvas.itemconfigure(self.main_window, width=event.width)
+
+    def _is_descendant_widget(self, widget, ancestor) -> bool:
+        cur = widget
+        while cur is not None:
+            if cur == ancestor:
+                return True
+            cur = getattr(cur, "master", None)
+        return False
+
+    def _on_main_mousewheel(self, event) -> None:
+        # Allow text and entry controls to keep their own native scroll behavior.
+        try:
+            klass = str(event.widget.winfo_class()).lower()
+        except Exception:
+            klass = ""
+        if klass in ("text", "entry", "spinbox", "listbox"):
+            return
+
+        delta_units = 0
+        if getattr(event, "num", None) == 4:
+            delta_units = -1
+        elif getattr(event, "num", None) == 5:
+            delta_units = 1
+        else:
+            delta = int(getattr(event, "delta", 0) or 0)
+            if delta != 0:
+                delta_units = -1 if delta > 0 else 1
+
+        if delta_units:
+            target_canvas = self.main_canvas
+            if (
+                getattr(self, "tiles_canvas", None) is not None
+                and (
+                    event.widget == self.tiles_canvas
+                    or (
+                        getattr(self, "tiles_inner", None) is not None
+                        and self._is_descendant_widget(event.widget, self.tiles_inner)
+                    )
+                )
+            ):
+                target_canvas = self.tiles_canvas
+            target_canvas.yview_scroll(delta_units, "units")
+
     def _device_label(self, device: PhoneDevice) -> str:
         meta = (device.meta or "").strip()
         return f"{device.serial}  {meta}".strip()
@@ -2277,8 +3454,12 @@ class SyncGUI:
 
     def _build_ui(self) -> None:
         self._update_source_meta()
+        page = self.main_frame
+        page.grid_columnconfigure(0, weight=1)
+        page.grid_rowconfigure(2, weight=3)
+        page.grid_rowconfigure(6, weight=1)
 
-        header = self.tk.Frame(self.root, bg=self.colors["bg"])
+        header = self.tk.Frame(page, bg=self.colors["bg"])
         header.grid(row=0, column=0, sticky="ew", padx=22, pady=(18, 10))
         header.grid_columnconfigure(0, weight=1)
         self._make_label(
@@ -2296,7 +3477,7 @@ class SyncGUI:
         ).grid(row=1, column=0, sticky="w", pady=(6, 0))
 
 
-        top = self.tk.Frame(self.root, bg=self.colors["bg"])
+        top = self.tk.Frame(page, bg=self.colors["bg"])
         top.grid(row=1, column=0, sticky="ew", padx=22, pady=(0, 12))
         top.grid_columnconfigure(0, weight=3)
         top.grid_columnconfigure(1, weight=4)
@@ -2435,8 +3616,15 @@ class SyncGUI:
         self.remember_btn.grid(row=2, column=1, sticky="ew", padx=8)
         self.close_btn = self._make_button(action_grid, "Close", self.root.destroy)
         self.close_btn.grid(row=2, column=2, sticky="ew", padx=(8, 0))
+        self.duplicate_btn = self._make_button(
+            action_grid,
+            "6. Duplicate Selected USB -> Backup USB",
+            self.on_duplicate_usb,
+            state="disabled",
+        )
+        self.duplicate_btn.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(10, 0))
 
-        body = self.tk.Frame(self.root, bg=self.colors["bg"])
+        body = self.tk.Frame(page, bg=self.colors["bg"])
         body.grid(row=2, column=0, sticky="nsew", padx=22, pady=(0, 12))
         body.grid_columnconfigure(0, weight=4)
         body.grid_columnconfigure(1, weight=3)
@@ -2538,8 +3726,8 @@ class SyncGUI:
             ).grid(row=idx * 2 + 1, column=0, sticky="w")
 
         # ── GitHub Sync Panel (row 3) ──────────────────────────────────────────
-        self.root.grid_rowconfigure(3, weight=0)
-        gh_panel = self._panel(self.root, self.colors["panel"])
+        page.grid_rowconfigure(3, weight=0)
+        gh_panel = self._panel(page, self.colors["panel"])
         gh_panel.grid(row=3, column=0, sticky="ew", padx=22, pady=(0, 8))
         gh_panel.grid_columnconfigure(0, weight=1)
 
@@ -2563,14 +3751,28 @@ class SyncGUI:
             font=("Consolas", 10),
         ).grid(row=1, column=0, sticky="w", pady=(2, 0))
 
+        # Git auth status indicator
+        self.gh_auth_var = self.tk.StringVar(value="")
+        self._make_label(
+            gh_header,
+            textvariable=self.gh_auth_var,
+            bg=self.colors["panel"],
+            fg=self.colors["warn"],
+            font=("Segoe UI", 9),
+        ).grid(row=2, column=0, sticky="w", pady=(2, 0))
+
         gh_btns = self.tk.Frame(gh_header, bg=self.colors["panel"])
-        gh_btns.grid(row=0, column=1, rowspan=2, sticky="e")
+        gh_btns.grid(row=0, column=1, rowspan=3, sticky="e")
         self._make_button(gh_btns, "Refresh Git Status", self._refresh_git_statuses).grid(
-            row=0, column=0, padx=(0, 8))
-        self._make_button(gh_btns, "Push All Updated", self.on_git_push_all).grid(
-            row=0, column=1, padx=(0, 8))
+            row=0, column=0, padx=(0, 6))
+        self._make_button(gh_btns, "Push All Updated", self.on_git_push_all, accent=True).grid(
+            row=0, column=1, padx=(0, 6))
         self._make_button(gh_btns, "Pull All Newer", self.on_git_pull_all_newer).grid(
-            row=0, column=2)
+            row=0, column=2, padx=(0, 6))
+        self._make_button(gh_btns, "Check Git Auth", self._check_git_auth).grid(
+            row=0, column=3, padx=(0, 6))
+        self._make_button(gh_btns, "Open GitHub.com", self._open_github_web).grid(
+            row=0, column=4)
 
         self.gh_apps_frame = self.tk.Frame(gh_panel, bg=self.colors["panel"])
         self.gh_apps_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 14))
@@ -2583,8 +3785,8 @@ class SyncGUI:
         ).grid(row=0, column=0, sticky="w", padx=8)
 
         # ── CITL App Overview (row 4) ──────────────────────────────────────────
-        self.root.grid_rowconfigure(4, weight=0)
-        apps_panel = self._panel(self.root, self.colors["panel"])
+        page.grid_rowconfigure(4, weight=0)
+        apps_panel = self._panel(page, self.colors["panel"])
         apps_panel.grid(row=4, column=0, sticky="ew", padx=22, pady=(0, 12))
         apps_panel.grid_columnconfigure(0, weight=1)
         self._make_label(
@@ -2599,7 +3801,7 @@ class SyncGUI:
         self._render_apps_overview()
 
         status_bar = self.tk.Label(
-            self.root,
+            page,
             textvariable=self.status_var,
             bg=self.colors["panel"],
             fg=self.colors["text"],
@@ -2610,7 +3812,7 @@ class SyncGUI:
         )
         status_bar.grid(row=5, column=0, sticky="ew")
 
-        log_panel = self._panel(self.root, self.colors["panel"])
+        log_panel = self._panel(page, self.colors["panel"])
         log_panel.grid(row=6, column=0, sticky="nsew", padx=22, pady=(0, 18))
         log_panel.grid_columnconfigure(0, weight=1)
         log_panel.grid_rowconfigure(1, weight=1)
@@ -2775,6 +3977,7 @@ class SyncGUI:
     def _update_action_states(self) -> None:
         has_target = self._selected_target() is not None
         has_device = self._selected_device() is not None
+        can_duplicate = has_target and len(self.targets) >= 2
         normal = "disabled" if self._busy else "normal"
         self.refresh_btn.configure(state=normal)
         self.pick_btn.configure(state=normal if (self.targets and not self._busy) else "disabled")
@@ -2783,6 +3986,7 @@ class SyncGUI:
         self.phone_btn.configure(state=normal if (has_target and has_device and not self._busy) else "disabled")
         self.open_target_btn.configure(state=normal if (has_target and not self._busy) else "disabled")
         self.remember_btn.configure(state=normal if (has_target and not self._busy) else "disabled")
+        self.duplicate_btn.configure(state=normal if (can_duplicate and not self._busy) else "disabled")
 
     def _bind_tile_select(self, widget, target_path: Path) -> None:
         widget.bind("<Button-1>", lambda _event, p=target_path: self._select_target(p))
@@ -2818,12 +4022,7 @@ class SyncGUI:
 
     def _app_source_root(self, app: dict) -> Path:
         """Return the source root for an app — its own repo_path if set, else the CITL source repo."""
-        rp = app.get("repo_path")
-        if rp:
-            p = Path(rp)
-            if p.exists():
-                return p
-        return self.source_repo
+        return resolve_app_source_root(app, self.source_repo)
 
     # ── GitHub sync methods ───────────────────────────────────────────────────
 
@@ -2834,31 +4033,72 @@ class SyncGUI:
     def _refresh_git_statuses(self) -> None:
         """Fetch git status for all apps in a background thread, then re-render."""
         self._set_status("Fetching git status from GitHub...")
+        self._append("\n[GITHUB] Refresh Git Status requested.\n")
 
         def worker():
             statuses: Dict[str, Dict] = {}
-            # Also detect logged-in git user from source repo
+            accounts: List[Dict[str, str]] = []
             user_name, user_email = "", ""
-            rc, u, _ = _git_run(self.source_repo, "config", "user.name")
-            if rc == 0: user_name = u
-            rc, e, _ = _git_run(self.source_repo, "config", "user.email")
-            if rc == 0: user_email = e
+
+            try:
+                rc, u, _ = _git_run(self.source_repo, "config", "user.name")
+                if rc == 0:
+                    user_name = u
+                rc, e, _ = _git_run(self.source_repo, "config", "user.email")
+                if rc == 0:
+                    user_email = e
+            except Exception:
+                pass
+
+            try:
+                accounts = self._detect_git_accounts()
+            except Exception as e:
+                self.root.after(0, lambda t=str(e): self._append(f"[GIT][WARN] account scan failed: {t}\n"))
 
             for app in CITL_APPS:
-                root = self._git_repo_root_for_app(app)
-                if root:
-                    statuses[app["name"]] = git_status_for_repo(root)
-                else:
-                    statuses[app["name"]] = {"error": "No git repo found"}
+                self.root.after(0, lambda n=app["name"]: self._append(f"[GITHUB] checking {n}...\n"))
+                try:
+                    root = self._git_repo_root_for_app(app)
+                    if root:
+                        statuses[app["name"]] = git_status_for_repo(root)
+                    else:
+                        statuses[app["name"]] = {"error": "No git repo found"}
+                except Exception as e:
+                    statuses[app["name"]] = {"error": f"Status failed: {e}"}
 
-            self.root.after(0, lambda: self._apply_git_statuses(statuses, user_name, user_email))
+            self.root.after(0, lambda: self._apply_git_statuses(statuses, user_name, user_email, accounts))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _apply_git_statuses(self, statuses: Dict[str, Dict], user_name: str, user_email: str) -> None:
+    def _apply_git_statuses(
+        self,
+        statuses: Dict[str, Dict],
+        user_name: str,
+        user_email: str,
+        accounts: Optional[List[Dict[str, str]]] = None,
+    ) -> None:
         self._git_statuses = statuses
-        if user_name:
+        self._git_accounts = list(accounts or [])
+
+        if self._git_accounts:
+            if len(self._git_accounts) == 1:
+                a = self._git_accounts[0]
+                self.gh_user_var.set(f"Logged in as: {a['name']} <{a['email']}>")
+                self.gh_auth_var.set("")
+            else:
+                first = self._git_accounts[0]
+                self.gh_user_var.set(
+                    f"Logged in as: {first['name']} <{first['email']}> (+{len(self._git_accounts) - 1} more)"
+                )
+                self.gh_auth_var.set(
+                    "Multiple Git identities detected. Click 'Check Git Auth' to choose repo-local identity."
+                )
+        elif user_name:
             self.gh_user_var.set(f"Logged in as: {user_name} <{user_email}>")
+            self.gh_auth_var.set("")
+        else:
+            self.gh_user_var.set("Logged in as: (no git identity detected)")
+
         self._render_github_panel()
         self._set_status("Git status refreshed.")
 
@@ -2981,6 +4221,272 @@ class SyncGUI:
             pull_btn.grid(row=0, column=1, sticky="ew", padx=(4, 0))
             btn_row.grid_columnconfigure(1, weight=1)
 
+    def _detect_git_accounts(self) -> List[Dict[str, str]]:
+        """
+        Scan the device for git identities already configured.
+        Returns a list of dicts: [{name, email, source}, ...]
+        Sources checked (in order): local repo config, global config, gh CLI, SSH config.
+        Deduplicates by email when possible.
+        """
+        accounts: List[Dict[str, str]] = []
+        seen_keys: set = set()
+
+        def _add(name: str, email: str, source: str) -> None:
+            e = (email or "").strip().lower()
+            n = (name or "").strip()
+            if not n and not e:
+                return
+            if not e and n:
+                e = f"{n.lower()}@users.noreply.github.com"
+            key = e or f"{source}:{n.lower()}"
+            if key in seen_keys:
+                return
+            seen_keys.add(key)
+            accounts.append({"name": n or e.split("@")[0], "email": e, "source": source})
+
+        def _owner_from_remote(remote_url: str) -> str:
+            raw = (remote_url or "").strip()
+            if not raw:
+                return ""
+            m = re.search(r"github\.com[:/]+([^/]+)/", raw, re.IGNORECASE)
+            if m:
+                return m.group(1).strip()
+            return ""
+
+        # 1. Repo-local config (highest priority)
+        rc, n, _ = _git_run(self.source_repo, "config", "--local", "user.name")
+        rc2, e, _ = _git_run(self.source_repo, "config", "--local", "user.email")
+        if rc == 0 and rc2 == 0 and e.strip():
+            _add(n, e, "repo-local")
+
+        # 1b. Repo-local config from all app repos (can differ per app/repo)
+        for app in CITL_APPS:
+            root = self._git_repo_root_for_app(app)
+            if not root:
+                continue
+            rc, n, _ = _git_run(root, "config", "--local", "user.name")
+            rc2, e, _ = _git_run(root, "config", "--local", "user.email")
+            if rc == 0 and rc2 == 0 and (n.strip() or e.strip()):
+                _add(n, e, f"repo-local:{app['name']}")
+            rc3, remote_url, _ = _git_run(root, "remote", "get-url", "origin")
+            if rc3 == 0 and remote_url.strip():
+                owner = _owner_from_remote(remote_url)
+                if owner:
+                    _add(owner, f"{owner}@users.noreply.github.com", f"origin-owner:{app['name']}")
+
+        # 2. Global git config
+        rc, n, _ = _git_run(self.source_repo, "config", "--global", "user.name")
+        rc2, e, _ = _git_run(self.source_repo, "config", "--global", "user.email")
+        if rc == 0 and rc2 == 0 and e.strip():
+            _add(n, e, "git-global")
+
+        # 3. GitHub CLI identities
+        try:
+            result = subprocess.run(
+                ["gh", "auth", "status", "-h", "github.com"],
+                capture_output=True, text=True, timeout=6,
+            )
+            combined = (result.stdout or "") + (result.stderr or "")
+            for m in re.finditer(r"Logged in to github\.com.*?as\s+([^\s]+)", combined, re.IGNORECASE):
+                gh_user = m.group(1).strip()
+                _add(gh_user, f"{gh_user}@users.noreply.github.com", "gh-cli")
+            for m in re.finditer(r"github\.com\s+account\s+([^\s]+)", combined, re.IGNORECASE):
+                gh_user = m.group(1).strip()
+                _add(gh_user, f"{gh_user}@users.noreply.github.com", "gh-cli")
+        except Exception:
+            pass
+
+        # 4. Windows Credential Manager entries for github.com
+        if os.name == "nt":
+            try:
+                cred = subprocess.run(
+                    ["cmdkey", "/list"],
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                )
+                ctext = (cred.stdout or "") + (cred.stderr or "")
+                for m in re.finditer(r"git:https://([^@\s]+)@github\.com", ctext, re.IGNORECASE):
+                    user = m.group(1).strip()
+                    _add(user, f"{user}@users.noreply.github.com", "win-credential-manager")
+            except Exception:
+                pass
+
+        # 5. Multiple identities in SSH config (~/.ssh/config  Host github-*)
+        ssh_conf = Path.home() / ".ssh" / "config"
+        if ssh_conf.exists():
+            try:
+                txt = ssh_conf.read_text(encoding="utf-8", errors="ignore")
+                for m in re.finditer(r"Host\s+(github[^\n]+)", txt, re.IGNORECASE):
+                    host_alias = m.group(1).strip()
+                    if host_alias.lower() != "github.com":
+                        # Extract identity comment if present
+                        block_start = m.start()
+                        block = txt[block_start:block_start + 300]
+                        id_m = re.search(r"IdentityFile\s+(\S+)", block, re.IGNORECASE)
+                        if id_m:
+                            key_path = Path(id_m.group(1).replace("~", str(Path.home())))
+                            pub = key_path.with_suffix(".pub")
+                            if pub.exists():
+                                pub_text = pub.read_text(encoding="utf-8", errors="ignore").strip()
+                                comment = pub_text.split()[-1] if pub_text.split() else ""
+                                if "@" in comment:
+                                    _add(host_alias, comment, f"ssh-config({host_alias})")
+            except Exception:
+                pass
+
+        # 6. SSH public key comments often include account email.
+        ssh_dir = Path.home() / ".ssh"
+        if ssh_dir.exists():
+            try:
+                for pub in ssh_dir.glob("*.pub"):
+                    try:
+                        text = pub.read_text(encoding="utf-8", errors="ignore").strip()
+                    except Exception:
+                        continue
+                    parts = text.split()
+                    if not parts:
+                        continue
+                    comment = parts[-1]
+                    if "@" in comment:
+                        _add(pub.stem, comment, f"ssh-key:{pub.name}")
+            except Exception:
+                pass
+
+        return accounts
+
+    def _check_git_auth(self) -> None:
+        """Detect all git accounts on this device; if multiple, offer account selection."""
+        self._set_status("Detecting git accounts...")
+        self._append("\n[GITHUB] Check Git Auth requested.\n")
+
+        def worker():
+            accounts = self._detect_git_accounts()
+
+            if not accounts:
+                self.root.after(0, lambda: (
+                    self.gh_auth_var.set("No git account detected on this device"),
+                    self._set_status("No git identity found."),
+                    self._append("\n[GIT] No git user.name/email configured on this device.\n"
+                                 "Run: git config --global user.name 'Your Name'\n"
+                                 "     git config --global user.email 'you@example.com'\n"),
+                ))
+                return
+
+            if len(accounts) == 1:
+                a = accounts[0]
+                label = f"{a['name']} <{a['email']}> [{a['source']}]"
+                self.root.after(0, lambda: (
+                    self.gh_user_var.set(f"Account: {label}"),
+                    self.gh_auth_var.set(""),
+                    self._set_status(f"Using: {label}"),
+                    self._append(f"\n[GIT] Active account: {label}\n"),
+                ))
+            else:
+                # Multiple accounts — let user pick
+                self.root.after(0, lambda: self._prompt_account_selection(accounts))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _prompt_account_selection(self, accounts: List[Dict[str, str]]) -> None:
+        """Show a simple dialog to pick which git identity to use for this repo."""
+        import tkinter as _tk
+
+        dlg = _tk.Toplevel(self.root)
+        dlg.title("Select GitHub Account")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.configure(bg=self.colors["bg"])
+
+        _tk.Label(dlg, text="Multiple git accounts detected.\nSelect which to use for this repo:",
+                  bg=self.colors["bg"], fg=self.colors["text"],
+                  font=("Segoe UI", 11), justify="left").pack(padx=20, pady=(16, 8))
+
+        choice_var = _tk.StringVar()
+        options = [f"{a['name']} <{a['email']}> [{a['source']}]" for a in accounts]
+        choice_var.set(options[0])
+
+        for opt in options:
+            _tk.Radiobutton(
+                dlg, text=opt, variable=choice_var, value=opt,
+                bg=self.colors["bg"], fg=self.colors["text"],
+                selectcolor=self.colors["card"],
+                activebackground=self.colors["bg"],
+                font=("Segoe UI", 10),
+            ).pack(anchor="w", padx=24, pady=2)
+
+        def _apply_identity(name: str, email: str, chosen_label: str) -> None:
+            # Write repo-local config across all detected app repos so Push/Pull uses
+            # the selected identity consistently.
+            roots: Dict[str, Path] = {}
+            src_root = _find_git_root(self.source_repo)
+            if src_root:
+                roots[str(src_root)] = src_root
+            for app in CITL_APPS:
+                r = self._git_repo_root_for_app(app)
+                if r:
+                    roots[str(r)] = r
+            for r in roots.values():
+                _git_run(r, "config", "--local", "user.name", name)
+                _git_run(r, "config", "--local", "user.email", email)
+            self.gh_user_var.set(f"Account: {chosen_label}")
+            self.gh_auth_var.set("")
+            self._set_status(f"Account set to: {name} <{email}> across {len(roots)} repo(s)")
+            self._append(
+                f"\n[GIT] Account set (repo-local across {len(roots)} repos): {chosen_label}\n"
+            )
+            dlg.destroy()
+
+        def _apply():
+            chosen = choice_var.get()
+            idx = options.index(chosen)
+            a = accounts[idx]
+            _apply_identity(a["name"], a["email"], chosen)
+
+        def _manual():
+            from tkinter import simpledialog
+
+            name = simpledialog.askstring("Manual Git Name", "Enter git user.name:", parent=dlg)
+            if name is None:
+                return
+            name = name.strip()
+            if not name:
+                self.messagebox.showerror("Invalid name", "git user.name cannot be blank.", parent=dlg)
+                return
+
+            email = simpledialog.askstring("Manual Git Email", "Enter git user.email:", parent=dlg)
+            if email is None:
+                return
+            email = email.strip().lower()
+            if "@" not in email:
+                self.messagebox.showerror("Invalid email", "Enter a valid email address.", parent=dlg)
+                return
+
+            label = f"{name} <{email}> [manual]"
+            _apply_identity(name, email, label)
+
+        btn_row = _tk.Frame(dlg, bg=self.colors["bg"])
+        btn_row.pack(pady=(12, 16))
+        self._make_button(btn_row, "Use This Account", _apply, accent=True).pack(side="left", padx=8)
+        self._make_button(btn_row, "Use Manual...", _manual).pack(side="left", padx=8)
+        self._make_button(btn_row, "Cancel", dlg.destroy).pack(side="left")
+
+    def _open_github_web(self) -> None:
+        """Open the GitHub remote URL in the default browser."""
+        rc, url, _ = _git_run(self.source_repo, "remote", "get-url", "origin")
+        if rc == 0 and url:
+            web_url = url.strip()
+            if web_url.startswith("git@"):
+                # Convert SSH to HTTPS
+                web_url = re.sub(r"^git@github\.com:", "https://github.com/", web_url)
+                web_url = re.sub(r"\.git$", "", web_url)
+            elif web_url.endswith(".git"):
+                web_url = web_url[:-4]
+            import webbrowser
+            webbrowser.open(web_url)
+        else:
+            self.messagebox.showinfo("No remote", "No 'origin' remote URL configured for this repo.")
+
     def _on_git_push_app(self, app: dict) -> None:
         root = self._git_repo_root_for_app(app)
         if root is None:
@@ -3037,6 +4543,7 @@ class SyncGUI:
 
     def on_git_push_all(self) -> None:
         """Push all apps that are dirty or ahead of remote."""
+        self._append("\n[GITHUB] Push All Updated requested.\n")
         to_push = [
             app for app in CITL_APPS
             if (self._git_statuses.get(app["name"]) or {}).get("dirty")
@@ -3086,6 +4593,7 @@ class SyncGUI:
 
     def on_git_pull_all_newer(self) -> None:
         """Pull all apps where remote has newer commits."""
+        self._append("\n[GITHUB] Pull All Newer requested.\n")
         to_pull = [
             app for app in CITL_APPS
             if int((self._git_statuses.get(app["name"]) or {}).get("behind", 0)) > 0
@@ -3319,13 +4827,25 @@ class SyncGUI:
             ).grid(row=4, column=0, sticky="w", pady=(8, 0))
 
             # Platform readiness (check against the app's own source root)
-            win_ok = (src_root / app["launcher_win"]).exists() if app.get("launcher_win") else None
-            nix_ok = (src_root / app["launcher_nix"]).exists() if app.get("launcher_nix") else None
+            slug = _slugify_name(app.get("name", "app"))
+            fallback_win = self.source_repo / "bootstrap" / "windows" / f"Run-{slug}.cmd"
+            fallback_nix = self.source_repo / "bootstrap" / "linux" / f"run-{slug}.sh"
+
+            win_ok = None
+            nix_ok = None
             parts = []
-            if win_ok is not None:
+            if app.get("launcher_win"):
+                win_ok = (src_root / app["launcher_win"]).exists() or fallback_win.exists()
                 parts.append(f"Win {'OK' if win_ok else '!'}")
-            if nix_ok is not None:
+            else:
+                win_ok = fallback_win.exists()
+                parts.append(f"Win {'OK' if win_ok else '!'} (bootstrap)")
+            if app.get("launcher_nix"):
+                nix_ok = (src_root / app["launcher_nix"]).exists() or fallback_nix.exists()
                 parts.append(f"Ubuntu {'OK' if nix_ok else '!'}")
+            else:
+                nix_ok = fallback_nix.exists()
+                parts.append(f"Ubuntu {'OK' if nix_ok else '!'} (bootstrap)")
             if parts:
                 all_ok = all(x for x in [win_ok, nix_ok] if x is not None)
                 self._make_label(
@@ -3555,6 +5075,8 @@ class SyncGUI:
             self.guide_var.set("Guide: the selected copy appears aligned. No repo sync is needed unless you want a fresh export to phone.")
         else:
             self.guide_var.set("Guide: both sides have differences. Review the counts before pushing or pulling so you do not overwrite newer work.")
+        if len(self.targets) >= 2:
+            self.guide_var.set(self.guide_var.get() + " You can also duplicate the selected USB to another backup USB.")
         self.guide_label.configure(fg=self._recommendation_color(comparison))
 
     def _update_health_banner(self, *, log: bool = False) -> None:
@@ -3704,6 +5226,127 @@ class SyncGUI:
         self._set_status("Health check complete.")
 
 
+    def _choose_duplicate_destination(self, source_target: Path) -> Optional[Tuple[Path, RepoComparison]]:
+        candidates = [t for t in self.targets if t.path != source_target]
+        if not candidates:
+            return None
+        picked = _pick_duplicate_target(
+            source_target,
+            candidates,
+            include_data=bool(self.include_data_var.get()),
+            include_models=bool(self.include_models_var.get()),
+        )
+        if picked is None:
+            return None
+        dest_target, comparison = picked
+        self._append(f"[DUPLICATE] auto-picked destination: {dest_target}\n")
+        return dest_target, comparison
+
+    def _prepare_model_sync_plan(
+        self,
+        op_label: str,
+        source_repo_for_models: Path,
+        target_repo_for_models: Path,
+    ) -> Optional[Tuple[bool, Optional[Path], Optional[Path]]]:
+        include_models = bool(self.include_models_var.get())
+        if not include_models:
+            return (False, None, None)
+
+        model_candidates = candidate_ollama_model_dirs(source_repo_for_models)
+        default_source = model_candidates[0] if model_candidates else None
+        default_target = recommended_ollama_model_target_dir(target_repo_for_models)
+
+        detected_size = _dir_size_bytes(default_source) if default_source else 0
+        size_msg = _fmt_bytes(detected_size) if detected_size > 0 else "unknown"
+        warn = (
+            f"{op_label} requested model sync.\n\n"
+            "Model files can be very large (often 8 GB to 100+ GB).\n"
+            "Please make sure you already pulled required models first, for example:\n"
+            "  ollama pull qwen2.5:7b\n"
+            "  ollama pull nomic-embed-text\n\n"
+            "Continue with model transfer setup now?"
+        )
+        if not self.messagebox.askyesno("Model Sync Preflight", warn):
+            if self.messagebox.askyesno(
+                "Skip model files?",
+                "Continue this sync WITHOUT copying model files?",
+            ):
+                return (False, None, None)
+            return None
+
+        source_dir: Optional[Path] = None
+        if default_source:
+            source_prompt = (
+                "Use detected model source directory?\n\n"
+                f"{default_source}\n\n"
+                f"Approximate size: {size_msg}\n"
+            )
+            if detected_size >= MODEL_SYNC_WARN_BYTES:
+                source_prompt += "\nWarning: this is a large transfer."
+            if self.messagebox.askyesno("Model Source Directory", source_prompt):
+                source_dir = default_source
+
+        if source_dir is None:
+            picked = self.filedialog.askdirectory(
+                title="Select Ollama model source directory",
+                initialdir=str(source_repo_for_models),
+                mustexist=True,
+            )
+            if not picked:
+                return None
+            source_dir = Path(picked).expanduser()
+
+        if not source_dir.exists() or not source_dir.is_dir():
+            self.messagebox.showerror("Invalid model source", f"Directory not found:\n{source_dir}")
+            return None
+
+        target_choice = self.messagebox.askyesnocancel(
+            "Model Target Directory",
+            "Choose destination for model storage.\n\n"
+            f"Recommended (keeps models out of repo and easier to manage size):\n{default_target}\n\n"
+            "Yes = use recommended path\n"
+            "No = pick a custom path\n"
+            "Cancel = stop this sync",
+        )
+        if target_choice is None:
+            return None
+        if target_choice:
+            target_dir = default_target
+        else:
+            picked_target = self.filedialog.askdirectory(
+                title="Select destination model directory",
+                initialdir=str(_guess_usb_root(target_repo_for_models)),
+                mustexist=False,
+            )
+            if not picked_target:
+                return None
+            target_dir = Path(picked_target).expanduser()
+
+        self._append(
+            f"[MODEL] external model copy enabled\n"
+            f"[MODEL] source={source_dir} ({_fmt_bytes(_dir_size_bytes(source_dir))})\n"
+            f"[MODEL] target={target_dir}\n"
+        )
+        return (True, source_dir, target_dir)
+
+    def _sync_app_key_overlay(self, target_repo: Path) -> Tuple[int, int, int]:
+        summary = sync_registered_app_key_files(
+            self.source_repo,
+            target_repo,
+            log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+        )
+        total_copied = sum(v.get("copied", 0) for v in summary.values())
+        total_missing = sum(v.get("missing", 0) for v in summary.values())
+        total_errors = sum(v.get("errors", 0) for v in summary.values())
+        self.root.after(
+            0,
+            lambda: self._append(
+                f"[APP-SYNC][OVERLAY] apps={len(summary)} copied={total_copied} "
+                f"missing={total_missing} errors={total_errors}\n"
+            ),
+        )
+        return total_copied, total_missing, total_errors
+
     def _confirm_sync_direction(self, mode: str, snap: TargetStatus) -> bool:
         comparison = snap.comparison
         if mode == "push":
@@ -3756,6 +5399,9 @@ class SyncGUI:
         self._busy = False
         self._update_action_states()
 
+    # Alias used by GitHub worker threads
+    _end_busy = _finish_busy
+
     def on_push_to_target(self) -> None:
         target = self._selected_target()
         snap = self._selected_status()
@@ -3767,6 +5413,14 @@ class SyncGUI:
 
         include_data = bool(self.include_data_var.get())
         include_models = bool(self.include_models_var.get())
+        model_plan = self._prepare_model_sync_plan(
+            "PC -> USB push",
+            self.source_repo,
+            target,
+        )
+        if model_plan is None:
+            return
+        include_models_effective, model_source_dir, model_target_dir = model_plan
         try:
             _remember_target(target)
             self._mark_target_remembered(target)
@@ -3782,7 +5436,9 @@ class SyncGUI:
                     self.source_repo,
                     target,
                     include_data=include_data,
-                    include_models=include_models,
+                    include_models=include_models_effective,
+                    model_source_dir=model_source_dir,
+                    model_target_dir=model_target_dir,
                     log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
                 )
             except Exception as e:
@@ -3799,6 +5455,7 @@ class SyncGUI:
                 )
                 # Auto-bump version numbers in source repo after successful push
                 if result.errors == 0:
+                    self._sync_app_key_overlay(target)
                     bumped = []
                     for app in CITL_APPS:
                         vf = app.get("version_file")
@@ -3826,6 +5483,14 @@ class SyncGUI:
 
         include_data = bool(self.include_data_var.get())
         include_models = bool(self.include_models_var.get())
+        model_plan = self._prepare_model_sync_plan(
+            "USB -> PC pull",
+            target,
+            self.source_repo,
+        )
+        if model_plan is None:
+            return
+        include_models_effective, model_source_dir, model_target_dir = model_plan
         self._begin_busy("Syncing selected USB copy back to local PC source...")
         self._append("\n[SYNC] starting USB -> PC pull...\n")
 
@@ -3835,7 +5500,9 @@ class SyncGUI:
                     target,
                     self.source_repo,
                     include_data=include_data,
-                    include_models=include_models,
+                    include_models=include_models_effective,
+                    model_source_dir=model_source_dir,
+                    model_target_dir=model_target_dir,
                     log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
                 )
             except Exception as e:
@@ -3851,6 +5518,78 @@ class SyncGUI:
                     ),
                 )
                 self.root.after(0, lambda: self._set_status("USB -> PC pull complete. Refreshing analysis..."))
+            finally:
+                self.root.after(0, self._after_sync_action)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_duplicate_usb(self) -> None:
+        self._append("\n[SYNC] duplicate button pressed.\n")
+        source_target = self._selected_target()
+        if source_target is None:
+            self.messagebox.showerror("No target", "Select the USB copy you want to duplicate from.")
+            return
+        picked = self._choose_duplicate_destination(source_target)
+        if picked is None:
+            self.messagebox.showerror(
+                "No destination",
+                "No backup USB destination was detected. Connect another CITL USB and refresh.",
+            )
+            return
+        dest_target, comparison = picked
+        if source_target == dest_target:
+            self.messagebox.showerror("Invalid destination", "Source and destination USB paths are the same.")
+            return
+
+        include_data = bool(self.include_data_var.get())
+        include_models = bool(self.include_models_var.get())
+        if not self.messagebox.askyesno(
+            "Confirm USB duplication",
+            "Duplicate selected USB copy to backup USB?\n\n"
+            f"From:\n{source_target}\n\n"
+            f"To:\n{dest_target}\n\n"
+            f"{comparison.summary}",
+        ):
+            return
+
+        model_plan = self._prepare_model_sync_plan(
+            "USB -> USB duplicate",
+            source_target,
+            dest_target,
+        )
+        if model_plan is None:
+            return
+        include_models_effective, model_source_dir, model_target_dir = model_plan
+
+        self._begin_busy("Duplicating selected USB copy to backup USB...")
+        self._append("\n[SYNC] starting USB -> USB duplicate...\n")
+
+        def worker() -> None:
+            try:
+                result = sync_repo(
+                    source_target,
+                    dest_target,
+                    include_data=include_data,
+                    include_models=include_models_effective,
+                    model_source_dir=model_source_dir,
+                    model_target_dir=model_target_dir,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+            except Exception as e:
+                self.root.after(0, lambda: self._append(f"[ERROR] duplicate failed: {e}\n"))
+                self.root.after(0, lambda: self._set_status("USB duplicate failed."))
+            else:
+                mode = "rsync" if result.used_rsync else "python-copy"
+                self.root.after(
+                    0,
+                    lambda: self._append(
+                        f"[DONE] USB duplicate mode={mode} copied={result.copied} skipped={result.skipped} "
+                        f"errors={result.errors} elapsed={result.elapsed_sec:.1f}s\n"
+                    ),
+                )
+                if result.errors == 0:
+                    self._sync_app_key_overlay(dest_target)
+                self.root.after(0, lambda: self._set_status("USB duplicate complete. Refreshing analysis..."))
             finally:
                 self.root.after(0, self._after_sync_action)
 
@@ -3981,11 +5720,21 @@ def _print_detect_json(source: SourceDetection) -> int:
 
 def _run_headless_sync(args: argparse.Namespace, source: SourceDetection) -> int:
     print(f"[SOURCE] {source.path} ({source.reason})")
+    model_source_arg = (getattr(args, "ollama_model_source", "") or "").strip()
+    model_target_arg = (getattr(args, "ollama_model_target", "") or "").strip()
+    if bool(args.include_models) and (not model_source_arg or not model_target_arg):
+        print(
+            "[WARN] --include-models set without both --ollama-model-source and "
+            "--ollama-model-target; external Ollama model store copy will be skipped "
+            "(repo-local models/ollama folders still sync)."
+        )
     result = sync_repo(
         source.path,
         args.sync,
         include_data=bool(args.include_data),
         include_models=bool(args.include_models),
+        model_source_dir=(model_source_arg or None),
+        model_target_dir=(model_target_arg or None),
         log_fn=lambda s: print(s, end=""),
     )
     mode = "rsync" if result.used_rsync else "python-copy"
@@ -3997,7 +5746,13 @@ def _run_headless_sync(args: argparse.Namespace, source: SourceDetection) -> int
 
 
 def _default_source() -> Path:
-    # .../factbook-assistant/citl_app_sync.py -> repo root is parent dir
+    if getattr(sys, "frozen", False):
+        # Running as a PyInstaller EXE.  Honour CITL_REPO env if set; otherwise
+        # walk up 3 levels from EXE: dist/AppName/App.exe -> CITL/
+        env_repo = os.environ.get("CITL_REPO", "").strip()
+        if env_repo and Path(env_repo).is_dir():
+            return Path(env_repo)
+        return Path(sys.executable).parent.parent.parent
     return Path(__file__).resolve().parent.parent
 
 
@@ -4011,8 +5766,47 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     ap.add_argument("--detect-json", action="store_true", help="Print detected targets as JSON and exit")
     ap.add_argument("--sync", default="", help="Sync source repo to this target path (headless)")
+    ap.add_argument(
+        "--sync-best-usb",
+        action="store_true",
+        help="Auto-detect the best USB target and push PC app files to it (headless)",
+    )
+    ap.add_argument(
+        "--target-path",
+        default="",
+        help="Explicit target repo path for --sync-best-usb (bypasses auto target selection)",
+    )
+    ap.add_argument(
+        "--duplicate-usb",
+        action="store_true",
+        help="Duplicate one USB CITL repo copy to another USB target (headless)",
+    )
+    ap.add_argument("--duplicate-from", default="", help="Source USB repo path for --duplicate-usb")
+    ap.add_argument("--duplicate-to", default="", help="Destination USB repo path for --duplicate-usb")
     ap.add_argument("--include-data", action="store_true", help="Include data/ and index folders in sync")
     ap.add_argument("--include-models", action="store_true", help="Include models/ and ollama/ in sync")
+    ap.add_argument("--ollama-model-source", default="", help="Optional external Ollama model source directory")
+    ap.add_argument("--ollama-model-target", default="", help="Optional external Ollama model target directory")
+    ap.add_argument(
+        "--no-app-key-sync",
+        action="store_true",
+        help="With --sync-best-usb, skip per-app key-file sync pass",
+    )
+    ap.add_argument(
+        "--full-repo-sync",
+        action="store_true",
+        help="With --sync-best-usb, also perform full repo copy (slower)",
+    )
+    ap.add_argument(
+        "--push-target-to-phone",
+        action="store_true",
+        help="After sync/duplicate, zip selected target and push it to phone Downloads via ADB",
+    )
+    ap.add_argument(
+        "--phone-serial",
+        default="auto",
+        help="ADB phone serial to use with --push-target-to-phone (default: auto)",
+    )
     args = ap.parse_args(argv)
 
     if args.version:
@@ -4023,6 +5817,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.detect_json:
         return _print_detect_json(source)
+    if args.duplicate_usb:
+        return _run_duplicate_usb(args, source)
+    if args.sync_best_usb:
+        return _run_sync_best_usb(args, source)
     if args.sync:
         return _run_headless_sync(args, source)
 
