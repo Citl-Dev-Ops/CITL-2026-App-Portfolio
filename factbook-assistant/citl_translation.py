@@ -1,5 +1,5 @@
 """
-citl_translation.py — Offline translation via argostranslate.
+citl_translation.py - Offline translation via argostranslate.
 
 Language packs are downloaded once per machine (~100 MB each pair).
 Translation itself is fully offline after install.
@@ -59,6 +59,15 @@ _install_lock = threading.Lock()
 # Public API
 # ---------------------------------------------------------------------------
 
+def _lang_code(lang_obj) -> str:
+    """Return language code from argostranslate language object variants."""
+    return getattr(lang_obj, "code", str(lang_obj))
+
+
+def _find_lang(installed, code: str):
+    """Find a language object by code across argostranslate versions."""
+    return next((l for l in installed if _lang_code(l) == code), None)
+
 def translate(text: str, from_code: str, to_code: str) -> str:
     """
     Translate text offline using argostranslate.
@@ -72,17 +81,28 @@ def translate(text: str, from_code: str, to_code: str) -> str:
         )
 
     installed = _at.get_installed_languages()
-    src_lang = next((l for l in installed if l.code == from_code), None)
+    src_lang = _find_lang(installed, from_code)
     if src_lang is None:
         raise RuntimeError(
             f"Source language '{from_code}' not installed. "
             f"Use install_pair('{from_code}', '{to_code}') first."
         )
 
-    translation = src_lang.get_translation(to_code)
+    dst_lang = _find_lang(installed, to_code)
+    translation = None
+    if dst_lang is not None:
+        try:
+            translation = src_lang.get_translation(dst_lang)
+        except Exception:
+            translation = None
+    if translation is None:
+        try:
+            translation = src_lang.get_translation(to_code)
+        except Exception:
+            translation = None
     if translation is None:
         raise RuntimeError(
-            f"Translation pair {from_code} → {to_code} not installed. "
+            f"Translation pair {from_code} -> {to_code} not installed. "
             f"Use install_pair('{from_code}', '{to_code}') first."
         )
 
@@ -95,7 +115,7 @@ def install_pair(
     progress_cb: Optional[Callable[[str], None]] = None,
 ) -> str:
     """
-    Download and install the language pack for from_code → to_code.
+    Download and install the language pack for from_code -> to_code.
     Thread-safe. Returns a status string.
     progress_cb(msg) is called with progress updates if provided.
     """
@@ -127,16 +147,16 @@ def install_pair(
 
         if match is None:
             return (
-                f"No package found for {from_code} → {to_code}. "
+                f"No package found for {from_code} -> {to_code}. "
                 "Check argostranslate package index."
             )
 
-        _emit(f"Downloading {from_code} → {to_code} (~{match.package_version or '?'}) ...")
+        _emit(f"Downloading {from_code} -> {to_code} (~{match.package_version or '?'}) ...")
         dl_path = match.download()
         _emit("Installing package...")
         _pkg.install_from_path(dl_path)
-        _emit(f"Installed: {from_code} → {to_code}")
-        return f"OK: {LANGUAGES.get(from_code, from_code)} → {LANGUAGES.get(to_code, to_code)}"
+        _emit(f"Installed: {from_code} -> {to_code}")
+        return f"OK: {LANGUAGES.get(from_code, from_code)} -> {LANGUAGES.get(to_code, to_code)}"
 
 
 def is_pair_installed(from_code: str, to_code: str) -> bool:
@@ -144,10 +164,19 @@ def is_pair_installed(from_code: str, to_code: str) -> bool:
     try:
         from argostranslate import translate as _at
         installed = _at.get_installed_languages()
-        src = next((l for l in installed if l.code == from_code), None)
+        src = _find_lang(installed, from_code)
         if src is None:
             return False
-        return src.get_translation(to_code) is not None
+        dst = _find_lang(installed, to_code)
+        try:
+            if dst is not None and src.get_translation(dst) is not None:
+                return True
+        except Exception:
+            pass
+        try:
+            return src.get_translation(to_code) is not None
+        except Exception:
+            return False
     except Exception:
         return False
 
@@ -158,8 +187,13 @@ def list_installed_pairs() -> list:
         from argostranslate import translate as _at
         pairs = []
         for lang in _at.get_installed_languages():
-            for t in lang.translations_from:
-                pairs.append((lang.code, t.to_lang.code))
+            from_code = _lang_code(lang)
+            translations = getattr(lang, "translations_from", None) or []
+            for t in translations:
+                to_lang = getattr(t, "to_lang", None)
+                to_code = _lang_code(to_lang) if to_lang is not None else ""
+                if from_code and to_code:
+                    pairs.append((from_code, to_code))
         return pairs
     except Exception:
         return []

@@ -1,28 +1,30 @@
 @echo off
 setlocal enableextensions
 set "ROOT=%~dp0"
-set "TARGET="
+set "SCRIPT=%ROOT%factbook-assistant\citl_app_sync.py"
+set "PY="
 
-if exist "%ROOT%Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%"
-if not defined TARGET if exist "%ROOT%CITL_FACTBOOK_UBUNTU\Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%CITL_FACTBOOK_UBUNTU\"
-if not defined TARGET if exist "%ROOT%CITL\Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%CITL\"
-if not defined TARGET if exist "%ROOT%PORTABLE_APPS\CITL\Run-CITL-App-Sync.ps1" set "TARGET=%ROOT%PORTABLE_APPS\CITL\"
+if exist "%ROOT%.venv\Scripts\python.exe" set "PY=%ROOT%.venv\Scripts\python.exe"
+if not defined PY if exist "%ROOT%\.venv\Scripts\python.exe" set "PY=%ROOT%\.venv\Scripts\python.exe"
+if not defined PY if exist "%ROOT%python.exe" set "PY=%ROOT%python.exe"
+if not defined PY if exist "%ROOT%Python\python.exe" set "PY=%ROOT%Python\python.exe"
 
-if not defined TARGET (
-  for /d %%D in ("%ROOT%*") do (
-    if exist "%%~fD\Run-CITL-App-Sync.ps1" (
-      set "TARGET=%%~fD\"
-      goto :found
-    )
-  )
+if not defined PY (
+  where python.exe >nul 2>&1
+  if %ERRORLEVEL% equ 0 set "PY=python.exe"
 )
 
-:found
-if not defined TARGET (
-  echo Could not find Run-CITL-App-Sync.ps1 under %ROOT%
+if not defined PY (
+  echo Python not found. Install Python 3 or add python.exe to PATH.
   pause
   exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%TARGET%Run-CITL-App-Sync.ps1" %*
+if not exist "%SCRIPT%" (
+  echo Could not find citl_app_sync.py at %SCRIPT%
+  pause
+  exit /b 1
+)
+
+"%PY%" "%SCRIPT%" %*
 exit /b %ERRORLEVEL%

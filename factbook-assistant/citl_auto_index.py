@@ -256,30 +256,58 @@ def auto_index_library(
     return results
 
 
-# ── Keyword search across all JSONL indexes ───────────────────────────────────
+# ── Book domain detection ─────────────────────────────────────────────────────
 
-def keyword_search(
-    query: str,
-    idx_dir: Optional[Path] = None,
-    top_k: int = 8,
-    min_score: int = 1,
-) -> List[Dict]:
+_DOMAIN_KEYWORDS: Dict[str, List[str]] = {
+    "law / legal":        ["law","legal","statute","court","plaintiff","defendant","tort",
+                           "contract","property","estate","landlord","tenant","rcw","title",
+                           "chapter","section","amendment","constitution","jurisdiction"],
+    "medicine / nursing": ["nursing","patient","medical","clinical","diagnosis","treatment",
+                           "medication","dosage","anatomy","physiology","hospital","nurse",
+                           "disease","symptom","pharmacology","health","care"],
+    "geography / world":  ["country","capital","population","geography","continent","ocean",
+                           "government","gdp","exports","imports","ethnic","religion",
+                           "factbook","territory","border"],
+    "dictionary / reference": ["definition","noun","verb","adjective","pronunciation",
+                               "etymology","plural","informal","archaic","variant"],
+    "science / technology": ["algorithm","data","computer","network","software","hardware",
+                             "physics","chemistry","biology","engineering","research"],
+}
+
+
+def _detect_domain(titles: List[str], texts_sample: List[str]) -> str:
+    """Return best-matching domain label for a book based on its section titles + text."""
+    combined = " ".join(titles + texts_sample[:10]).lower()
+    best_domain, best_score = "general", 0
+    for domain, kws in _DOMAIN_KEYWORDS.items():
+        score = sum(1 for kw in kws if kw in combined)
+        if score > best_score:
+            best_score = score
+            best_domain = domain
+    return best_domain
+
+
+# ── Book catalog ──────────────────────────────────────────────────────────────
+
+CATALOG_FILE = IDX_DIR / "_book_catalog.json"
+
+
+def build_book_catalog(idx_dir: Optional[Path] = None) -> Dict[str, Dict]:
     """
-    Score every indexed chunk against the query using weighted term overlap.
-    Title hits count 3×, body hits 1×.  Fast — no embeddings needed.
+    Scan all JSONL indexes and build a catalog of:
+      { source_filename: {chunks, domain, top_sections, idx_file} }
+    Saves result to _book_catalog.json and returns it.
     """
     search_dir = idx_dir or IDX_DIR
-    if not search_dir.is_dir():
-        return []
+    catalog: Dict[str, Dict] = {}
 
-    words = set(re.findall(r"\b\w{3,}\b", query.lower()))
-    if not words:
-        return []
-
-    scored: List[tuple] = []
     for idx_file in sorted(search_dir.glob("*.jsonl")):
         if idx_file.name.startswith("_"):
             continue
+        source_counts: Dict[str, int] = {}
+        all_titles: List[str] = []
+        text_samples: List[str] = []
+        total = 0
         try:
             with idx_file.open(encoding="utf-8", errors="ignore") as fh:
                 for line in fh:
@@ -290,10 +318,217 @@ def keyword_search(
                         rec = json.loads(line)
                     except Exception:
                         continue
+                    total += 1
+                    src = (rec.get("source") or "").strip()
+                    if src:
+                        source_counts[src] = source_counts.get(src, 0) + 1
+                    title = (rec.get("title") or "").strip()
+                    if title and title not in all_titles:
+                        all_titles.append(title)
+                    if len(text_samples) < 20:
+                        text_samples.append((rec.get("text") or "")[:200])
+        except Exception:
+            continue
+
+        if total < 5:
+            # Skip near-empty / stale index files
+            continue
+
+        # Primary source = the filename that contributed most records, or infer from idx filename
+        primary_source = max(source_counts, key=lambda k: source_counts[k]) if source_counts else ""
+        if not primary_source:
+            # Infer from index filename: foo_index.jsonl → foo
+            primary_source = re.sub(r"_index$", "", idx_file.stem).replace("_", " ").strip()
+
+        domain = _detect_domain(all_titles, text_samples)
+        top_sections = all_titles[:30]  # first 30 unique section titles
+
+        catalog[primary_source] = {
+            "chunks": total,
+            "domain": domain,
+            "top_sections": top_sections,
+            "idx_file": idx_file.name,
+            "source_counts": source_counts,
+        }
+
+    # Save catalog
+    try:
+        CATALOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CATALOG_FILE.write_text(json.dumps(catalog, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+    return catalog
+
+
+def load_book_catalog(idx_dir: Optional[Path] = None) -> Dict[str, Dict]:
+    """Load the saved catalog or build it fresh if missing/stale."""
+    cat_path = (idx_dir or IDX_DIR) / "_book_catalog.json"
+    try:
+        if cat_path.exists():
+            return json.loads(cat_path.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return build_book_catalog(idx_dir)
+
+
+def list_indexed_books(idx_dir: Optional[Path] = None) -> Dict[str, int]:
+    """Return {source_name: chunk_count} for all non-stale indexes."""
+    catalog = load_book_catalog(idx_dir)
+    return {name: info["chunks"] for name, info in catalog.items()}
+
+
+# ── Orphan / stale index cleanup ──────────────────────────────────────────────
+
+def clean_orphan_indexes(
+    lib_dir: Optional[Path] = None,
+    idx_dir: Optional[Path] = None,
+    min_chunks: int = 5,
+    dry_run: bool = False,
+) -> List[str]:
+    """
+    Remove index files that:
+    - Have fewer than min_chunks records (stale/empty), OR
+    - Are duplicates of the same source file (keep the one with more chunks)
+    Returns list of removed filenames.
+    """
+    search_dir = idx_dir or IDX_DIR
+    src_dir    = lib_dir  or LIB_RAW
+    removed: List[str] = []
+
+    if not search_dir.is_dir():
+        return removed
+
+    # Count chunks and gather primary source name per index file
+    file_info: List[Dict] = []
+    for idx_file in sorted(search_dir.glob("*.jsonl")):
+        if idx_file.name.startswith("_"):
+            continue
+        count = 0
+        sources: Dict[str, int] = {}
+        try:
+            with idx_file.open(encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                        count += 1
+                        src = (rec.get("source") or "").strip()
+                        if src:
+                            sources[src] = sources.get(src, 0) + 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        primary = max(sources, key=lambda k: sources[k]) if sources else ""
+        file_info.append({
+            "path": idx_file,
+            "count": count,
+            "primary": primary,
+            "stem_norm": re.sub(r"[^\w]", "", idx_file.stem.lower()),
+        })
+
+    # Group by normalised source name; keep highest chunk count
+    groups: Dict[str, List[Dict]] = {}
+    for fi in file_info:
+        key = re.sub(r"[^\w]", "", (fi["primary"] or fi["stem_norm"]).lower())
+        groups.setdefault(key, []).append(fi)
+
+    for key, group in groups.items():
+        group.sort(key=lambda x: -x["count"])
+        for fi in group[1:]:  # all but the winner
+            if not dry_run:
+                try:
+                    fi["path"].unlink()
+                except Exception:
+                    pass
+            removed.append(fi["path"].name)
+
+    # Remove any remaining under-chunk files
+    for fi in file_info:
+        if fi["path"].exists() and fi["count"] < min_chunks:
+            if not dry_run:
+                try:
+                    fi["path"].unlink()
+                except Exception:
+                    pass
+            if fi["path"].name not in removed:
+                removed.append(fi["path"].name)
+
+    # Rebuild catalog after cleanup
+    if not dry_run:
+        try:
+            build_book_catalog(search_dir)
+        except Exception:
+            pass
+
+    return removed
+
+
+# ── Keyword search across all JSONL indexes ───────────────────────────────────
+
+def keyword_search(
+    query: str,
+    idx_dir: Optional[Path] = None,
+    top_k: int = 8,
+    min_score: int = 1,
+    source_filter: Optional[str] = None,
+) -> List[Dict]:
+    """
+    Score every indexed chunk against the query using weighted term overlap.
+    Title hits count 3×, body hits 1×.  Fast — no embeddings needed.
+
+    source_filter: if set, only search the index whose primary source matches
+                   (case-insensitive substring match on source field).
+    """
+    search_dir = idx_dir or IDX_DIR
+    if not search_dir.is_dir():
+        return []
+
+    words = set(re.findall(r"\b\w{3,}\b", query.lower()))
+    if not words:
+        return []
+
+    # Resolve which index files to search
+    all_idx = [f for f in sorted(search_dir.glob("*.jsonl")) if not f.name.startswith("_")]
+
+    if source_filter:
+        sf_norm = source_filter.lower()
+        catalog = load_book_catalog(search_dir)
+        # Find the idx_file(s) that match the filter
+        matched_idx_names = set()
+        for src, info in catalog.items():
+            if sf_norm in src.lower() or sf_norm in (info.get("idx_file") or "").lower():
+                matched_idx_names.add(info.get("idx_file", ""))
+        if matched_idx_names:
+            all_idx = [f for f in all_idx if f.name in matched_idx_names]
+        else:
+            # Fallback: substring match on filename
+            all_idx = [f for f in all_idx if sf_norm in f.name.lower()]
+
+    scored: List[tuple] = []
+    for idx_file in all_idx:
+        try:
+            with idx_file.open(encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    # Skip records with no source field (stale/malformed)
+                    if not rec.get("source"):
+                        continue
                     title = (rec.get("title") or "").lower()
                     text  = (rec.get("text")  or rec.get("content") or "").lower()
-                    score = (sum(3 for w in words if w in title)
-                             + sum(1 for w in words if w in text))
+                    # Title scoring: cap at 6 to prevent book-title inflation
+                    title_score = min(sum(3 for w in words if w in title), 6)
+                    body_score  = sum(1 for w in words if w in text)
+                    score = title_score + body_score
                     if score >= min_score:
                         scored.append((score, rec))
         except Exception:

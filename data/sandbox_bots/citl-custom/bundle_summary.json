@@ -1,0 +1,13 @@
+{
+  "model_name": "citl-custom",
+  "base_model": "qwen2.5:14b-instruct",
+  "outdir": "C:\\Users\\Doc_M\\CITL\\data\\sandbox_bots\\citl-custom",
+  "missing_models": [
+    "olmo2:13b",
+    "olmo2:7b",
+    "olmo-3:7b-instruct",
+    "olmo-3:7b-think",
+    "nomic-embed-text:latest"
+  ],
+  "modelfile": "C:\\Users\\Doc_M\\CITL\\data\\sandbox_bots\\citl-custom\\Modelfile.citl-custom"
+}

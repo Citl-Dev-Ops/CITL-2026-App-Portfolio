@@ -446,13 +446,77 @@ def _try_entity_locked_answer(question: str) -> Optional[str]:
     except Exception:
         return None
 
-def _keyword_search_hits(question: str, top_k: int = 8) -> List[Dict]:
+def _keyword_search_hits(question: str, top_k: int = 8, source_filter: Optional[str] = None) -> List[Dict]:
     """Return ranked JSONL records from all indexed books. Never returns raw text — callers synthesize."""
     try:
         from citl_auto_index import keyword_search, IDX_DIR
-        return keyword_search(question, idx_dir=IDX_DIR, top_k=top_k) or []
+        return keyword_search(question, idx_dir=IDX_DIR, top_k=top_k, source_filter=source_filter) or []
     except Exception:
         return []
+
+
+def _load_book_catalog() -> Dict:
+    """Load the auto-index book catalog (domain, sections per book)."""
+    try:
+        from citl_auto_index import load_book_catalog, IDX_DIR
+        return load_book_catalog(IDX_DIR)
+    except Exception:
+        return {}
+
+
+def _catalog_summary_for_prompt(catalog: Dict) -> str:
+    """Format catalog as a compact LLM context block listing each book and its domain."""
+    if not catalog:
+        return ""
+    lines = ["Available library books (use these as sources):"]
+    for name, info in catalog.items():
+        domain = info.get("domain", "general")
+        chunks = info.get("chunks", 0)
+        sections = info.get("top_sections", [])[:5]
+        sec_str = "; ".join(sections) if sections else "no section index"
+        lines.append(f"  - {name} [{domain}, {chunks} passages] — sections include: {sec_str}")
+    return "\n".join(lines)
+
+
+def _auto_route_to_source(question: str, catalog: Dict) -> Optional[str]:
+    """
+    If the question strongly matches a single book's domain, return that book's
+    source name so the search can be focused there first.
+    Returns None to search all books.
+    """
+    if not catalog:
+        return None
+    q = question.lower()
+
+    # Domain keyword sets for routing
+    domain_signals: Dict[str, List[str]] = {
+        "law / legal":        ["rcw","statute","law","legal","property law","estate law",
+                               "landlord","tenant","contract","tort","plaintiff","defendant",
+                               "court","judge","jurisdiction","washington law","us law"],
+        "medicine / nursing": ["nursing","patient","medication","dosage","clinical","nurse",
+                               "anatomy","diagnosis","treatment","hospital","symptom"],
+        "geography / world":  ["country","capital of","population of","factbook","continent",
+                               "geography","what country","which country","nation","territory"],
+        "dictionary / reference": ["define ","definition of","what does","word for","synonym",
+                                   "noun","verb","adjective"],
+    }
+
+    # Find best domain match
+    best_domain, best_score = None, 0
+    for domain, signals in domain_signals.items():
+        score = sum(1 for s in signals if s in q)
+        if score > best_score:
+            best_score = score
+            best_domain = domain
+
+    if best_domain and best_score >= 1:
+        # Find catalog book with this domain
+        matches = [name for name, info in catalog.items()
+                   if info.get("domain", "") == best_domain]
+        if len(matches) == 1:
+            return matches[0]
+
+    return None
 
 
 def _try_local_truth_answer(question: str) -> Optional[str]:
@@ -882,24 +946,48 @@ def top_k_chunks(question: str, host: str, k: int = 6) -> List[Tuple[str, str, f
         out.append((src, text, float(sims[int(i)])))
     return out
 
-def answer_question(question: str, model: str, ollama_host: str, topk: int = 6, maxctx: int = 6000) -> str:
+def answer_question(
+    question: str,
+    model: str,
+    ollama_host: str,
+    topk: int = 6,
+    maxctx: int = 6000,
+    source_filter: Optional[str] = None,
+) -> str:
     # ── Pass 1: deterministic structured answers (no LLM needed) ──────────────
     local = _try_local_truth_answer(question)
     if local:
         return local
 
-    # ── Pass 2: gather context from ALL available sources ─────────────────────
+    # ── Pass 2: auto-route to most relevant book if no explicit filter ─────────
+    catalog = _load_book_catalog()
+    effective_filter = source_filter
+    if not effective_filter:
+        auto_routed = _auto_route_to_source(question, catalog)
+        if auto_routed:
+            effective_filter = auto_routed
+
+    # ── Pass 3: gather context from indexed books ──────────────────────────────
     # Keyword search runs without Ollama — always attempt it first.
-    kw_hits = _keyword_search_hits(question, top_k=topk)
+    kw_hits = _keyword_search_hits(question, top_k=topk, source_filter=effective_filter)
+    # If filter gave no results, fall back to all books
+    if not kw_hits and effective_filter and effective_filter != source_filter:
+        kw_hits = _keyword_search_hits(question, top_k=topk)
 
     # Semantic embedding search — requires Ollama embed model (optional).
     emb_ranked: List[Tuple[str, str, float]] = []
     try:
         emb_ranked = top_k_chunks(question, host=ollama_host, k=topk)
+        # Apply source filter to embedding results too
+        if effective_filter and emb_ranked:
+            sf = effective_filter.lower()
+            filtered = [(src, txt, sc) for src, txt, sc in emb_ranked if sf in src.lower()]
+            if filtered:
+                emb_ranked = filtered
     except Exception:
         pass  # embeddings unavailable — keyword hits carry the load
 
-    # ── Pass 3: build unified ranked context ──────────────────────────────────
+    # ── Pass 4: build unified ranked context ──────────────────────────────────
     source_map: Dict[str, str] = {}
     parts: List[str] = []
     seen_texts: set = set()
@@ -939,14 +1027,21 @@ def answer_question(question: str, model: str, ollama_host: str, topk: int = 6, 
 
     ctx = "\n\n---\n\n".join(parts)[:maxctx]
 
-    # ── Pass 4: LLM synthesis ─────────────────────────────────────────────────
+    # ── Pass 5: LLM synthesis ─────────────────────────────────────────────────
+    catalog_block = _catalog_summary_for_prompt(catalog)
+    source_note = f"Focused search: {effective_filter}\n" if effective_filter else ""
+
     prompt = (
         "You are CITL Assistant — a professional academic study and research assistant.\n"
         "You help students and researchers understand course material from their own library.\n"
-        "Answer the question thoroughly using ONLY the provided source context.\n"
+        "Answer the question thoroughly using ONLY the provided source context below.\n"
         "Do NOT use outside knowledge. If the context is insufficient, say so clearly.\n"
-        "Cite your sources with [S#] inline. Be thorough, clear, and academically precise.\n\n"
-        f"CONTEXT:\n{ctx}\n\n"
+        "Cite your sources with [S#] inline. Be thorough, clear, and academically precise.\n"
+        "When the question is about law, legal procedures, or statutes, look for content from "
+        "the law/legal book and cite specific sections, chapters, or rules found in the text.\n\n"
+        + (f"{catalog_block}\n\n" if catalog_block else "")
+        + source_note
+        + f"CONTEXT:\n{ctx}\n\n"
         f"QUESTION:\n{question}\n\n"
         "ANSWER:\n"
     )

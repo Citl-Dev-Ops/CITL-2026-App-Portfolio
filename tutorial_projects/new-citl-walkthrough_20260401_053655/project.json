@@ -1,0 +1,12 @@
+{
+  "app": "CITL Technical Writing and Tutorial Creator",
+  "version": "v0.1",
+  "saved_utc": "2026-04-01T12:36:55Z",
+  "project_title": "New CITL Walkthrough",
+  "app_name": "CITL App",
+  "author": "Doc_M",
+  "audience": "Staff and faculty",
+  "template": "Blank Article",
+  "doc_style": "Staff Walkthrough Blue",
+  "model": "citl-custom:latest"
+}

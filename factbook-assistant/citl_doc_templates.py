@@ -14,7 +14,9 @@ import re
 import threading
 from typing import Callable, Dict, List, Optional, Tuple
 
-# â”€â”€ Ollama model detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ---------------------------------------------------------------------------
+# Ollama model detection
+# ---------------------------------------------------------------------------
 OLLAMA_HOST = "localhost"
 OLLAMA_PORT = 11434
 
@@ -49,7 +51,7 @@ def _looks_vision_model(name: str, details: dict) -> bool:
 def get_ollama_models() -> List[dict]:
     """
     Return all installed Ollama models sorted best-first.
-    Rank: parameter count desc â†’ blob size desc â†’ modified_at desc.
+    Rank: parameter count desc -> blob size desc -> modified_at desc.
     Each dict: {name, size_mb, params, display}.
     """
     try:
@@ -66,7 +68,7 @@ def get_ollama_models() -> List[dict]:
         params = _param_float(details)
         size_mb = m.get("size", 0) // (1024 * 1024)
         is_vision = _looks_vision_model(m.get("name", ""), details)
-        display = f"{m['name']}  ({params}B  ·  {size_mb:,} MB)"
+        display = f"{m['name']} ({params}B - {size_mb:,} MB)"
         if is_vision:
             display += "  [vision]"
         models.append({
@@ -97,7 +99,9 @@ def get_best_vision_model() -> Optional[str]:
     return None
 
 
-# â”€â”€ Streaming generation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ---------------------------------------------------------------------------
+# Streaming generation
+# ---------------------------------------------------------------------------
 _SYSTEM = (
     "You are a professional technical writer producing documentation for CITL "
     "(Center for Information Technology and Learning) software applications.\n"
@@ -156,12 +160,13 @@ def stream_generate(
     token_cb: Callable[[str], None],
     done_cb: Callable[[bool, str], None],
     image_paths: Optional[List[str]] = None,
+    system_override: Optional[str] = None,
 ) -> None:
     """
     Non-blocking: starts a thread that streams Ollama tokens.
     token_cb(token_str) called for each token on the caller's thread via queue.
     done_cb(success, error_msg) called when complete.
-    Uses a queue â€” caller must poll with stream_poll().
+    Uses a queue - caller must poll with stream_poll().
     Returns the queue for polling.
     """
     q: queue.Queue = queue.Queue()
@@ -169,7 +174,7 @@ def stream_generate(
     def _stream_once(image_payload: Optional[List[str]]) -> None:
         payload = {
             "model": model,
-            "system": _SYSTEM,
+            "system": system_override if system_override else _SYSTEM,
             "prompt": _fill_prompt(section_prompt, meta),
             "stream": True,
         }
@@ -224,12 +229,14 @@ def _fill_prompt(template: str, meta: dict) -> str:
     return template
 
 
-# â”€â”€ Template definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ---------------------------------------------------------------------------
+# Template definitions
 # Each section:
-#   id       â€” unique key
-#   title    â€” display + document heading
-#   prompt   â€” LLM instruction (supports {app_name}, {version}, {topic}, {author})
-#   required â€” always included (False = optional, shown but can be deleted)
+#   id       - unique key
+#   title    - display + document heading
+#   prompt   - LLM instruction (supports {app_name}, {version}, {topic}, {author})
+#   required - always included (False = optional, shown but can be deleted)
+# ---------------------------------------------------------------------------
 
 def _make_section(sid, title, prompt, required=True):
     return {"id": sid, "title": title, "prompt": prompt,
@@ -241,7 +248,7 @@ _INTRO_PROMPT = (
     "Topic context: {topic}\n"
     "Cover: what the application does, who it is designed for, and what the reader "
     "will be able to accomplish after reading this document.\n"
-    "Length: 2â€“3 focused paragraphs."
+    "Length: 2-3 focused paragraphs."
 )
 
 _REQUIREMENTS_PROMPT = (
@@ -323,7 +330,7 @@ _LICENSE_PROMPT = (
 _OBJECTIVES_PROMPT = (
     "Write a Learning Objectives section for a training tutorial about {app_name}.\n"
     "Topic: {topic}\n"
-    "List 4â€“6 measurable objectives using Bloom's Taxonomy action verbs "
+    "List 4-6 measurable objectives using Bloom's Taxonomy action verbs "
     "(identify, demonstrate, configure, apply, evaluate).\n"
     "Follow the list with a one-paragraph overview of the tutorial structure."
 )
@@ -333,7 +340,7 @@ _BACKGROUND_PROMPT = (
     "Topic: {topic}\n"
     "Explain the problem this tool solves, relevant concepts the learner needs, "
     "and why this skill matters for IT/LLMOps career readiness.\n"
-    "2â€“3 paragraphs, accessible to a first-year college student."
+    "2-3 paragraphs, accessible to a first-year college student."
 )
 
 _EXERCISES_PROMPT = (
@@ -346,7 +353,7 @@ _EXERCISES_PROMPT = (
 _TAKEAWAYS_PROMPT = (
     "Write a Key Takeaways section for a training tutorial about {app_name}.\n"
     "Topic: {topic}\n"
-    "Summarize 5â€“7 key lessons from the tutorial as a bulleted list. "
+    "Summarize 5-7 key lessons from the tutorial as a bulleted list. "
     "Follow with a paragraph suggesting next steps and further learning resources."
 )
 
@@ -376,7 +383,7 @@ _WALKTHROUGH_PROMPT = (
 _NEXT_STEPS_PROMPT = (
     "Write a Next Steps and Further Reading section for a walkthrough guide about {app_name}.\n"
     "Topic: {topic}\n"
-    "Suggest 3â€“5 logical follow-on tasks or topics the reader can explore. "
+    "Suggest 3-5 logical follow-on tasks or topics the reader can explore. "
     "Mention related CITL tools where relevant."
 )
 
@@ -413,7 +420,7 @@ _VERIFY_PROMPT = (
     "UI goal: {ui_goal}\n"
     "Screenshot evidence notes: {screenshot_notes}\n"
     "Attached screenshots: {screenshot_count}\n"
-    "Describe 3â€“5 tests the user should perform to confirm successful installation: "
+    "Describe 3-5 tests the user should perform to confirm successful installation: "
     "launch the app, check a key feature, verify connectivity to Ollama, etc.\n"
     "Use explicit menu paths, Expected Result lines, and SCREENSHOT lines."
 )
@@ -499,6 +506,247 @@ TEMPLATES: Dict[str, List[dict]] = {
         _make_section("uninstall",  "Uninstallation",            _UNINSTALL_PROMPT),
     ],
 }
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Grant / Proposal  and  State Policy Brief  templates
+# ──────────────────────────────────────────────────────────────────────────────
+
+_GRANT_SYSTEM = (
+    "You are a professional grant writer and workforce-development policy author "
+    "producing institutional documents for a Washington State community college.\n"
+    "Audience: state education officials, grant reviewers, and technology agency "
+    "representatives who may not have deep IT backgrounds.\n"
+    "Style: authoritative, evidence-based, clearly structured — like a published "
+    "policy report or federal grant application.\n"
+    "IMPORTANT FORMATTING RULES:\n"
+    "  - Write plain prose only. No markdown symbols (no *, #, `, _).\n"
+    "  - Separate paragraphs with a blank line.\n"
+    "  - For bullet points write: - Item text\n"
+    "  - For two-column tables write: Column A | Column B on each row, "
+    "    with a separator row of dashes after the header.\n"
+    "  - Begin callouts with: NOTE: or IMPORTANT:\n"
+    "  - Do not start your response with 'Sure' or 'Of course'; begin directly.\n"
+    "  - Avoid jargon — when a technical term is unavoidable, define it on first use.\n"
+)
+
+def _mg(sid, title, prompt, required=True):
+    """Make a grant section with its own system prompt override."""
+    s = _make_section(sid, title, prompt, required)
+    s["system_prompt"] = _GRANT_SYSTEM
+    return s
+
+
+# ── Section prompts ───────────────────────────────────────────────────────────
+
+_GRANT_EXEC_SUMMARY = (
+    "Write an Executive Summary for a state grant proposal titled '{topic}'.\n"
+    "Organization: {author}\n"
+    "The summary must cover in 3-4 paragraphs:\n"
+    "1. What the program is and its primary purpose.\n"
+    "2. The specific workforce problem it addresses (use the phrase 'credential bifurcation' "
+    "if relevant, and explain it in plain language).\n"
+    "3. Why this approach is uniquely positioned to serve community college students "
+    "(offline-first, no licensing fees, USB-portable).\n"
+    "4. A brief statement of the funding request and intended outcomes.\n"
+    "Write for a reader who may spend 90 seconds on this page before deciding to read further."
+)
+
+_GRANT_WORKFORCE_PROBLEM = (
+    "Write a 'Workforce Problem and Context' section for a grant proposal about '{topic}'.\n"
+    "Organization: {author}\n"
+    "This section should:\n"
+    "1. Explain the widening gap between AI-adjacent IT skills that employers demand "
+    "and the credentials most community college graduates hold.\n"
+    "2. Describe the 'credential bifurcation' occurring in IT labor markets: "
+    "routine IT tasks being automated while AI-augmented IT roles are growing.\n"
+    "3. Reference relevant labor market indicators for Washington State "
+    "(ESD tech sector reports, CompTIA workforce data, LinkedIn/Indeed trends).\n"
+    "4. Explain why four-year universities have adapted to this shift but community "
+    "and technical colleges have not yet caught up.\n"
+    "5. Explain the equity dimension: CTC students often cannot access cloud AI tools "
+    "due to internet, account, or budget barriers.\n"
+    "Length: 3-4 substantial paragraphs. Use specific, credible-sounding evidence.\n"
+    "Avoid overstatement — frame claims as 'consistent with available data' rather than "
+    "absolute facts."
+)
+
+_GRANT_SOLUTION_OVERVIEW = (
+    "Write a 'Solution Overview' section for a grant proposal about '{topic}'.\n"
+    "Organization: {author}\n"
+    "Describe the CITL AI Workforce Training Application Suite as a solution to the "
+    "workforce problem identified in the previous section.\n"
+    "Cover:\n"
+    "- What the suite is: a collection of locally-deployed, offline, AI-powered tools\n"
+    "- How it is delivered: runs on existing lab hardware, USB-portable, no licenses\n"
+    "- The range of skills it trains: from AI model operations to AV/IT support\n"
+    "- How it produces portfolio evidence: each tool generates exportable work products\n"
+    "- Why it is accessible to all students: offline-first, no accounts, cross-platform\n"
+    "Length: 2-3 paragraphs. Use plain language accessible to a non-technical grant reviewer."
+)
+
+_GRANT_APP_ENTRY = (
+    "Write a program component description for a grant proposal about the following "
+    "application: {app_name}.\n"
+    "Parent program: {topic}\n"
+    "Organization: {author}\n"
+    "Structure this entry with the following sub-sections:\n"
+    "1. What It Does: 2-3 sentences in plain language, no jargon.\n"
+    "2. Skills Trained: a bulleted list of 4-6 professional skills with a brief note "
+    "on how the tool trains each.\n"
+    "3. Portfolio Output: a bulleted list of 2-4 specific, exportable work products "
+    "the student takes away.\n"
+    "4. Employer Demand: 1 paragraph connecting these skills to Washington State hiring data "
+    "or industry trends.\n"
+    "Keep each entry concise but complete — a grant reviewer reading this should be able "
+    "to quickly understand the training value."
+)
+
+_GRANT_SKILLS_MATRIX = (
+    "Write a 'Skills Matrix and Portfolio Summary' section for a grant proposal about '{topic}'.\n"
+    "Organization: {author}\n"
+    "Produce a clear written summary (not a markdown table — use plain prose) that:\n"
+    "1. Lists the 10-12 key skill categories trained across the suite.\n"
+    "2. For each category, names which tools train it and characterizes "
+    "employer demand in Washington State as 'Very High', 'High', or 'Steady'.\n"
+    "3. Explains in a closing paragraph why the suite's portfolio-first design "
+    "gives students a competitive advantage over credential-only candidates.\n"
+    "Format as a narrative followed by a plain-text two-column reference list:\n"
+    "Skill Category | Demand Level"
+)
+
+_GRANT_EQUITY = (
+    "Write an 'Institutional Equity and Accessibility' section for a grant proposal "
+    "about '{topic}'.\n"
+    "Organization: {author}\n"
+    "This section should address how the program removes technology access barriers for:\n"
+    "- Students with unreliable home internet\n"
+    "- Students on shared lab machines with restricted internet access\n"
+    "- Programs with limited per-student software budgets\n"
+    "- Students who need to continue work at home, at libraries, or on personal hardware\n"
+    "Explain how USB-portable deployment, offline-first design, cross-platform "
+    "compatibility (Windows + Ubuntu), and no-account operation each address these "
+    "equity dimensions.\n"
+    "Connect to WA State Digital Equity Act where appropriate.\n"
+    "Length: 2-3 paragraphs."
+)
+
+_GRANT_BUDGET = (
+    "Write a 'Budget Justification' section for a grant proposal about '{topic}'.\n"
+    "Organization: {author}\n"
+    "This suite was developed in-house with no vendor contracts or licensing fees.\n"
+    "The primary cost categories are:\n"
+    "- Developer / faculty FTE for ongoing tool development and maintenance\n"
+    "- Lab hardware upgrades (RAM — local AI models require 16-32 GB)\n"
+    "- USB media stock for portable deployment program\n"
+    "- Student portfolio hosting (GitHub or institutional git server)\n"
+    "- Faculty professional development for tool integration\n"
+    "Write a 2-paragraph narrative that:\n"
+    "1. Explains why the in-house development model is cost-efficient and sustainable.\n"
+    "2. Justifies each cost category in terms of student outcomes.\n"
+    "Avoid giving specific dollar amounts — frame in terms of FTE categories and "
+    "capital vs. recurring costs."
+)
+
+_GRANT_ALIGNMENT = (
+    "Write a 'Funding Alignment' section for a grant proposal about '{topic}'.\n"
+    "Organization: {author}\n"
+    "Map this program to the following funding categories. For each, write 1-2 sentences "
+    "explaining the specific alignment:\n"
+    "- WIOA Title I (Workforce Innovation and Opportunity Act)\n"
+    "- WIOA Title II (Adult Education and Family Literacy)\n"
+    "- Carl D. Perkins Career and Technical Education Act\n"
+    "- SBCTC Strong Workforce Initiative (Washington State)\n"
+    "- Washington State Digital Equity Act\n"
+    "- Governor's Office AI Strategy (if applicable)\n"
+    "- OSPI K-12 Computer Science Pathway (dual-credit articulation opportunity)\n"
+    "Keep language crisp and specific to what this program actually does."
+)
+
+_GRANT_CONCLUSION = (
+    "Write a Conclusion section for a grant proposal about '{topic}'.\n"
+    "Organization: {author}\n"
+    "The conclusion should:\n"
+    "1. Restate the core problem (credential gap in AI-adjacent IT skills) in 1 sentence.\n"
+    "2. Restate the solution (CITL suite: offline, portable, portfolio-producing) in 2 sentences.\n"
+    "3. Make a clear, specific call to action for the grant reviewer.\n"
+    "4. End with a single memorable closing sentence about the impact on students.\n"
+    "Length: 1 substantive paragraph. Do not repeat earlier detail — synthesize and close."
+)
+
+_POLICY_BRIEF_OVERVIEW = (
+    "Write a one-page Policy Overview for a state technology policy brief about '{topic}'.\n"
+    "Organization: {author}\n"
+    "Structure:\n"
+    "1. The Situation (1 paragraph): what is changing in the IT labor market and why CTCs "
+    "are currently not equipped to respond.\n"
+    "2. The Opportunity (1 paragraph): what the CITL suite does and what it costs the state "
+    "(hint: zero licensing cost).\n"
+    "3. The Ask (1 short paragraph): what the institution needs from the state "
+    "(funding for FTE, hardware, and faculty development).\n"
+    "Write for a legislator or department director who has 3 minutes to read this."
+)
+
+_POLICY_BRIEF_EVIDENCE = (
+    "Write an 'Evidence and Data' section for a state technology policy brief about '{topic}'.\n"
+    "Organization: {author}\n"
+    "In 2-3 tight paragraphs, summarize:\n"
+    "- Labor market evidence for AI-adjacent IT skill demand in Washington State\n"
+    "- The credential gap facing CTC graduates specifically\n"
+    "- Evidence that portfolio-based candidates outperform credential-only candidates in "
+    "hiring outcomes\n"
+    "Cite source types (LinkedIn Workforce Report, CompTIA, WA ESD) without fabricating "
+    "specific statistics. Frame as 'consistent with published data' where appropriate."
+)
+
+_POLICY_BRIEF_RECOMMENDATIONS = (
+    "Write a 'Recommendations' section for a state technology policy brief about '{topic}'.\n"
+    "Organization: {author}\n"
+    "Provide 4-5 numbered policy recommendations that a state official could act on. "
+    "Each recommendation should:\n"
+    "- Be specific and actionable\n"
+    "- Reference this program or similar in-house AI training initiatives\n"
+    "- Note the expected student or workforce outcome\n"
+    "Examples might include: funding for faculty AI training, hardware capital grants, "
+    "USB deployment program support, dual-credit articulation with K-12.\n"
+    "Keep each recommendation to 2-3 sentences."
+)
+
+
+# ── Register templates ────────────────────────────────────────────────────────
+
+TEMPLATES["Grant / Proposal"] = [
+    _make_section("cover",       "Cover Page",             "",                   True),
+    _mg("exec_summary",  "Executive Summary",      _GRANT_EXEC_SUMMARY),
+    _mg("problem",       "Part I — Workforce Problem & Context",
+                                                   _GRANT_WORKFORCE_PROBLEM),
+    _mg("solution",      "Part II — Solution Overview",
+                                                   _GRANT_SOLUTION_OVERVIEW),
+    _mg("app_01",        "App 1 — Description",    _GRANT_APP_ENTRY,      False),
+    _mg("app_02",        "App 2 — Description",    _GRANT_APP_ENTRY,      False),
+    _mg("app_03",        "App 3 — Description",    _GRANT_APP_ENTRY,      False),
+    _mg("app_04",        "App 4 — Description",    _GRANT_APP_ENTRY,      False),
+    _mg("app_05",        "App 5 — Description",    _GRANT_APP_ENTRY,      False),
+    _mg("skills_matrix", "Part III — Skills Matrix & Portfolio Summary",
+                                                   _GRANT_SKILLS_MATRIX),
+    _mg("equity",        "Part IV — Equity & Accessibility",
+                                                   _GRANT_EQUITY),
+    _mg("budget",        "Part V — Budget Justification",
+                                                   _GRANT_BUDGET),
+    _mg("alignment",     "Part VI — Funding Alignment",
+                                                   _GRANT_ALIGNMENT),
+    _mg("conclusion",    "Conclusion",             _GRANT_CONCLUSION),
+]
+
+TEMPLATES["State Policy Brief"] = [
+    _make_section("cover",           "Cover Page",          "",                    True),
+    _mg("overview",      "Policy Overview",         _POLICY_BRIEF_OVERVIEW),
+    _mg("evidence",      "Evidence & Data",         _POLICY_BRIEF_EVIDENCE),
+    _mg("app_highlight", "Program Highlights",      _GRANT_APP_ENTRY,      False),
+    _mg("equity",        "Equity & Access",         _GRANT_EQUITY),
+    _mg("alignment",     "Funding Alignment",       _GRANT_ALIGNMENT),
+    _mg("recs",          "Recommendations",         _POLICY_BRIEF_RECOMMENDATIONS),
+    _mg("conclusion",    "Conclusion",              _GRANT_CONCLUSION),
+]
 
 TEMPLATE_NAMES = list(TEMPLATES.keys())
 

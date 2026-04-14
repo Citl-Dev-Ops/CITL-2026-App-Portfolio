@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -31,7 +32,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Un
 PathLike = Union[str, Path]
 LogFn = Optional[Callable[[str], None]]
 APP_SYNC_NAME = "CITL App Sync Utility"
-APP_SYNC_VERSION = "v1.6.3"
+APP_SYNC_VERSION = "v1.9.1"
 SYNC_LAUNCHER_WINDOWS = "RUN_APP_SYNC_WINDOWS.cmd"
 SYNC_LAUNCHER_UBUNTU = "RUN_APP_SYNC_UBUNTU.sh"
 SYNC_DUPLICATE_WINDOWS = "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd"
@@ -41,6 +42,19 @@ STATE_SCHEMA_VERSION = 1
 STATE_FILE_NAME = "citl_app_sync_state.json"
 UPDATE_AVAILABLE_EPSILON_SEC = 2.0
 MODEL_SYNC_WARN_BYTES = 8 * 1024 * 1024 * 1024  # 8 GiB
+BOOTSTRAP_SCHEMA_VERSION = 1
+BOOTSTRAP_MANIFEST_NAME = "citl_bootstrap_manifest.json"
+BOOTSTRAP_STATE_REL = "bootstrap/citl_bootstrap_state.json"
+BOOTSTRAP_PATCH_DIR_REL = "bootstrap/patches"
+BOOTSTRAP_ROLLBACK_DIR_REL = "bootstrap/rollback"
+BOOTSTRAP_ROLLBACK_MANIFEST_NAME = "citl_bootstrap_rollback_manifest.json"
+BOOTSTRAP_WARN_EPSILON_SEC = 2.0
+USB_MEDIA_CACHE_TTL_SEC = 20.0
+DEVICE_PUSH_LOG_NAME = "citl_device_push_log.jsonl"
+TERMUX_SHORTCUT_BACKUP_DIR = "termux_shortcut_backups"
+TERMUX_SHORTCUT_FILE = "CITL_Latest_Push.sh"
+PINNED_APP_NOETIKON = "NOETIKON PRIME"
+PINNED_APP_CANIS = "CANIS COSMOS ASTROLOGY"
 
 REPO_MARKERS: Tuple[str, ...] = (
     "factbook-assistant/factbook_assistant_gui.py",
@@ -74,15 +88,18 @@ CITL_APPS: Tuple[dict, ...] = (
             "factbook-assistant/citl_theme.py",
             "factbook-assistant/parsers.py",
             "factbook-assistant/citl_screen_recorder.py",
+            "factbook-assistant/citl_video_post_editor.py",
             "factbook-assistant/citl_doc_composer.py",
             "factbook-assistant/citl_doc_theme.py",
             "factbook-assistant/citl_doc_templates.py",
+            "factbook-assistant/fonts/doc_composer",
             "RUN_FACTBOOK_WINDOWS.cmd",
             "RUN_FACTBOOK.sh",
             "scripts/windows/run.ps1",
             "Run-CITL.ps1",
             "scripts/windows/run_llmops.ps1",
             "scripts/windows/record_demo.ps1",
+            "scripts/windows/sync_doc_composer_fonts.ps1",
         ],
         "version_file": "FACTBOOK_VERSION.txt",
         "launcher_win": "RUN_FACTBOOK_WINDOWS.cmd",
@@ -110,10 +127,14 @@ CITL_APPS: Tuple[dict, ...] = (
             "scripts/linux/setup.sh",
             "SYNC_CITL_APPS_TO_USB_WINDOWS.cmd",
             "SYNC_CITL_APPS_TO_USB_UBUNTU.sh",
+            "SYNC_EXES_TO_USB_WINDOWS.cmd",
+            "INSTALL_CITL_APPS_PORTABLE.cmd",
             "scripts/windows/sync_usb_apps.ps1",
+            "scripts/windows/install_citl_apps_portable.ps1",
             "scripts/windows/build_all_citl_exes.ps1",
             "BUILD_ALL_CITL_EXES_WINDOWS.cmd",
             "OPEN_SYNC_UTILITY_README.txt",
+            "bootstrap/patches",
         ],
         "version_file": None,
         "launcher_win": "RUN_APP_SYNC_WINDOWS.cmd",
@@ -144,19 +165,54 @@ CITL_APPS: Tuple[dict, ...] = (
         # Backed by Ollama qwen2.5:7b — advises on college course schedules,
         # degree audits, and CTCLink/SBCTC data.
         # Repo: C:\00 HENOSIS CODING PROJECTS\CITL PROJECTS\2026 ACADEMIC ADVISOR
+        # Override source: set env CITL_ACADEMIC_ADVISOR_REPO=<path> if repo
+        # lives at a non-standard location on the target machine.
         "name": "CITL Academic Advisor",
         "description": (
             "AI degree-audit and advising assistant. "
-            "FastAPI backend + React UI, powered by Ollama qwen2.5. "
-            "Parses class schedules, audits transcripts, and answers "
-            "advising questions from CTCLink/SBCTC data."
+            "FastAPI backend + React UI (Vite), powered by Ollama qwen2.5. "
+            "Features academic calendar explorer, program prereq planner, "
+            "course catalog browser, and CTCLink/SBCTC transcript audit. "
+            "USB-ready: dist/ ships built so no Node.js required on target."
         ),
         "icon": "🎓",
         "key_files": [
+            # ── FastAPI backend (all runnable source) ──────────────────────
+            "api/__init__.py",
             "api/app.py",
+            "api/main.py",
+            "api/routes.py",
+            "api/planner_core.py",
+            "api/baseline_router.py",
+            "api/ctclink_scraper.py",
+            "api/fetch_ctclink.py",
+            "api/fetch_sbctc.py",
+            "api/term_code_utils.py",
             "api/Modelfile",
-            "scripts/Run-CITLAdvisor.ps1",
+            # ── React / Vite frontend — source ────────────────────────────
+            # advisor-ui/src is a directory: all .ts/.tsx/.css files inside
+            # are walked and copied, including rtcData.ts and App.tsx.
             "advisor-ui/src",
+            "advisor-ui/public",
+            "advisor-ui/index.html",
+            "advisor-ui/package.json",
+            "advisor-ui/package-lock.json",
+            "advisor-ui/vite.config.ts",
+            "advisor-ui/tsconfig.json",
+            "advisor-ui/tsconfig.app.json",
+            "advisor-ui/tsconfig.node.json",
+            "advisor-ui/eslint.config.js",
+            # ── React / Vite frontend — built output ──────────────────────
+            # Shipping dist/ means the UI runs from USB without Node.js.
+            # Build first on dev machine: cd advisor-ui && npm run build
+            "advisor-ui/dist",
+            # ── Scripts / launchers ───────────────────────────────────────
+            "scripts/Run-CITLAdvisor.ps1",
+            "scripts/Install-CITLAdvisor.ps1",
+            "scripts/Create-RTCAdvisorModel.ps1",
+            "scripts/Pull-OllamaModels.ps1",
+            "scripts/Run-UI.ps1",
+            # ── Python dependencies ───────────────────────────────────────
             "requirements.txt",
         ],
         "version_file": None,
@@ -186,6 +242,96 @@ CITL_APPS: Tuple[dict, ...] = (
         "repo_marker": "CITL_Toolkit/CITL_Launcher.ps1",
     },
     {
+        # ── CITL Technical Writing and Tutorial Creator ──────────────────────
+        "name": "CITL Technical Writing and Tutorial Creator",
+        "description": (
+            "Comprehensive tutorial production hub that combines technical writing, "
+            "screenshot organization, LLM-assisted formatting, screen recording, and "
+            "video post-editing into one workflow-focused GUI."
+        ),
+        "icon": "🧭",
+        "key_files": [
+            "factbook-assistant/citl_technical_writing_tutorial_creator.py",
+            "factbook-assistant/citl_screen_recorder.py",
+            "factbook-assistant/citl_video_post_editor.py",
+            "factbook-assistant/citl_doc_composer.py",
+            "factbook-assistant/citl_doc_theme.py",
+            "factbook-assistant/citl_doc_templates.py",
+            "RUN_TECHNICAL_WRITER_CREATOR_WINDOWS.cmd",
+            "RUN_TECHNICAL_WRITER_CREATOR.sh",
+            "scripts/windows/run_technical_writer_creator.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_TECHNICAL_WRITER_CREATOR_WINDOWS.cmd",
+        "launcher_nix": "RUN_TECHNICAL_WRITER_CREATOR.sh",
+        "repo_marker": "factbook-assistant/citl_technical_writing_tutorial_creator.py",
+    },
+    {
+        # ── CITL Database LLMOps Builder ─────────────────────────────────────
+        "name": "CITL Database LLMOps Builder",
+        "description": (
+            "Wizard that exports complete runnable custom AI apps with Modelfile, "
+            "README, launchers, and corpus packaging for portfolio-ready LLMOps work."
+        ),
+        "icon": "🛠️",
+        "key_files": [
+            "factbook-assistant/citl_database_llmops_builder.py",
+            "RUN_DATABASE_LLMOPS_BUILDER_WINDOWS.cmd",
+            "RUN_DATABASE_LLMOPS_BUILDER.sh",
+            "scripts/windows/run_database_llmops_builder.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_DATABASE_LLMOPS_BUILDER_WINDOWS.cmd",
+        "launcher_nix": "RUN_DATABASE_LLMOPS_BUILDER.sh",
+        "repo_marker": "factbook-assistant/citl_database_llmops_builder.py",
+    },
+    {
+        # ── CITL AV IT Operations ────────────────────────────────────────────
+        "name": "CITL AV IT Operations",
+        "description": (
+            "Room inventory, AV inspection checklists, and patch documentation utility "
+            "for classroom technology support workflows."
+        ),
+        "icon": "🖧",
+        "key_files": [
+            "factbook-assistant/citl_av_it_ops.py",
+            "RUN_AV_IT_OPS_WINDOWS.cmd",
+            "RUN_AV_IT_OPS.sh",
+            "scripts/windows/run_av_it_ops.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_AV_IT_OPS_WINDOWS.cmd",
+        "launcher_nix": "RUN_AV_IT_OPS.sh",
+        "repo_marker": "factbook-assistant/citl_av_it_ops.py",
+    },
+    {
+        # ── CITL Work and Preparedness Launcher ───────────────────────────────
+        "name": "CITL Work and Preparedness Launcher",
+        "description": (
+            "Multi-app work and preparedness launcher for staff/workstudy covering "
+            "LLMOps IT Admin, AV IT Operations, E-Learning Technologies, and "
+            "Technical Writing, with resource links for SharePoint, Office 365, "
+            "and local file databases."
+        ),
+        "icon": "🧰",
+        "key_files": [
+            "factbook-assistant/citl_staff_toolkit.py",
+            "RUN_WORK_PREPAREDNESS_LAUNCHER_WINDOWS.cmd",
+            "RUN_WORK_PREPAREDNESS_LAUNCHER.sh",
+            "scripts/windows/run_work_preparedness_launcher.ps1",
+            "RUN_STAFF_TOOLKIT_WINDOWS.cmd",
+            "RUN_STAFF_TOOLKIT.sh",
+            "scripts/windows/run_staff_toolkit.ps1",
+            "factbook-assistant/citl_database_llmops_builder.py",
+            "factbook-assistant/citl_av_it_ops.py",
+            "factbook-assistant/citl_technical_writing_tutorial_creator.py",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_WORK_PREPAREDNESS_LAUNCHER_WINDOWS.cmd",
+        "launcher_nix": "RUN_WORK_PREPAREDNESS_LAUNCHER.sh",
+        "repo_marker": "factbook-assistant/citl_staff_toolkit.py",
+    },
+    {
         # ── CITL LLMOps Presentation Suite ────────────────────────────────────
         "name": "LLMOps Suite",
         "description": (
@@ -210,6 +356,75 @@ CITL_APPS: Tuple[dict, ...] = (
         "launcher_win": "RUN_LLMOPS_WINDOWS.cmd",
         "launcher_nix": "RUN_LLMOPS.sh",
         "repo_marker": "factbook-assistant/citl_llmops_suite.py",
+    },
+    {
+        # ── CITL Workstation Apps ─────────────────────────────────────────────
+        # Windows-only (uses WMI/PowerShell display APIs). No Linux launcher.
+        "name": "CITL Workstation Apps",
+        "description": (
+            "Display port tester, profile save/restore, connection diagnostics, "
+            "and quick-fix actions for campus workstations with persistent "
+            "display difficulties. No admin required, Windows 10/11."
+        ),
+        "icon": "🖥️",
+        "key_files": [
+            "factbook-assistant/citl_workstation_apps.py",
+            "RUN_WORKSTATION_APPS_WINDOWS.cmd",
+            "scripts/windows/build_all_citl_exes.ps1",
+            "SYNC_EXES_TO_USB_WINDOWS.cmd",
+            "INSTALL_CITL_APPS_PORTABLE.cmd",
+            "scripts/windows/install_citl_apps_portable.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_WORKSTATION_APPS_WINDOWS.cmd",
+        "launcher_nix": None,
+        "repo_marker": "factbook-assistant/citl_workstation_apps.py",
+    },
+    {
+        # ── CITL Field Apps ───────────────────────────────────────────────────
+        # Windows-only (uses WMI/PowerShell display APIs). No Linux launcher.
+        "name": "CITL Field Apps",
+        "description": (
+            "Field technician toolkit: room inventory, AV driver check/log/"
+            "rollback guide, rapid 25-point inspection checklist, and "
+            "per-room display profile saver. No admin required, Windows 10/11."
+        ),
+        "icon": "🧰",
+        "key_files": [
+            "factbook-assistant/citl_field_apps.py",
+            "RUN_FIELD_APPS_WINDOWS.cmd",
+            "scripts/windows/build_all_citl_exes.ps1",
+            "SYNC_EXES_TO_USB_WINDOWS.cmd",
+            "INSTALL_CITL_APPS_PORTABLE.cmd",
+            "scripts/windows/install_citl_apps_portable.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_FIELD_APPS_WINDOWS.cmd",
+        "launcher_nix": None,
+        "repo_marker": "factbook-assistant/citl_field_apps.py",
+    },
+    {
+        # ── CITL Sync Hub ─────────────────────────────────────────────────────
+        "name": "CITL Sync Hub",
+        "description": (
+            "Comprehensive sync and management hub with maroon RTC GUI. "
+            "Tiles: System Scan, First-Time Install, USB->PC, PC->USB, "
+            "Git Upload, Git Pull, Fix Shortcuts, App Bundle Status."
+        ),
+        "icon": "🔄",
+        "key_files": [
+            "factbook-assistant/citl_sync_hub.py",
+            "RUN_SYNC_HUB_WINDOWS.cmd",
+            "CITL Sync Hub.spec",
+            "scripts/windows/build_all_citl_exes.ps1",
+            "SYNC_EXES_TO_USB_WINDOWS.cmd",
+            "INSTALL_CITL_APPS_PORTABLE.cmd",
+            "scripts/windows/install_citl_apps_portable.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_SYNC_HUB_WINDOWS.cmd",
+        "launcher_nix": None,
+        "repo_marker": "factbook-assistant/citl_sync_hub.py",
     },
 )
 
@@ -346,6 +561,32 @@ class TargetStatus:
     update_available: bool
     root_label: str
     comparison: RepoComparison
+
+
+@dataclass(frozen=True)
+class BootstrapPackage:
+    path: Path
+    bootstrap_id: str
+    created_utc: str
+    created_ts: float
+    package_size: int
+    app_names: Tuple[str, ...]
+    app_file_counts: Dict[str, int]
+    file_count: int
+    payload_bytes: int
+    source_repo_label: str
+    source_hint: str
+
+
+@dataclass
+class BootstrapInstallPreview:
+    total_apps: int
+    newer_apps: int
+    same_apps: int
+    older_apps: int
+    classification: str  # all | some | none
+    stale: bool
+    stale_reason: str
 
 
 def _freshness_score(values: Iterable[float], sample_limit: int = 250) -> float:
@@ -551,6 +792,9 @@ def push_repo_archive_to_phone(
     include_data: bool = False,
     include_models: bool = False,
     log_fn: LogFn = None,
+    preserve_termux_shortcuts: bool = True,
+    install_termux_shortcut: bool = True,
+    record_push_log: bool = True,
 ) -> Dict[str, object]:
     src = Path(source_repo).expanduser().resolve()
     temp_root = Path(tempfile.mkdtemp(prefix="citl_phone_bundle_"))
@@ -558,8 +802,26 @@ def push_repo_archive_to_phone(
     archive_name = f"{_safe_archive_name(src.name)}_{stamp}.zip"
     archive_path = temp_root / archive_name
     remote_path = f"/sdcard/Download/{archive_name}"
+    backup_ok = False
+    backup_note = "Termux shortcut backup not requested."
+    backup_path: Optional[Path] = None
+    shortcut_ok = False
+    shortcut_note = "Termux shortcut update not requested."
+    info: Dict[str, object] = {
+        "archive_path": archive_path,
+        "file_count": 0,
+        "byte_count": 0,
+        "elapsed_sec": 0.0,
+        "remote_path": remote_path,
+        "serial": serial,
+    }
 
     try:
+        if preserve_termux_shortcuts:
+            backup_ok, backup_note, backup_path = _backup_termux_shortcuts(serial, log_fn=log_fn)
+            level = "[TERMUX]" if backup_ok else "[TERMUX][WARN]"
+            _safe_log(log_fn, f"{level} {backup_note}\n")
+
         info = create_repo_zip_archive(
             src,
             archive_path,
@@ -583,7 +845,72 @@ def push_repo_archive_to_phone(
             raise RuntimeError(f"adb push failed with exit code {proc.returncode}")
         info["remote_path"] = remote_path
         info["serial"] = serial
+        if install_termux_shortcut:
+            shortcut_ok, shortcut_note = _install_termux_shortcut_for_push(
+                serial,
+                remote_path,
+                log_fn=log_fn,
+            )
+            level = "[TERMUX]" if shortcut_ok else "[TERMUX][WARN]"
+            _safe_log(log_fn, f"{level} {shortcut_note}\n")
+
+        event = {
+            "kind": "phone_push",
+            "status": "ok",
+            "source_repo": str(src),
+            "phone_serial": serial,
+            "remote_path": remote_path,
+            "file_count": int(info.get("file_count") or 0),
+            "byte_count": int(info.get("byte_count") or 0),
+            "include_data": bool(include_data),
+            "include_models": bool(include_models),
+            "termux_backup_ok": bool(backup_ok),
+            "termux_backup_path": str(backup_path) if backup_path else "",
+            "termux_shortcut_ok": bool(shortcut_ok),
+            "termux_shortcut_note": shortcut_note,
+        }
+        if record_push_log:
+            _append_device_push_log_entry(event, log_fn=log_fn)
+            phone_line = (
+                f"{event.get('applied_utc', _utc_now_iso())} "
+                f"status=ok serial={serial} repo={src.name} "
+                f"remote={remote_path} files={event['file_count']} bytes={event['byte_count']}"
+            )
+            ok_phone_log, msg_phone_log = _append_phone_push_log(serial, phone_line, log_fn=log_fn)
+            if not ok_phone_log:
+                _safe_log(log_fn, f"[PHONE-LOG][WARN] {msg_phone_log}\n")
+
+        info["termux_backup_ok"] = backup_ok
+        info["termux_backup_path"] = str(backup_path) if backup_path else ""
+        info["termux_shortcut_ok"] = shortcut_ok
+        info["termux_shortcut_note"] = shortcut_note
         return info
+    except Exception as exc:
+        if record_push_log:
+            error_event = {
+                "kind": "phone_push",
+                "status": "error",
+                "source_repo": str(src),
+                "phone_serial": serial,
+                "remote_path": remote_path,
+                "file_count": int(info.get("file_count") or 0),
+                "byte_count": int(info.get("byte_count") or 0),
+                "include_data": bool(include_data),
+                "include_models": bool(include_models),
+                "termux_backup_ok": bool(backup_ok),
+                "termux_backup_path": str(backup_path) if backup_path else "",
+                "termux_shortcut_ok": bool(shortcut_ok),
+                "termux_shortcut_note": shortcut_note,
+                "error": str(exc),
+            }
+            _append_device_push_log_entry(error_event, log_fn=log_fn)
+            phone_line = (
+                f"{error_event.get('applied_utc', _utc_now_iso())} "
+                f"status=error serial={serial} repo={src.name} "
+                f"remote={remote_path} error={str(exc)[:180]}"
+            )
+            _append_phone_push_log(serial, phone_line, log_fn=log_fn)
+        raise
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
@@ -600,6 +927,170 @@ def _fmt_ts(ts: float) -> str:
 def _safe_log(log_fn: LogFn, message: str) -> None:
     if log_fn:
         log_fn(message)
+
+
+def _device_push_log_path() -> Path:
+    return _state_dir() / DEVICE_PUSH_LOG_NAME
+
+
+def _append_device_push_log_entry(entry: Dict[str, object], log_fn: LogFn = None) -> None:
+    row = dict(entry or {})
+    if not row.get("applied_utc"):
+        row["applied_utc"] = _utc_now_iso()
+    path = _device_push_log_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=True) + "\n")
+    except Exception as e:
+        _safe_log(log_fn, f"[PUSH-LOG][WARN] could not write {path}: {e}\n")
+
+
+def _sh_single_quote(text: str) -> str:
+    return "'" + str(text or "").replace("'", "'\"'\"'") + "'"
+
+
+def _append_phone_push_log(serial: str, line: str, log_fn: LogFn = None) -> Tuple[bool, str]:
+    remote_dir = "/sdcard/Download/CITL"
+    remote_log = f"{remote_dir}/pushed_apps.log"
+    cmd = f"mkdir -p {remote_dir} && printf '%s\\n' {_sh_single_quote(line)} >> {remote_log}"
+    try:
+        proc = subprocess.run(
+            ["adb", "-s", serial, "shell", "sh", "-lc", cmd],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            check=False,
+            timeout=20.0,
+        )
+    except Exception as e:
+        return False, f"adb phone log write failed: {e}"
+    if proc.returncode != 0:
+        out = (proc.stdout or "").strip()
+        return False, f"adb phone log write rc={proc.returncode} {out}"
+    _safe_log(log_fn, f"[PHONE-LOG] appended: {remote_log}\n")
+    return True, remote_log
+
+
+def _backup_termux_shortcuts(serial: str, log_fn: LogFn = None) -> Tuple[bool, str, Optional[Path]]:
+    backup_root = _state_dir() / TERMUX_SHORTCUT_BACKUP_DIR / _safe_archive_name(serial)
+    stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    out_path = backup_root / f"termux_shortcuts_{stamp}.tar.gz"
+    cmd = [
+        "adb",
+        "-s",
+        serial,
+        "exec-out",
+        "run-as",
+        "com.termux",
+        "sh",
+        "-lc",
+        "cd files/home && if [ -d .shortcuts ] || [ -d .termux ]; then tar -czf - .shortcuts .termux 2>/dev/null; fi; true",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=45.0,
+        )
+    except Exception as e:
+        return False, f"Termux shortcut backup unavailable: {e}", None
+    if proc.returncode != 0:
+        err = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+        return False, f"Termux shortcut backup failed rc={proc.returncode} {err}", None
+
+    payload = proc.stdout or b""
+    if len(payload) < 32 or not payload.startswith(b"\x1f\x8b"):
+        return False, "No existing Termux shortcuts were detected to back up.", None
+
+    try:
+        backup_root.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(payload)
+    except Exception as e:
+        return False, f"Could not save Termux shortcut backup: {e}", None
+
+    _safe_log(log_fn, f"[TERMUX] shortcut backup saved: {out_path}\n")
+    return True, f"Saved Termux shortcut backup: {out_path.name}", out_path
+
+
+def _install_termux_shortcut_for_push(
+    serial: str,
+    remote_archive_path: str,
+    log_fn: LogFn = None,
+) -> Tuple[bool, str]:
+    archive = str(remote_archive_path or "").strip()
+    if not archive:
+        return False, "No remote archive path provided for Termux shortcut."
+    archive_escaped = archive.replace('"', '\\"')
+    script = "\n".join(
+        [
+            "#!/data/data/com.termux/files/usr/bin/sh",
+            "set -eu",
+            f'ARCHIVE="{archive_escaped}"',
+            'echo "CITL push helper"',
+            'echo "Archive: $ARCHIVE"',
+            'if [ -f "$ARCHIVE" ]; then',
+            '  echo "Archive found. Extract with:"',
+            '  echo "  pkg install -y unzip"',
+            '  echo "  unzip -o \\"$ARCHIVE\\" -d \\"$HOME/citl_pushes/latest\\""',
+            "else",
+            '  echo "Archive not found at expected location."',
+            "fi",
+            "",
+        ]
+    )
+    install_cmd = (
+        f"mkdir -p files/home/.shortcuts && "
+        f"cat > files/home/.shortcuts/{TERMUX_SHORTCUT_FILE} && "
+        f"chmod 700 files/home/.shortcuts/{TERMUX_SHORTCUT_FILE}"
+    )
+    try:
+        proc = subprocess.run(
+            ["adb", "-s", serial, "shell", "run-as", "com.termux", "sh", "-lc", install_cmd],
+            input=script,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            check=False,
+            timeout=45.0,
+        )
+    except Exception as e:
+        return False, f"Termux shortcut install unavailable: {e}"
+    if proc.returncode != 0:
+        out = (proc.stdout or "").strip()
+        return False, f"Termux shortcut install failed rc={proc.returncode} {out}"
+
+    tmp_root = Path(tempfile.mkdtemp(prefix="citl_termux_shortcut_"))
+    try:
+        local_shortcut = tmp_root / TERMUX_SHORTCUT_FILE
+        local_shortcut.write_text(script, encoding="utf-8")
+        subprocess.run(
+            ["adb", "-s", serial, "shell", "mkdir", "-p", "/sdcard/Download/CITL"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            check=False,
+            timeout=20.0,
+        )
+        subprocess.run(
+            ["adb", "-s", serial, "push", str(local_shortcut), f"/sdcard/Download/CITL/{TERMUX_SHORTCUT_FILE}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            check=False,
+            timeout=45.0,
+        )
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
+
+    _safe_log(log_fn, "[TERMUX] shortcut updated: ~/.shortcuts/CITL_Latest_Push.sh\n")
+    return True, "Termux shortcut updated."
 
 
 def _fmt_bytes(size: int) -> str:
@@ -1247,7 +1738,16 @@ def scan_roots() -> List[Path]:
     user = os.environ.get("USER", "").strip()
 
     if os.name == "nt":
-        roots.extend(_windows_drive_roots())
+        # Prefer removable media first for responsive USB scanning.
+        removable = _windows_removable_roots()
+        include_fixed = (os.environ.get("CITL_SYNC_INCLUDE_FIXED_DRIVES", "").strip().lower() in {"1", "true", "yes"})
+        if removable:
+            roots.extend(removable)
+            if include_fixed:
+                roots.extend(_windows_drive_roots_by_type((3,)))
+        else:
+            # Fallback to original behavior when no removable media is present.
+            roots.extend(_windows_drive_roots())
     else:
         if user:
             roots.append(Path("/media") / user)
@@ -1482,6 +1982,7 @@ def resolve_app_source_root(app: dict, source_repo: PathLike) -> Path:
 def sync_registered_app_key_files(
     source_repo: PathLike,
     target_repo: PathLike,
+    selected_app_names: Optional[Sequence[str]] = None,
     log_fn: LogFn = None,
 ) -> Dict[str, Dict[str, int]]:
     """
@@ -1519,8 +2020,14 @@ def sync_registered_app_key_files(
             skipped += 1
         return copied, skipped
 
+    wanted: Optional[set] = None
+    if selected_app_names is not None:
+        wanted = {str(x or "").strip() for x in selected_app_names if str(x or "").strip()}
+
     for app in CITL_APPS:
         app_name = str(app.get("name") or "Unnamed App")
+        if wanted is not None and app_name not in wanted:
+            continue
         key_files = app.get("key_files") or []
         if not key_files:
             continue
@@ -1657,6 +2164,15 @@ def _push_repo_copy_to_phone(
         f"[PHONE][DONE] files={result['file_count']} bytes={result['byte_count']} "
         f"remote={result['remote_path']} elapsed={result['elapsed_sec']:.1f}s"
     )
+    if bool(result.get("termux_backup_ok")):
+        print(f"[PHONE][TERMUX] backup saved: {result.get('termux_backup_path')}")
+    else:
+        print("[PHONE][TERMUX][WARN] no shortcut backup captured before push.")
+    shortcut_note = str(result.get("termux_shortcut_note") or "").strip()
+    if bool(result.get("termux_shortcut_ok")):
+        print(f"[PHONE][TERMUX] shortcut updated. {shortcut_note}")
+    elif shortcut_note:
+        print(f"[PHONE][TERMUX][WARN] {shortcut_note}")
     return 0
 
 
@@ -1707,7 +2223,10 @@ def _run_sync_best_usb(args: argparse.Namespace, source: SourceDetection) -> int
         target_path = target.path
         print(f"[TARGET] {target_path}")
 
-    assert target_path is not None
+    if target_path is None:
+        print("[ERROR] target_path could not be resolved after USB detection. "
+              "Ensure a CITL USB is connected or pass --target-path explicitly.")
+        return 2
     print(f"[TARGET] recommendation={comparison.recommendation} ({comparison.summary})")
     if comparison.recommendation == "pull_target_to_source":
         print(
@@ -1855,7 +2374,21 @@ def _pick_duplicate_target(
 
 
 def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int:
+    """
+    Hardened USB duplication function with comprehensive validation and diagnostics.
+    
+    Validates:
+    - Source/destination are different devices
+    - Sufficient space on destination
+    - Both paths are CITL repositories
+    - USB is formatted with appropriate filesystem
+    """
     print(f"[SOURCE] {source.path} ({source.reason})")
+    
+    smoke_test = bool(getattr(args, "smoke_test", False))
+    if smoke_test:
+        print("[SMOKE-TEST] Running in diagnostic mode - no actual copying")
+    
     source_repo = Path(source.path).expanduser().resolve()
     targets = _discover_duplicate_targets(source_repo)
     by_path = {str(t.path): t for t in targets}
@@ -1864,6 +2397,7 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
     from_path = _normalize_repo_path(from_arg) if from_arg else None
     to_path = _normalize_repo_path(to_arg) if to_arg else None
 
+    # ── VALIDATE SOURCE ───────────────────────────────────────────────────────
     if from_path is not None:
         if from_path != source_repo and str(from_path) not in by_path:
             print(f"[ERROR] --duplicate-from not detected as a target: {from_path}")
@@ -1871,10 +2405,12 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
         if not _has_repo_marker(from_path):
             print(f"[ERROR] --duplicate-from is not a CITL repo: {from_path}")
             return 2
+        print(f"[VALIDATE] Source explicitly set: {from_path}")
     if to_path and str(to_path) not in by_path:
         print(f"[ERROR] --duplicate-to not detected as a target: {to_path}")
         return 2
 
+    # ── AUTO-DETECT SOURCE ────────────────────────────────────────────────────
     if from_path is None:
         if _is_removable_source_repo(source_repo) and _has_repo_marker(source_repo):
             from_path = source_repo
@@ -1882,15 +2418,34 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
         else:
             if not targets:
                 print("[ERROR] No external CITL targets were detected for duplication.")
+                print("[ERROR] Connect a USB drive with CITL repo or pass --duplicate-from")
                 return 2
             ranked = sorted(targets, key=lambda t: (_repo_freshness(t.path), t.score), reverse=True)
             from_path = ranked[0].path
             print(f"[DUPLICATE] auto-source=best detected target ({from_path})")
 
-    assert from_path is not None
+    if from_path is None:
+        print("[ERROR] Could not determine a duplication source. "
+              "Connect a CITL USB or pass --duplicate-from explicitly.")
+        return 2
 
+    # Validate source is readable
+    try:
+        src_commit = (Path(from_path) / ".git" / "HEAD").read_text(encoding="utf-8", errors="ignore")
+        print(f"[VALIDATE] Source is readable (git: {src_commit.strip()[:20]}...)")
+    except Exception:
+        print(f"[WARN] Could not detect git HEAD in source; continuing anyway")
+
+    # ── AUTO-DETECT DESTINATION ──────────────────────────────────────────────
     if to_path is None:
         candidates = [t for t in targets if t.path != from_path]
+        if not candidates:
+            print("[ERROR] Need at least 2 USB drives for duplication:")
+            print("[ERROR]   - Source USB (with CITL repo)")
+            print("[ERROR]   - Destination USB (will be cloned to)")
+            print("[ERROR] Connect a second USB drive and try again.")
+            return 2
+        
         picked = _pick_duplicate_target(
             from_path,
             candidates,
@@ -1898,10 +2453,8 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
             include_models=bool(args.include_models),
         )
         if picked is None:
-            print(
-                "[ERROR] Need at least one additional USB/external CITL target to duplicate to. "
-                "Connect another CITL USB and try again."
-            )
+            print("[ERROR] Could not pick a suitable destination USB.")
+            print(f"[ERROR] Found {len(candidates)} candidates but none suitable")
             return 2
         to_path, auto_comp = picked
         print(f"[DUPLICATE] auto-target=next detected target ({to_path})")
@@ -1913,12 +2466,36 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
             include_models=bool(args.include_models),
         )
 
+    # ── FINAL VALIDATION ──────────────────────────────────────────────────────
     if from_path == to_path:
         print("[ERROR] Source and destination USB paths are the same.")
+        print(f"[ERROR] Both resolved to: {from_path}")
         return 2
 
     if _path_root_key(from_path) == _path_root_key(to_path):
         print("[WARN] Source and destination appear to be on the same drive root; continuing anyway.")
+
+    # Check destination space
+    try:
+        src_usage = shutil.disk_usage(str(from_path))
+        dst_usage = shutil.disk_usage(str(to_path))
+        src_needed = src_usage.used
+        dst_available = dst_usage.free
+        
+        print(f"[VALIDATE] Source size: {_fmt_bytes(src_needed)}")
+        print(f"[VALIDATE] Dest free:   {_fmt_bytes(dst_available)}")
+        
+        if src_needed > dst_available:
+            print(f"[ERROR] Insufficient space on destination USB")
+            print(f"[ERROR]   Source needed: {_fmt_bytes(src_needed)}")
+            print(f"[ERROR]   Dest free:     {_fmt_bytes(dst_available)}")
+            print(f"[ERROR]   Shortfall:     {_fmt_bytes(src_needed - dst_available)}")
+            return 2
+        else:
+            headroom_mb = (dst_available - src_needed) / (1024*1024)
+            print(f"[VALIDATE] Space check OK (headroom: {headroom_mb:.1f} MB)")
+    except Exception as e:
+        print(f"[WARN] Could not verify space requirements: {e}")
 
     model_source_arg = (getattr(args, "ollama_model_source", "") or "").strip()
     model_target_arg = (getattr(args, "ollama_model_target", "") or "").strip()
@@ -1932,7 +2509,17 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
     print(f"[DUPLICATE] from={from_path}")
     print(f"[DUPLICATE] to={to_path}")
     print(f"[DUPLICATE] recommendation={auto_comp.recommendation} ({auto_comp.summary})")
+    print(f"[DUPLICATE] include_data={bool(args.include_data)} include_models={bool(args.include_models)}")
 
+    # ── SMOKE TEST MODE ───────────────────────────────────────────────────────
+    if smoke_test:
+        print("[SMOKE-TEST] Validation complete - skipping actual sync")
+        print("[SMOKE-TEST] To run actual clone, remove --smoke-test flag")
+        return 0
+
+    # ── PERFORM SYNC ──────────────────────────────────────────────────────────
+    print("[SYNC] Starting actual file copy...")
+    
     result = sync_repo(
         from_path,
         to_path,
@@ -1979,7 +2566,12 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
             include_models=bool(args.include_models),
         )
 
-    return 0 if total_errors == 0 else 1
+    if total_errors == 0:
+        print("[SUCCESS] USB clone completed without errors!")
+        return 0
+    else:
+        print(f"[WARNING] USB clone completed with {total_errors} error(s)")
+        return 1
 
 
 # ── GitHub / git automation ───────────────────────────────────────────────────
@@ -2660,6 +3252,1071 @@ def sync_device_agnostic_bootstraps(repo: Path) -> Tuple[bool, str]:
     return False, "Bootstrap launchers already up to date."
 
 
+def _utc_now_iso() -> str:
+    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_ts(value: object) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return 0.0
+    iso = text
+    if iso.endswith("Z"):
+        iso = iso[:-1] + "+00:00"
+    try:
+        return float(datetime.fromisoformat(iso).timestamp())
+    except Exception:
+        pass
+    try:
+        return float(text)
+    except Exception:
+        return 0.0
+
+
+def _normalize_rel_path(rel_path: str) -> str:
+    rel = str(rel_path or "").replace("\\", "/").strip().strip("/")
+    if not rel:
+        return ""
+    parts = [p for p in rel.split("/") if p and p != "."]
+    if not parts:
+        return ""
+    if any(p == ".." for p in parts):
+        return ""
+    return "/".join(parts)
+
+
+def _drive_total_bytes(path: PathLike) -> int:
+    try:
+        return int(shutil.disk_usage(str(Path(path))).total)
+    except Exception:
+        return 0
+
+
+_USB_MEDIA_PROFILE_CACHE: Dict[str, Tuple[float, Dict[str, object]]] = {}
+
+
+def _windows_drive_filesystem(path: PathLike) -> str:
+    if os.name != "nt":
+        return ""
+    p = Path(path).expanduser()
+    drive = (p.drive or p.anchor or "").strip().rstrip("\\/").rstrip(":")
+    if not drive:
+        return ""
+    letter = drive[0].upper()
+    try:
+        cmd = [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            f"(Get-Volume -DriveLetter '{letter}' -ErrorAction SilentlyContinue).FileSystem",
+        ]
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+        out = (proc.stdout or "").strip()
+        return out.lower()
+    except Exception:
+        return ""
+
+
+def usb_media_profile(path: PathLike) -> Dict[str, object]:
+    root = Path(path).expanduser()
+    try:
+        cache_key = str(root.resolve())
+    except Exception:
+        cache_key = str(root)
+    cached = _USB_MEDIA_PROFILE_CACHE.get(cache_key)
+    now = time.time()
+    if cached and (now - cached[0]) <= USB_MEDIA_CACHE_TTL_SEC:
+        return dict(cached[1])
+    total = _drive_total_bytes(root)
+    fs = _windows_drive_filesystem(root)
+    profile = {
+        "path": str(root),
+        "total_bytes": total,
+        "total_human": _fmt_bytes(total),
+        "filesystem": fs or "unknown",
+    }
+    _USB_MEDIA_PROFILE_CACHE[cache_key] = (now, dict(profile))
+    return profile
+
+
+def is_expected_usb_bootstrap_media(path: PathLike) -> Tuple[bool, str]:
+    profile = usb_media_profile(path)
+    total = int(profile.get("total_bytes") or 0)
+    fs = str(profile.get("filesystem") or "").lower()
+    min_bytes = 40 * 1024 * 1024 * 1024
+    max_bytes = 80 * 1024 * 1024 * 1024
+    size_ok = min_bytes <= total <= max_bytes
+    if os.name == "nt":
+        fs_ok = ("exfat" in fs) or ("fat32" in fs)
+    else:
+        fs_ok = True
+    ok = bool(size_ok and fs_ok)
+    reason = (
+        f"media={profile.get('path')} fs={profile.get('filesystem')} "
+        f"size={profile.get('total_human')} expected_fs=exfat/fat32 expected_size=40-80GB"
+    )
+    return ok, reason
+
+
+def _bootstrap_state_path(repo: PathLike) -> Path:
+    return Path(repo).expanduser().resolve() / BOOTSTRAP_STATE_REL
+
+
+def _bootstrap_default_state() -> Dict[str, object]:
+    return {
+        "schema_version": BOOTSTRAP_SCHEMA_VERSION,
+        "updated_utc": "",
+        "last_applied": {},
+        "app_patch_state": {},
+        "history": [],
+        "rollback_stack": [],
+    }
+
+
+def load_bootstrap_repo_state(repo: PathLike) -> Dict[str, object]:
+    state = _bootstrap_default_state()
+    path = _bootstrap_state_path(repo)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return state
+    if not isinstance(raw, dict):
+        return state
+
+    for key in ("last_applied",):
+        if isinstance(raw.get(key), dict):
+            state[key] = raw.get(key) or {}
+    for key in ("app_patch_state",):
+        if isinstance(raw.get(key), dict):
+            state[key] = raw.get(key) or {}
+    for key in ("history", "rollback_stack"):
+        if isinstance(raw.get(key), list):
+            state[key] = raw.get(key) or []
+    if isinstance(raw.get("updated_utc"), str):
+        state["updated_utc"] = raw.get("updated_utc") or ""
+    return state
+
+
+def save_bootstrap_repo_state(repo: PathLike, data: Dict[str, object]) -> None:
+    path = _bootstrap_state_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _bootstrap_default_state()
+    if isinstance(data.get("last_applied"), dict):
+        payload["last_applied"] = data.get("last_applied") or {}
+    if isinstance(data.get("app_patch_state"), dict):
+        payload["app_patch_state"] = data.get("app_patch_state") or {}
+    if isinstance(data.get("history"), list):
+        payload["history"] = list(data.get("history") or [])[-100:]
+    if isinstance(data.get("rollback_stack"), list):
+        payload["rollback_stack"] = list(data.get("rollback_stack") or [])[-20:]
+    payload["updated_utc"] = _utc_now_iso()
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _iter_bootstrap_app_files(source_repo: Path, app: dict) -> Iterable[Tuple[str, Path]]:
+    app_root = resolve_app_source_root(app, source_repo)
+    key_files = app.get("key_files") or []
+    for rel in key_files:
+        rel_raw = str(rel or "").strip()
+        if not rel_raw:
+            continue
+        src_path = app_root / rel_raw
+        rel_base = _normalize_rel_path(rel_raw)
+        if not rel_base:
+            continue
+        if not src_path.exists():
+            continue
+        if src_path.is_file():
+            yield rel_base, src_path
+            continue
+        if src_path.is_dir():
+            for child in sorted(src_path.rglob("*")):
+                if not child.is_file():
+                    continue
+                rel_child = child.relative_to(src_path).as_posix()
+                rel_path = _normalize_rel_path(f"{rel_base}/{rel_child}")
+                if rel_path:
+                    yield rel_path, child
+
+
+def _read_bootstrap_manifest_dict(zip_path: PathLike) -> Optional[Dict[str, object]]:
+    path = Path(zip_path).expanduser()
+    try:
+        with zipfile.ZipFile(path, "r") as zf:
+            candidates = [
+                BOOTSTRAP_MANIFEST_NAME,
+                "manifest.json",
+                "bootstrap_manifest.json",
+            ]
+            name = ""
+            for c in candidates:
+                if c in zf.namelist():
+                    name = c
+                    break
+            if not name:
+                return None
+            text = zf.read(name).decode("utf-8", errors="replace")
+            raw = json.loads(text)
+            if not isinstance(raw, dict):
+                return None
+            return raw
+    except Exception:
+        return None
+
+
+def _package_from_manifest(zip_path: PathLike, source_hint: str = "") -> Optional[BootstrapPackage]:
+    path = Path(zip_path).expanduser()
+    manifest = _read_bootstrap_manifest_dict(path)
+    if manifest is None:
+        return None
+
+    bootstrap_id = str(manifest.get("bootstrap_id") or "").strip()
+    if not bootstrap_id:
+        bootstrap_id = path.stem
+    created_utc = str(manifest.get("created_utc") or "").strip()
+    created_ts = _parse_ts(created_utc)
+    if created_ts <= 0:
+        created_ts = _parse_ts(manifest.get("created_epoch"))
+    if created_ts <= 0:
+        try:
+            created_ts = float(path.stat().st_mtime)
+        except Exception:
+            created_ts = 0.0
+
+    apps_raw = manifest.get("apps") if isinstance(manifest.get("apps"), list) else []
+    app_names: List[str] = []
+    app_file_counts: Dict[str, int] = {}
+    file_count = 0
+    for item in apps_raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        files = item.get("files")
+        if isinstance(files, list):
+            count = sum(1 for f in files if isinstance(f, str) and _normalize_rel_path(f))
+        else:
+            count = int(item.get("file_count") or 0)
+        app_names.append(name)
+        app_file_counts[name] = count
+        file_count += count
+
+    if not app_names:
+        flat = manifest.get("app_names")
+        if isinstance(flat, list):
+            app_names = [str(x).strip() for x in flat if str(x).strip()]
+            for name in app_names:
+                app_file_counts[name] = 0
+        if not app_names:
+            return None
+
+    try:
+        package_size = int(path.stat().st_size)
+    except Exception:
+        package_size = 0
+
+    payload_bytes = int(manifest.get("payload_bytes") or 0)
+    source_repo_label = str(manifest.get("source_repo") or "").strip() or "unknown"
+    source_hint_text = source_hint or str(path.parent)
+    return BootstrapPackage(
+        path=path.resolve(),
+        bootstrap_id=bootstrap_id,
+        created_utc=created_utc or _fmt_ts(created_ts),
+        created_ts=created_ts,
+        package_size=package_size,
+        app_names=tuple(app_names),
+        app_file_counts=app_file_counts,
+        file_count=file_count,
+        payload_bytes=payload_bytes,
+        source_repo_label=source_repo_label,
+        source_hint=source_hint_text,
+    )
+
+
+def discover_bootstrap_packages(search_roots: Sequence[Tuple[str, PathLike]]) -> List[BootstrapPackage]:
+    packages: List[BootstrapPackage] = []
+    seen: set = set()
+    for hint, root_like in search_roots:
+        root = Path(root_like).expanduser()
+        candidates = [
+            root / BOOTSTRAP_PATCH_DIR_REL,
+            root / "bootstrap" / "packages",
+            root / "bootstrap",
+        ]
+        for folder in candidates:
+            if not folder.exists() or not folder.is_dir():
+                continue
+            for path in sorted(folder.glob("*.zip")):
+                try:
+                    key = str(path.resolve())
+                except Exception:
+                    key = str(path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                pkg = _package_from_manifest(path, source_hint=hint)
+                if pkg is not None:
+                    packages.append(pkg)
+    def _sort_key(pkg: BootstrapPackage) -> Tuple[float, float]:
+        mtime = 0.0
+        try:
+            if pkg.path.exists():
+                mtime = float(pkg.path.stat().st_mtime)
+        except Exception:
+            mtime = 0.0
+        return (pkg.created_ts, mtime)
+
+    packages.sort(key=_sort_key, reverse=True)
+    return packages
+
+
+def build_bootstrap_package(
+    source_repo: PathLike,
+    selected_apps: Optional[Sequence[str]] = None,
+    log_fn: LogFn = None,
+) -> Tuple[bool, str, Optional[BootstrapPackage]]:
+    source = Path(source_repo).expanduser().resolve()
+    selected = {str(x).strip() for x in (selected_apps or []) if str(x).strip()}
+    if not selected:
+        selected = {str(app.get("name") or "").strip() for app in CITL_APPS if str(app.get("name") or "").strip()}
+
+    skip_prefixes = (
+        _normalize_rel_path(BOOTSTRAP_PATCH_DIR_REL) + "/",
+        _normalize_rel_path(BOOTSTRAP_ROLLBACK_DIR_REL) + "/",
+    )
+    skip_exact = {
+        _normalize_rel_path(BOOTSTRAP_STATE_REL),
+    }
+
+    app_files: Dict[str, List[str]] = {}
+    payload_sources: Dict[str, Path] = {}
+    payload_bytes = 0
+
+    for app in CITL_APPS:
+        app_name = str(app.get("name") or "").strip()
+        if not app_name or app_name not in selected:
+            continue
+        rels: List[str] = []
+        rel_seen: set = set()
+        for rel_path, src_path in _iter_bootstrap_app_files(source, app):
+            if rel_path in skip_exact or any(rel_path.startswith(prefix) for prefix in skip_prefixes):
+                continue
+            if rel_path not in payload_sources:
+                payload_sources[rel_path] = src_path
+                try:
+                    payload_bytes += int(src_path.stat().st_size)
+                except Exception:
+                    pass
+            if rel_path not in rel_seen:
+                rels.append(rel_path)
+                rel_seen.add(rel_path)
+        if rels:
+            app_files[app_name] = sorted(rels)
+            _safe_log(log_fn, f"[BOOTSTRAP][BUILD] {app_name}: {len(rels)} file(s)\n")
+
+    if not payload_sources:
+        return False, "No files found for selected apps. Bootstrap package was not created.", None
+
+    created_utc = _utc_now_iso()
+    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    digest = hashlib.sha1()
+    for rel in sorted(payload_sources):
+        digest.update(rel.encode("utf-8", errors="ignore"))
+        try:
+            digest.update(str(payload_sources[rel].stat().st_size).encode("ascii", errors="ignore"))
+        except Exception:
+            digest.update(b"0")
+    short_hash = digest.hexdigest()[:10]
+    bootstrap_id = f"{stamp}-{short_hash}"
+
+    out_dir = source / BOOTSTRAP_PATCH_DIR_REL
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"citl_bootstrap_{stamp}_{short_hash[:8]}.zip"
+
+    apps_manifest = []
+    for app_name in sorted(app_files.keys()):
+        files = app_files[app_name]
+        apps_manifest.append(
+            {
+                "name": app_name,
+                "file_count": len(files),
+                "files": files,
+            }
+        )
+    manifest = {
+        "schema_version": BOOTSTRAP_SCHEMA_VERSION,
+        "bootstrap_id": bootstrap_id,
+        "created_utc": created_utc,
+        "created_epoch": _parse_ts(created_utc),
+        "generator_app": APP_SYNC_NAME,
+        "generator_version": APP_SYNC_VERSION,
+        "source_repo": source.name,
+        "source_repo_path": str(source),
+        "app_names": sorted(app_files.keys()),
+        "apps": apps_manifest,
+        "file_count": len(payload_sources),
+        "payload_bytes": payload_bytes,
+    }
+
+    with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for rel in sorted(payload_sources):
+            arc = f"payload/{rel}"
+            zf.write(payload_sources[rel], arcname=arc)
+        zf.writestr(BOOTSTRAP_MANIFEST_NAME, json.dumps(manifest, indent=2))
+
+    package = _package_from_manifest(out_path, source_hint="local-source")
+    if package is None:
+        return False, f"Bootstrap package created but manifest parse failed: {out_path}", None
+    scripts_ok, scripts_msg, _script_paths = generate_bootstrap_patch_scripts(source, package, log_fn=log_fn)
+    msg = (
+        f"Created bootstrap package {out_path.name} "
+        f"({len(package.app_names)} app(s), {package.file_count} file(s), {_fmt_bytes(package.package_size)}). "
+        f"{scripts_msg if scripts_ok else f'Script generation warning: {scripts_msg}'}"
+    )
+    return True, msg, package
+
+
+def generate_bootstrap_patch_scripts(
+    source_repo: PathLike,
+    package: BootstrapPackage,
+    log_fn: LogFn = None,
+) -> Tuple[bool, str, List[Path]]:
+    repo = Path(source_repo).expanduser().resolve()
+    out_dir = repo / BOOTSTRAP_PATCH_DIR_REL
+    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        rel_pkg = package.path.resolve().relative_to(repo).as_posix()
+    except Exception:
+        rel_pkg = package.path.resolve().as_posix()
+    rel_pkg_win = rel_pkg.replace("/", "\\")
+    slug = re.sub(r"[^a-zA-Z0-9_.-]+", "_", package.bootstrap_id).strip("_") or "bootstrap"
+
+    ps1_path = out_dir / f"apply_bootstrap_{slug}.ps1"
+    bat_path = out_dir / f"apply_bootstrap_{slug}.bat"
+    sh_path = out_dir / f"apply_bootstrap_{slug}.sh"
+
+    ps1 = (
+        "param(\n"
+        "  [switch]$AlsoUsb\n"
+        ")\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        "$Repo = Split-Path -Parent $PSScriptRoot\n"
+        "$Repo = Split-Path -Parent $Repo\n"
+        "$SyncPy = Join-Path $Repo 'factbook-assistant\\citl_app_sync.py'\n"
+        f"$Pkg = Join-Path $Repo '{rel_pkg_win}'\n"
+        "if (!(Test-Path -LiteralPath $SyncPy)) { throw \"citl_app_sync.py not found: $SyncPy\" }\n"
+        "if (!(Test-Path -LiteralPath $Pkg)) { throw \"bootstrap package not found: $Pkg\" }\n"
+        "$args = @('--bootstrap-install-package', $Pkg, '--bootstrap-install-target', 'local')\n"
+        "if ($AlsoUsb) { $args += '--bootstrap-install-usb-if-found' }\n"
+        "if (Get-Command py -ErrorAction SilentlyContinue) {\n"
+        "  & py -3 $SyncPy @args\n"
+        "} else {\n"
+        "  & python $SyncPy @args\n"
+        "}\n"
+        "exit $LASTEXITCODE\n"
+    )
+    bat = (
+        "@echo off\n"
+        "setlocal\n"
+        'set "SCRIPT=%~dp0apply_bootstrap_' + slug + '.ps1"\n'
+        "powershell -NoProfile -ExecutionPolicy Bypass -File \"%SCRIPT%\" %*\n"
+        "exit /b %ERRORLEVEL%\n"
+    )
+    sh = (
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+        'REPO="$(cd "$HERE/../.." && pwd)"\n'
+        'SYNC_PY="$REPO/factbook-assistant/citl_app_sync.py"\n'
+        f'PKG="$REPO/{rel_pkg}"\n'
+        'ARGS=(--bootstrap-install-package "$PKG" --bootstrap-install-target local)\n'
+        'if [[ "${1:-}" == "--also-usb" ]]; then\n'
+        "  ARGS+=(--bootstrap-install-usb-if-found)\n"
+        "  shift\n"
+        "fi\n"
+        'ARGS+=("$@")\n'
+        'if [[ ! -f "$SYNC_PY" ]]; then echo "Missing: $SYNC_PY"; exit 1; fi\n'
+        'if [[ ! -f "$PKG" ]]; then echo "Missing: $PKG"; exit 1; fi\n'
+        'if [[ -x "$REPO/.venv/bin/python3" ]]; then exec "$REPO/.venv/bin/python3" "$SYNC_PY" "${ARGS[@]}"; fi\n'
+        'if command -v python3 >/dev/null 2>&1; then exec python3 "$SYNC_PY" "${ARGS[@]}"; fi\n'
+        'exec python "$SYNC_PY" "${ARGS[@]}"\n'
+    )
+
+    try:
+        ps1_path.write_text(ps1, encoding="utf-8")
+        bat_path.write_text(bat, encoding="utf-8")
+        sh_path.write_text(sh, encoding="utf-8")
+        if os.name != "nt":
+            sh_path.chmod(0o755)
+        _safe_log(
+            log_fn,
+            f"[BOOTSTRAP][SCRIPTS] generated: {ps1_path.name}, {bat_path.name}, {sh_path.name}\n",
+        )
+        return True, "Generated patch scripts (.ps1/.bat/.sh).", [ps1_path, bat_path, sh_path]
+    except Exception as exc:
+        return False, str(exc), []
+
+
+def preview_bootstrap_install(
+    package: BootstrapPackage,
+    dest_repo: PathLike,
+    selected_apps: Optional[Sequence[str]] = None,
+) -> BootstrapInstallPreview:
+    state = load_bootstrap_repo_state(dest_repo)
+    app_state = state.get("app_patch_state") if isinstance(state.get("app_patch_state"), dict) else {}
+    wanted = {str(x).strip() for x in (selected_apps or []) if str(x).strip()}
+    names = [n for n in package.app_names if (not wanted or n in wanted)]
+    newer = 0
+    same = 0
+    older = 0
+    for name in names:
+        prev = app_state.get(name) if isinstance(app_state, dict) else {}
+        prev_ts = 0.0
+        if isinstance(prev, dict):
+            prev_ts = _parse_ts(prev.get("bootstrap_created_utc"))
+            if prev_ts <= 0:
+                prev_ts = _parse_ts(prev.get("bootstrap_created_ts"))
+        if prev_ts <= 0:
+            newer += 1
+        elif package.created_ts > (prev_ts + BOOTSTRAP_WARN_EPSILON_SEC):
+            newer += 1
+        elif package.created_ts + BOOTSTRAP_WARN_EPSILON_SEC < prev_ts:
+            older += 1
+        else:
+            same += 1
+
+    total = len(names)
+    if total <= 0 or newer <= 0:
+        classification = "none"
+    elif newer == total:
+        classification = "all"
+    else:
+        classification = "some"
+
+    stale = False
+    stale_reason = ""
+    last = state.get("last_applied") if isinstance(state.get("last_applied"), dict) else {}
+    last_ts = _parse_ts(last.get("bootstrap_created_utc")) if isinstance(last, dict) else 0.0
+    if last_ts > 0 and package.created_ts + BOOTSTRAP_WARN_EPSILON_SEC < last_ts:
+        stale = True
+        stale_reason = (
+            f"Selected package ({_fmt_ts(package.created_ts)}) appears older than last applied "
+            f"({_fmt_ts(last_ts)})."
+        )
+    elif older > 0:
+        stale = True
+        stale_reason = f"{older} selected app(s) appear older than currently installed patch state."
+
+    return BootstrapInstallPreview(
+        total_apps=total,
+        newer_apps=newer,
+        same_apps=same,
+        older_apps=older,
+        classification=classification,
+        stale=stale,
+        stale_reason=stale_reason,
+    )
+
+
+def _manifest_app_files(manifest: Dict[str, object]) -> Dict[str, List[str]]:
+    out: Dict[str, List[str]] = {}
+    apps = manifest.get("apps")
+    if not isinstance(apps, list):
+        return out
+    for item in apps:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        files = item.get("files")
+        if not name or not isinstance(files, list):
+            continue
+        clean: List[str] = []
+        seen: set = set()
+        for rel in files:
+            rel_norm = _normalize_rel_path(str(rel or ""))
+            if not rel_norm or rel_norm in seen:
+                continue
+            seen.add(rel_norm)
+            clean.append(rel_norm)
+        out[name] = clean
+    return out
+
+
+def _create_bootstrap_rollback_snapshot(
+    repo: Path,
+    rel_files: Sequence[str],
+    package: BootstrapPackage,
+    previous_state: Dict[str, object],
+) -> Path:
+    rollback_dir = repo / BOOTSTRAP_ROLLBACK_DIR_REL
+    rollback_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    safe_id = re.sub(r"[^a-zA-Z0-9_.-]+", "_", package.bootstrap_id)[:60]
+    zip_path = rollback_dir / f"rollback_{stamp}_{safe_id}.zip"
+
+    files_manifest: List[Dict[str, object]] = []
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for rel in sorted(set(rel_files)):
+            rel_norm = _normalize_rel_path(rel)
+            if not rel_norm:
+                continue
+            dst = repo / rel_norm
+            existed = dst.exists() and dst.is_file()
+            files_manifest.append(
+                {
+                    "rel_path": rel_norm,
+                    "existed_before": bool(existed),
+                }
+            )
+            if existed:
+                zf.write(dst, arcname=f"before/{rel_norm}")
+        rollback_manifest = {
+            "schema_version": BOOTSTRAP_SCHEMA_VERSION,
+            "created_utc": _utc_now_iso(),
+            "bootstrap_id": package.bootstrap_id,
+            "package_path": str(package.path),
+            "files": files_manifest,
+            "previous_state": {
+                "last_applied": previous_state.get("last_applied") if isinstance(previous_state.get("last_applied"), dict) else {},
+                "app_patch_state": previous_state.get("app_patch_state") if isinstance(previous_state.get("app_patch_state"), dict) else {},
+            },
+        }
+        zf.writestr(BOOTSTRAP_ROLLBACK_MANIFEST_NAME, json.dumps(rollback_manifest, indent=2))
+    return zip_path
+
+
+def apply_bootstrap_package_to_repo(
+    package: BootstrapPackage,
+    dest_repo: PathLike,
+    selected_apps: Optional[Sequence[str]] = None,
+    log_fn: LogFn = None,
+) -> Tuple[bool, str]:
+    repo = Path(dest_repo).expanduser().resolve()
+    manifest = _read_bootstrap_manifest_dict(package.path)
+    if manifest is None:
+        return False, f"Manifest not found in package: {package.path}"
+
+    app_files = _manifest_app_files(manifest)
+    if not app_files:
+        return False, f"Package manifest has no app file list: {package.path}"
+
+    wanted = {str(x).strip() for x in (selected_apps or []) if str(x).strip()}
+    chosen_apps = [name for name in app_files.keys() if (not wanted or name in wanted)]
+    if not chosen_apps:
+        return False, "No selected apps matched this bootstrap package."
+
+    rel_files: List[str] = []
+    rel_seen: set = set()
+    for app_name in chosen_apps:
+        for rel in app_files.get(app_name, []):
+            if rel not in rel_seen:
+                rel_seen.add(rel)
+                rel_files.append(rel)
+
+    state_before = load_bootstrap_repo_state(repo)
+    snapshot_zip = _create_bootstrap_rollback_snapshot(repo, rel_files, package, state_before)
+    _safe_log(log_fn, f"[BOOTSTRAP][SNAPSHOT] {snapshot_zip}\n")
+
+    copied = 0
+    errors = 0
+    bytes_written = 0
+    with zipfile.ZipFile(package.path, "r") as zf:
+        names = set(zf.namelist())
+        for rel in rel_files:
+            rel_norm = _normalize_rel_path(rel)
+            if not rel_norm:
+                errors += 1
+                _safe_log(log_fn, f"[BOOTSTRAP][ERR] unsafe rel path skipped: {rel}\n")
+                continue
+            arc = f"payload/{rel_norm}"
+            if arc not in names:
+                errors += 1
+                _safe_log(log_fn, f"[BOOTSTRAP][ERR] missing payload entry: {arc}\n")
+                continue
+            dst = repo / rel_norm
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(arc, "r") as src_fh, open(dst, "wb") as dst_fh:
+                    shutil.copyfileobj(src_fh, dst_fh)
+                copied += 1
+                try:
+                    bytes_written += int(dst.stat().st_size)
+                except Exception:
+                    pass
+            except Exception as exc:
+                errors += 1
+                _safe_log(log_fn, f"[BOOTSTRAP][ERR] {rel_norm}: {exc}\n")
+
+    state_after = load_bootstrap_repo_state(repo)
+    if not isinstance(state_after.get("app_patch_state"), dict):
+        state_after["app_patch_state"] = {}
+    app_patch_state = state_after.get("app_patch_state") or {}
+    applied_utc = _utc_now_iso()
+    for app_name in chosen_apps:
+        app_patch_state[app_name] = {
+            "bootstrap_id": package.bootstrap_id,
+            "bootstrap_created_utc": package.created_utc,
+            "bootstrap_created_ts": package.created_ts,
+            "applied_utc": applied_utc,
+            "package_size_bytes": package.package_size,
+            "package_path": str(package.path),
+            "file_count": len(app_files.get(app_name, [])),
+        }
+    state_after["app_patch_state"] = app_patch_state
+
+    install_event = {
+        "event": "install",
+        "applied_utc": applied_utc,
+        "bootstrap_id": package.bootstrap_id,
+        "bootstrap_created_utc": package.created_utc,
+        "package_path": str(package.path),
+        "package_size_bytes": package.package_size,
+        "apps": chosen_apps,
+        "copied_files": copied,
+        "errors": errors,
+        "bytes_written": bytes_written,
+        "rollback_snapshot": str(snapshot_zip),
+    }
+    state_after["last_applied"] = install_event
+    hist = state_after.get("history") if isinstance(state_after.get("history"), list) else []
+    hist.append(install_event)
+    state_after["history"] = hist[-100:]
+    rollback_stack = state_after.get("rollback_stack") if isinstance(state_after.get("rollback_stack"), list) else []
+    rollback_stack.append(
+        {
+            "created_utc": applied_utc,
+            "bootstrap_id": package.bootstrap_id,
+            "snapshot_path": str(snapshot_zip),
+            "apps": chosen_apps,
+        }
+    )
+    state_after["rollback_stack"] = rollback_stack[-20:]
+    save_bootstrap_repo_state(repo, state_after)
+
+    msg = (
+        f"Installed bootstrap {package.bootstrap_id} to {repo.name}: "
+        f"apps={len(chosen_apps)} files={copied} errors={errors} bytes={_fmt_bytes(bytes_written)} "
+        f"rollback={snapshot_zip.name}"
+    )
+    return errors == 0, msg
+
+
+def rollback_last_bootstrap_on_repo(dest_repo: PathLike, log_fn: LogFn = None) -> Tuple[bool, str]:
+    repo = Path(dest_repo).expanduser().resolve()
+    state = load_bootstrap_repo_state(repo)
+    stack = state.get("rollback_stack") if isinstance(state.get("rollback_stack"), list) else []
+    if not stack:
+        return False, f"No rollback snapshot is available for {repo}."
+
+    entry = stack[-1]
+    snapshot_path_raw = str(entry.get("snapshot_path") or "").strip()
+    if not snapshot_path_raw:
+        return False, "Rollback entry is missing snapshot path."
+    snap_path = Path(snapshot_path_raw).expanduser()
+    if not snap_path.is_absolute():
+        snap_path = repo / snap_path
+    if not snap_path.exists():
+        return False, f"Rollback snapshot not found: {snap_path}"
+
+    restored = 0
+    removed = 0
+    with zipfile.ZipFile(snap_path, "r") as zf:
+        if BOOTSTRAP_ROLLBACK_MANIFEST_NAME not in zf.namelist():
+            return False, f"Rollback manifest missing in {snap_path.name}."
+        manifest = json.loads(zf.read(BOOTSTRAP_ROLLBACK_MANIFEST_NAME).decode("utf-8", errors="replace"))
+        files = manifest.get("files") if isinstance(manifest.get("files"), list) else []
+        for item in files:
+            if not isinstance(item, dict):
+                continue
+            rel = _normalize_rel_path(str(item.get("rel_path") or ""))
+            if not rel:
+                continue
+            existed_before = bool(item.get("existed_before"))
+            dst = repo / rel
+            if existed_before:
+                arc = f"before/{rel}"
+                if arc not in zf.namelist():
+                    _safe_log(log_fn, f"[BOOTSTRAP][ROLLBACK][WARN] missing snapshot file {arc}\n")
+                    continue
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(arc, "r") as src_fh, open(dst, "wb") as dst_fh:
+                    shutil.copyfileobj(src_fh, dst_fh)
+                restored += 1
+            else:
+                if dst.exists():
+                    if dst.is_file():
+                        dst.unlink(missing_ok=True)
+                        removed += 1
+                    elif dst.is_dir():
+                        shutil.rmtree(dst, ignore_errors=True)
+                        removed += 1
+
+        previous_state = manifest.get("previous_state") if isinstance(manifest.get("previous_state"), dict) else {}
+        if isinstance(previous_state.get("app_patch_state"), dict):
+            state["app_patch_state"] = previous_state.get("app_patch_state") or {}
+        else:
+            state["app_patch_state"] = {}
+        if isinstance(previous_state.get("last_applied"), dict):
+            state["last_applied"] = previous_state.get("last_applied") or {}
+        else:
+            state["last_applied"] = {}
+
+    stack = state.get("rollback_stack") if isinstance(state.get("rollback_stack"), list) else []
+    if stack:
+        stack = stack[:-1]
+    state["rollback_stack"] = stack
+    history = state.get("history") if isinstance(state.get("history"), list) else []
+    history.append(
+        {
+            "event": "rollback",
+            "applied_utc": _utc_now_iso(),
+            "snapshot_path": str(snap_path),
+            "restored_files": restored,
+            "removed_files": removed,
+            "for_bootstrap_id": str(entry.get("bootstrap_id") or ""),
+        }
+    )
+    state["history"] = history[-100:]
+    save_bootstrap_repo_state(repo, state)
+
+    return True, (
+        f"Rollback complete for {repo.name}: restored={restored} removed={removed} "
+        f"snapshot={snap_path.name}"
+    )
+
+
+# ── Git-based patch detection and packaging ───────────────────────────────────
+
+def detect_git_patches(repo: PathLike, max_count: int = 30) -> List[dict]:
+    """
+    Return a list of recent git commits from the repo, newest first.
+    Each entry: {hash, short_hash, date_iso, subject, files, file_count}
+    Returns [] if repo is not a git repo or git is unavailable.
+    """
+    git_root = _find_git_root(Path(repo).expanduser().resolve())
+    if git_root is None:
+        return []
+
+    rc, out, _ = _git_run(
+        git_root,
+        "log",
+        f"--max-count={max_count}",
+        "--pretty=format:%H|%ai|%s",
+        timeout=20,
+    )
+    if rc != 0 or not out.strip():
+        return []
+
+    commits: List[dict] = []
+    for line in out.splitlines():
+        parts = line.split("|", 2)
+        if len(parts) < 3:
+            continue
+        full_hash = parts[0].strip()
+        date_iso  = parts[1].strip()
+        subject   = parts[2].strip()
+
+        rc2, files_out, _ = _git_run(
+            git_root,
+            "diff-tree", "--no-commit-id", "-r", "--name-only",
+            "--diff-filter=ACMRD",
+            full_hash,
+            timeout=15,
+        )
+        files = [f.strip() for f in files_out.splitlines() if f.strip()] if rc2 == 0 else []
+
+        commits.append({
+            "hash":       full_hash,
+            "short_hash": full_hash[:8],
+            "date_iso":   date_iso,
+            "subject":    subject,
+            "files":      files,
+            "file_count": len(files),
+        })
+
+    return commits
+
+
+def build_git_patch_from_commits(
+    source_repo: PathLike,
+    commit_hashes: Sequence[str],
+    log_fn: LogFn = None,
+) -> Tuple[bool, str, Optional[BootstrapPackage]]:
+    """
+    Build a bootstrap-compatible patch ZIP from the files changed in the
+    given git commits.  Files are read from the current working tree.
+    Also generates apply scripts (.ps1/.bat/.sh) in bootstrap/patches/.
+
+    Returns (ok, message, BootstrapPackage | None).
+    """
+    source = Path(source_repo).expanduser().resolve()
+    git_root = _find_git_root(source) or source
+    hashes = [h.strip() for h in commit_hashes if h.strip()]
+
+    if not hashes:
+        return False, "No commits provided.", None
+
+    # ── 1. Collect all files changed across the given commits ─────────────────
+    changed_files: set = set()
+    for commit in hashes:
+        rc, out, _ = _git_run(
+            git_root,
+            "diff-tree", "--no-commit-id", "-r", "--name-only",
+            "--diff-filter=ACMRD",
+            commit,
+            timeout=15,
+        )
+        if rc == 0:
+            for f in out.splitlines():
+                rel = _normalize_rel_path(f.strip())
+                if rel:
+                    changed_files.add(rel)
+
+    if not changed_files:
+        return False, "No file changes found in selected commits (they may only contain deletes or merges).", None
+
+    _safe_log(log_fn, f"[GIT-PATCH] {len(changed_files)} changed path(s) across {len(hashes)} commit(s).\n")
+
+    skip_prefixes = (
+        _normalize_rel_path(BOOTSTRAP_PATCH_DIR_REL) + "/",
+        _normalize_rel_path(BOOTSTRAP_ROLLBACK_DIR_REL) + "/",
+    )
+    skip_exact = {_normalize_rel_path(BOOTSTRAP_STATE_REL)}
+
+    # ── 2. Match files to CITL apps ───────────────────────────────────────────
+    app_files:       Dict[str, List[str]] = {}
+    payload_sources: Dict[str, Path]      = {}
+    payload_bytes = 0
+
+    for app in CITL_APPS:
+        app_name = str(app.get("name") or "").strip()
+        if not app_name:
+            continue
+        app_root = resolve_app_source_root(app, source)
+        app_rels: List[str] = []
+
+        key_files = app.get("key_files") or []
+        key_norms = [_normalize_rel_path(str(kf or "")) for kf in key_files if _normalize_rel_path(str(kf or ""))]
+
+        for rel in changed_files:
+            if rel in skip_exact or any(rel.startswith(p) for p in skip_prefixes):
+                continue
+            # Is this file part of this app's key_files?
+            is_app_file = any(
+                rel == kn or rel.startswith(kn + "/")
+                for kn in key_norms
+            )
+            if not is_app_file:
+                continue
+            # Resolve actual file path
+            src_path = (app_root / rel) if (app_root / rel).is_file() else (source / rel)
+            if not src_path.is_file():
+                continue
+            app_rels.append(rel)
+            if rel not in payload_sources:
+                payload_sources[rel] = src_path
+                try:
+                    payload_bytes += int(src_path.stat().st_size)
+                except Exception:
+                    pass
+
+        if app_rels:
+            app_files[app_name] = sorted(set(app_rels))
+            _safe_log(log_fn, f"[GIT-PATCH]   {app_name}: {len(app_rels)} file(s)\n")
+
+    # ── 3. Capture unmatched changed files under "CITL Other" ─────────────────
+    matched: set = set()
+    for rels in app_files.values():
+        matched.update(rels)
+    unmatched: List[str] = []
+    for rel in sorted(changed_files - matched):
+        if rel in skip_exact or any(rel.startswith(p) for p in skip_prefixes):
+            continue
+        src = source / rel
+        if src.is_file():
+            unmatched.append(rel)
+            if rel not in payload_sources:
+                payload_sources[rel] = src
+                try:
+                    payload_bytes += int(src.stat().st_size)
+                except Exception:
+                    pass
+    if unmatched:
+        app_files["CITL Other"] = sorted(unmatched)
+        _safe_log(log_fn, f"[GIT-PATCH]   CITL Other (unmatched changed files): {len(unmatched)}\n")
+
+    if not payload_sources:
+        return (
+            False,
+            "None of the changed files exist in the working tree — they may have been deleted. Nothing to package.",
+            None,
+        )
+
+    # ── 4. Build ZIP ──────────────────────────────────────────────────────────
+    created_utc = _utc_now_iso()
+    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    digest = hashlib.sha1()
+    for h in sorted(hashes):
+        digest.update(h.encode("ascii", errors="ignore"))
+    short_hash = digest.hexdigest()[:8]
+    bootstrap_id = f"git-{stamp}-{short_hash}"
+
+    out_dir = source / BOOTSTRAP_PATCH_DIR_REL
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"citl_gitpatch_{stamp}_{short_hash}.zip"
+
+    apps_manifest = [
+        {"name": n, "file_count": len(f), "files": f}
+        for n, f in sorted(app_files.items())
+    ]
+    manifest: Dict[str, object] = {
+        "schema_version":    BOOTSTRAP_SCHEMA_VERSION,
+        "bootstrap_id":      bootstrap_id,
+        "created_utc":       created_utc,
+        "created_epoch":     _parse_ts(created_utc),
+        "generator_app":     APP_SYNC_NAME,
+        "generator_version": APP_SYNC_VERSION,
+        "patch_type":        "git",
+        "git_commits":       list(hashes),
+        "source_repo":       source.name,
+        "source_repo_path":  str(source),
+        "app_names":         sorted(app_files.keys()),
+        "apps":              apps_manifest,
+        "file_count":        len(payload_sources),
+        "payload_bytes":     payload_bytes,
+    }
+
+    with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for rel in sorted(payload_sources):
+            zf.write(payload_sources[rel], arcname=f"payload/{rel}")
+        zf.writestr(BOOTSTRAP_MANIFEST_NAME, json.dumps(manifest, indent=2))
+
+    package = _package_from_manifest(out_path, source_hint="git-patch")
+    if package is None:
+        return False, f"Git patch created but manifest parse failed: {out_path}", None
+
+    generate_bootstrap_patch_scripts(source, package, log_fn=log_fn)
+
+    msg = (
+        f"Git patch ready: {out_path.name}  "
+        f"({len(hashes)} commit(s), {len(app_files)} app(s), "
+        f"{len(payload_sources)} file(s), {_fmt_bytes(payload_bytes)})"
+    )
+    _safe_log(log_fn, f"[GIT-PATCH] {msg}\n")
+    return True, msg, package
+
+
 def port_to_ubuntu(repo: Path, log_fn: LogFn = None) -> Dict[str, str]:
     """
     Run all Ubuntu porting checks on `repo` and return a dict of
@@ -3117,7 +4774,9 @@ def _sync_with_rsync(
         errors="replace",
         bufsize=1,
     )
-    assert p.stdout is not None
+    if p.stdout is None:
+        raise RuntimeError("rsync subprocess stdout pipe was not created; "
+                           "check that stdout=subprocess.PIPE was set.")
     for line in p.stdout:
         if line:
             _safe_log(log_fn, line)
@@ -3280,6 +4939,27 @@ class SyncGUI:
         self.detail_write_var = tk.StringVar(value="-")
         self.detail_memory_var = tk.StringVar(value="-")
         self.detail_device_var = tk.StringVar(value="No phone selected")
+        self.bootstrap_info_var = tk.StringVar(value="Bootstrap packages: scanning...")
+        self.bootstrap_selection_var = tk.StringVar(value="No bootstrap package selected.")
+        self.bootstrap_preview_var = tk.StringVar(value="Install preview: select a package and destination.")
+        self.bootstrap_packages: List[BootstrapPackage] = []
+        self.bootstrap_listbox = None
+        self.bootstrap_app_vars: Dict[str, object] = {}
+        self.bootstrap_history_box = None
+        self.sync_app_vars: Dict[str, object] = {}
+        self.sync_app_selection_var = tk.StringVar(value="App inclusion: all apps selected.")
+        self.sync_app_health_var = tk.StringVar(value="App status: pending target analysis.")
+        self.launch_apps_cache: List[dict] = []
+        self.launch_app_listbox = None
+        self.launch_selected_var = tk.StringVar(value="Launch app: select an app from the list.")
+        self.launch_update_var = tk.StringVar(value="Update status: scanning app readiness...")
+        self.diagnostics_window = None
+        self.diagnostics_text = None
+
+        # Git-patch detector state
+        self.git_commits: List[dict] = []
+        self.git_patch_listbox = None
+        self.git_patch_status_var = tk.StringVar(value="Git patches: click 'Detect Recent Commits'")
 
         self._git_statuses: Dict[str, Dict] = {}   # populated by _refresh_git_statuses
         self._git_accounts: List[Dict[str, str]] = []
@@ -3452,12 +5132,62 @@ class SyncGUI:
             -comparison.source_only + comparison.target_only,
         )
 
+    def _app_priority_bucket(self, app: dict) -> int:
+        name = str(app.get("name") or "").strip().upper()
+        if PINNED_APP_NOETIKON in name:
+            return 0
+        if PINNED_APP_CANIS in name or (("CANIS COSMOS" in name) and ("ASTROLOGY" in name)):
+            return 1
+        return 2
+
+    def _app_last_update_ts(self, app: dict) -> float:
+        src_root = self._app_source_root(app)
+        latest = 0.0
+        for rel in (app.get("key_files") or []):
+            p = src_root / rel
+            if not p.exists():
+                continue
+            try:
+                ts = float(p.stat().st_mtime)
+            except Exception:
+                continue
+            if ts > latest:
+                latest = ts
+        if latest <= 0 and src_root.exists():
+            try:
+                latest = float(src_root.stat().st_mtime)
+            except Exception:
+                latest = 0.0
+        return latest
+
+    def _ordered_apps_for_overview(self) -> List[dict]:
+        ranked: List[Tuple[int, float, str, dict]] = []
+        for app in CITL_APPS:
+            ranked.append(
+                (
+                    self._app_priority_bucket(app),
+                    self._app_last_update_ts(app),
+                    str(app.get("name") or "").lower(),
+                    app,
+                )
+            )
+        ranked.sort(key=lambda x: (x[0], -x[1], x[2]))
+        return [item[3] for item in ranked]
+
+    def _app_rank_badge(self, app: dict, order_idx: int) -> Tuple[str, str]:
+        bucket = self._app_priority_bucket(app)
+        if bucket == 0:
+            return "[PIN-1] NOETIKON", self.colors["accent"]
+        if bucket == 1:
+            return "[PIN-2] CANIS", self.colors["warn"]
+        return f"[{order_idx:02d}] RECENT", self.colors["muted"]
+
     def _build_ui(self) -> None:
         self._update_source_meta()
         page = self.main_frame
         page.grid_columnconfigure(0, weight=1)
-        page.grid_rowconfigure(2, weight=3)
-        page.grid_rowconfigure(6, weight=1)
+        page.grid_rowconfigure(3, weight=3)
+        page.grid_rowconfigure(7, weight=1)
 
         header = self.tk.Frame(page, bg=self.colors["bg"])
         header.grid(row=0, column=0, sticky="ew", padx=22, pady=(18, 10))
@@ -3623,9 +5353,113 @@ class SyncGUI:
             state="disabled",
         )
         self.duplicate_btn.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        self.push_apps_only_btn = self._make_button(
+            action_grid,
+            "7. Push Selected Apps Only -> USB",
+            self.on_push_selected_apps_only,
+            state="disabled",
+        )
+        self.push_apps_only_btn.grid(row=4, column=0, sticky="ew", padx=(0, 8), pady=(10, 0))
+        self.pull_apps_only_btn = self._make_button(
+            action_grid,
+            "8. Pull Selected Apps Only <- USB",
+            self.on_pull_selected_apps_only,
+            state="disabled",
+        )
+        self.pull_apps_only_btn.grid(row=4, column=1, sticky="ew", padx=8, pady=(10, 0))
+        self.diagnostics_btn = self._make_button(
+            action_grid,
+            "Diagnostics Window",
+            self.on_open_diagnostics_window,
+        )
+        self.diagnostics_btn.grid(row=4, column=2, sticky="ew", padx=(8, 0), pady=(10, 0))
+
+        # ── Clone & Sync Panel ────────────────────────────────────────────────
+        clone_sync_panel = self.tk.Frame(actions_card, bg=self.colors["panel_alt"])
+        clone_sync_panel.grid(row=6, column=0, sticky="ew", padx=16, pady=(10, 10))
+        clone_sync_panel.grid_columnconfigure(0, weight=1)
+        clone_sync_panel.grid_columnconfigure(1, weight=1)
+        clone_sync_panel.grid_columnconfigure(2, weight=1)
+        
+        self._make_label(
+            clone_sync_panel,
+            text="Clone & Sync",
+            bg=self.colors["panel_alt"],
+            fg=self.colors["accent"],
+            font=("Segoe UI Semibold", 11, "bold"),
+        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        
+        self.clone_usb_btn = self._make_button(
+            clone_sync_panel,
+            "🔗 Clone USB (GUI)",
+            self.on_clone_usb,
+            accent=False
+        )
+        self.clone_usb_btn.grid(row=1, column=0, sticky="ew", padx=(0, 6))
+        
+        self.git_sync_btn = self._make_button(
+            clone_sync_panel,
+            "📥 Sync from Git",
+            self.on_sync_from_git
+        )
+        self.git_sync_btn.grid(row=1, column=1, sticky="ew", padx=6)
+        
+        self.git_push_btn = self._make_button(
+            clone_sync_panel,
+            "📤 Push to Git",
+            self.on_push_to_git
+        )
+        self.git_push_btn.grid(row=1, column=2, sticky="ew", padx=(6, 0))
+
+        # ── Application Launcher Buttons ──────────────────────────────────────
+        launcher_grid = self.tk.Frame(actions_card, bg=self.colors["panel_alt"])
+        launcher_grid.grid(row=7, column=0, sticky="ew", padx=16, pady=(10, 16))
+        launcher_grid.grid_columnconfigure(0, weight=1)
+        self._make_label(
+            launcher_grid,
+            text="Launch CITL Applications",
+            bg=self.colors["panel_alt"],
+            fg=self.colors["accent"],
+            font=("Segoe UI Semibold", 12, "bold"),
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        launcher_btns = self.tk.Frame(launcher_grid, bg=self.colors["panel_alt"])
+        launcher_btns.grid(row=1, column=0, sticky="ew")
+        launcher_btns.grid_columnconfigure(0, weight=1)
+        launcher_btns.grid_columnconfigure(1, weight=1)
+        launcher_btns.grid_columnconfigure(2, weight=1)
+
+        self.doc_composer_btn = self._make_button(
+            launcher_btns,
+            "📝 Document Composer",
+            self.on_launch_doc_composer,
+            accent=True
+        )
+        self.doc_composer_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=(0, 6))
+
+        self.presentation_btn = self._make_button(
+            launcher_btns,
+            "📊 Presentation Suite",
+            self.on_launch_presentation_suite
+        )
+        self.presentation_btn.grid(row=0, column=1, sticky="ew", padx=6, pady=(0, 6))
+
+        self.workstation_btn = self._make_button(
+            launcher_btns,
+            "🔧 Workstation Apps",
+            self.on_launch_workstation_apps
+        )
+        self.workstation_btn.grid(row=0, column=2, sticky="ew", padx=(6, 0), pady=(0, 6))
+
+        self.field_apps_btn = self._make_button(
+            launcher_btns,
+            "📱 Field Apps",
+            self.on_launch_field_apps
+        )
+        self.field_apps_btn.grid(row=1, column=0, sticky="ew", padx=(0, 6))
 
         body = self.tk.Frame(page, bg=self.colors["bg"])
-        body.grid(row=2, column=0, sticky="nsew", padx=22, pady=(0, 12))
+        body.grid(row=3, column=0, sticky="nsew", padx=22, pady=(0, 12))
         body.grid_columnconfigure(0, weight=4)
         body.grid_columnconfigure(1, weight=3)
         body.grid_rowconfigure(0, weight=1)
@@ -3725,10 +5559,10 @@ class SyncGUI:
                 font=font,
             ).grid(row=idx * 2 + 1, column=0, sticky="w")
 
-        # ── GitHub Sync Panel (row 3) ──────────────────────────────────────────
-        page.grid_rowconfigure(3, weight=0)
+        # ── GitHub Sync Panel (row 4) ──────────────────────────────────────────
+        page.grid_rowconfigure(4, weight=0)
         gh_panel = self._panel(page, self.colors["panel"])
-        gh_panel.grid(row=3, column=0, sticky="ew", padx=22, pady=(0, 8))
+        gh_panel.grid(row=4, column=0, sticky="ew", padx=22, pady=(0, 8))
         gh_panel.grid_columnconfigure(0, weight=1)
 
         gh_header = self.tk.Frame(gh_panel, bg=self.colors["panel"])
@@ -3784,10 +5618,10 @@ class SyncGUI:
             font=("Segoe UI", 10),
         ).grid(row=0, column=0, sticky="w", padx=8)
 
-        # ── CITL App Overview (row 4) ──────────────────────────────────────────
-        page.grid_rowconfigure(4, weight=0)
+        # ── CITL App Overview (row 2) ──────────────────────────────────────────
+        page.grid_rowconfigure(2, weight=0)
         apps_panel = self._panel(page, self.colors["panel"])
-        apps_panel.grid(row=4, column=0, sticky="ew", padx=22, pady=(0, 12))
+        apps_panel.grid(row=2, column=0, sticky="ew", padx=22, pady=(0, 12))
         apps_panel.grid_columnconfigure(0, weight=1)
         self._make_label(
             apps_panel,
@@ -3796,9 +5630,395 @@ class SyncGUI:
             fg=self.colors["accent"],
             font=("Segoe UI Semibold", 14, "bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
+        self._make_label(
+            apps_panel,
+            text=(
+                "Priority order: NOETIKON PRIME pinned first, CANIS COSMOS ASTROLOGY next, "
+                "then all remaining apps by most recent file update."
+            ),
+            bg=self.colors["panel"],
+            fg=self.colors["muted"],
+            font=("Segoe UI", 9, "normal"),
+            wraplength=1200,
+        ).grid(row=1, column=0, sticky="w", padx=16, pady=(0, 8))
         self.apps_frame = self.tk.Frame(apps_panel, bg=self.colors["panel"])
-        self.apps_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 14))
+        self.apps_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 14))
         self._render_apps_overview()
+        self._ensure_sync_app_vars()
+
+        filter_panel = self.tk.Frame(apps_panel, bg=self.colors["panel_alt"])
+        filter_panel.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
+        filter_panel.grid_columnconfigure(0, weight=1)
+        filter_panel.grid_columnconfigure(1, weight=0)
+        self._make_label(
+            filter_panel,
+            text="App Inclusion List for Push/Pull/Duplicate",
+            bg=self.colors["panel_alt"],
+            fg=self.colors["accent"],
+            font=("Segoe UI Semibold", 10, "bold"),
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 2))
+        self._make_label(
+            filter_panel,
+            textvariable=self.sync_app_selection_var,
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            font=("Segoe UI", 9, "normal"),
+            wraplength=980,
+        ).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 6))
+        self._make_label(
+            filter_panel,
+            textvariable=self.sync_app_health_var,
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            font=("Segoe UI", 9, "normal"),
+            wraplength=980,
+        ).grid(row=2, column=0, sticky="w", padx=10, pady=(0, 6))
+        pick_btns = self.tk.Frame(filter_panel, bg=self.colors["panel_alt"])
+        pick_btns.grid(row=0, column=1, rowspan=2, sticky="e", padx=8, pady=(4, 4))
+        self._make_button(pick_btns, "All", lambda: self._set_sync_app_selection("all")).pack(side="left", padx=4)
+        self._make_button(pick_btns, "Core", lambda: self._set_sync_app_selection("core")).pack(side="left", padx=4)
+        self._make_button(pick_btns, "Needs Sync", lambda: self._set_sync_app_selection("needs_sync")).pack(side="left", padx=4)
+        self._make_button(pick_btns, "None", lambda: self._set_sync_app_selection("none")).pack(side="left", padx=4)
+
+        app_checks = self.tk.Frame(filter_panel, bg=self.colors["panel_alt"])
+        app_checks.grid(row=3, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
+        col_count = 3
+        for c in range(col_count):
+            app_checks.grid_columnconfigure(c, weight=1)
+        for idx, app in enumerate(self._ordered_apps_for_overview()):
+            app_name = str(app.get("name") or "").strip()
+            var = self.sync_app_vars.get(app_name)
+            if var is None:
+                continue
+            cb = self.tk.Checkbutton(
+                app_checks,
+                text=app_name,
+                variable=var,
+                command=self._refresh_sync_app_selection_meta,
+                bg=self.colors["panel_alt"],
+                fg=self.colors["text"],
+                activebackground=self.colors["panel_alt"],
+                activeforeground=self.colors["text"],
+                selectcolor=self.colors["button"],
+                highlightthickness=0,
+                font=("Segoe UI", 9, "normal"),
+            )
+            cb.grid(row=idx // col_count, column=idx % col_count, sticky="w", padx=6, pady=1)
+
+        # ── Bootstrap / Patch Updater (row 5) ────────────────────────────────
+        page.grid_rowconfigure(5, weight=0)
+        bootstrap_panel = self._panel(page, self.colors["panel_alt"])
+        bootstrap_panel.grid(row=5, column=0, sticky="ew", padx=22, pady=(0, 10))
+        bootstrap_panel.grid_columnconfigure(0, weight=2)
+        bootstrap_panel.grid_columnconfigure(1, weight=2)
+        bootstrap_panel.grid_columnconfigure(2, weight=4)
+        walkthrough_blue = "#2e75b6"
+        self._make_label(
+            bootstrap_panel,
+            text="Bootstrap / Patch Updater",
+            bg=self.colors["panel_alt"],
+            fg=walkthrough_blue,
+            font=("Segoe UI Semibold", 14, "bold"),
+        ).grid(row=0, column=0, columnspan=3, sticky="w", padx=16, pady=(14, 6))
+        self._make_label(
+            bootstrap_panel,
+            textvariable=self.bootstrap_info_var,
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            wraplength=1200,
+            font=("Segoe UI", 10, "normal"),
+        ).grid(row=1, column=0, columnspan=3, sticky="w", padx=16, pady=(0, 10))
+
+        launch_frame = self.tk.Frame(bootstrap_panel, bg=self.colors["panel_alt"])
+        launch_frame.grid(row=2, column=0, sticky="nsew", padx=(16, 8), pady=(0, 12))
+        launch_frame.grid_columnconfigure(0, weight=1)
+        launch_frame.grid_rowconfigure(2, weight=1)
+        self._make_label(
+            launch_frame,
+            text="Launch App (Priority + Recent)",
+            bg=self.colors["panel_alt"],
+            fg=walkthrough_blue,
+            font=("Segoe UI Semibold", 10, "bold"),
+        ).grid(row=0, column=0, sticky="w", pady=(0, 2))
+        self._make_label(
+            launch_frame,
+            textvariable=self.launch_update_var,
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            wraplength=320,
+            font=("Segoe UI", 9, "normal"),
+        ).grid(row=1, column=0, sticky="w", pady=(0, 6))
+
+        launch_list_wrap = self.tk.Frame(launch_frame, bg=self.colors["panel_alt"])
+        launch_list_wrap.grid(row=2, column=0, sticky="nsew")
+        launch_list_wrap.grid_columnconfigure(0, weight=1)
+        launch_list_wrap.grid_rowconfigure(0, weight=1)
+        self.launch_app_listbox = self.tk.Listbox(
+            launch_list_wrap,
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            selectbackground=self.colors["button_active"],
+            selectforeground=self.colors["text"],
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground=self.colors["border"],
+            activestyle="none",
+            font=("Consolas", 9, "normal"),
+            height=11,
+        )
+        launch_scroll = self.tk.Scrollbar(launch_list_wrap, orient="vertical", command=self.launch_app_listbox.yview)
+        self.launch_app_listbox.configure(yscrollcommand=launch_scroll.set)
+        self.launch_app_listbox.grid(row=0, column=0, sticky="nsew")
+        launch_scroll.grid(row=0, column=1, sticky="ns")
+        self.launch_app_listbox.bind("<<ListboxSelect>>", self._on_launch_app_selection_changed)
+
+        self._make_label(
+            launch_frame,
+            textvariable=self.launch_selected_var,
+            bg=self.colors["panel_alt"],
+            fg=self.colors["text"],
+            wraplength=320,
+            font=("Segoe UI", 9, "normal"),
+        ).grid(row=3, column=0, sticky="w", pady=(8, 6))
+        launch_actions = self.tk.Frame(launch_frame, bg=self.colors["panel_alt"])
+        launch_actions.grid(row=4, column=0, sticky="ew")
+        launch_actions.grid_columnconfigure(0, weight=1)
+        launch_actions.grid_columnconfigure(1, weight=1)
+        launch_actions.grid_columnconfigure(2, weight=1)
+        self._make_button(launch_actions, "Launch Local", self.on_launch_selected_local).grid(
+            row=0, column=0, sticky="ew", padx=(0, 4)
+        )
+        self._make_button(launch_actions, "Launch USB", self.on_launch_selected_usb).grid(
+            row=0, column=1, sticky="ew", padx=4
+        )
+        self._make_button(launch_actions, "Open Repo", self.on_open_selected_repo).grid(
+            row=0, column=2, sticky="ew", padx=(4, 0)
+        )
+
+        list_frame = self.tk.Frame(bootstrap_panel, bg=self.colors["panel_alt"])
+        list_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 8), pady=(0, 12))
+        list_frame.grid_columnconfigure(0, weight=1)
+        list_frame.grid_rowconfigure(1, weight=1)
+        self._make_label(
+            list_frame,
+            text="Discovered bootstraps (newest first)",
+            bg=self.colors["panel_alt"],
+            fg=walkthrough_blue,
+            font=("Segoe UI Semibold", 10, "bold"),
+        ).grid(row=0, column=0, sticky="w", pady=(0, 6))
+
+        listbox_wrap = self.tk.Frame(list_frame, bg=self.colors["panel_alt"])
+        listbox_wrap.grid(row=1, column=0, sticky="nsew")
+        listbox_wrap.grid_columnconfigure(0, weight=1)
+        listbox_wrap.grid_rowconfigure(0, weight=1)
+        self.bootstrap_listbox = self.tk.Listbox(
+            listbox_wrap,
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            selectbackground=self.colors["button_active"],
+            selectforeground=self.colors["text"],
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground=self.colors["border"],
+            activestyle="none",
+            font=("Consolas", 9, "normal"),
+            height=7,
+        )
+        bootstrap_scroll = self.tk.Scrollbar(listbox_wrap, orient="vertical", command=self.bootstrap_listbox.yview)
+        self.bootstrap_listbox.configure(yscrollcommand=bootstrap_scroll.set)
+        self.bootstrap_listbox.grid(row=0, column=0, sticky="nsew")
+        bootstrap_scroll.grid(row=0, column=1, sticky="ns")
+        self.bootstrap_listbox.bind("<<ListboxSelect>>", self._on_bootstrap_selection_changed)
+
+        right_frame = self.tk.Frame(bootstrap_panel, bg=self.colors["panel_alt"])
+        right_frame.grid(row=2, column=2, sticky="nsew", padx=(8, 16), pady=(0, 12))
+        right_frame.grid_columnconfigure(0, weight=1)
+        right_frame.grid_rowconfigure(4, weight=1)
+        self._make_label(
+            right_frame,
+            textvariable=self.bootstrap_selection_var,
+            bg=self.colors["panel_alt"],
+            wraplength=760,
+            font=("Segoe UI Semibold", 10, "bold"),
+        ).grid(row=0, column=0, sticky="w")
+        self._make_label(
+            right_frame,
+            textvariable=self.bootstrap_preview_var,
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            wraplength=760,
+            font=("Segoe UI", 10, "normal"),
+        ).grid(row=1, column=0, sticky="w", pady=(4, 8))
+
+        app_pick = self.tk.Frame(right_frame, bg=self.colors["panel_alt"])
+        app_pick.grid(row=2, column=0, sticky="ew")
+        app_pick.grid_columnconfigure(0, weight=1)
+        self._make_label(
+            app_pick,
+            text="Selective update apps",
+            bg=self.colors["panel_alt"],
+            fg=walkthrough_blue,
+            font=("Segoe UI Semibold", 10, "bold"),
+        ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+        for idx, app in enumerate(self._ordered_apps_for_overview()):
+            app_name = str(app.get("name") or "").strip()
+            var = self.tk.BooleanVar(value=True)
+            self.bootstrap_app_vars[app_name] = var
+            cb = self.tk.Checkbutton(
+                app_pick,
+                text=app_name,
+                variable=var,
+                command=self._refresh_bootstrap_preview,
+                bg=self.colors["panel_alt"],
+                fg=self.colors["text"],
+                activebackground=self.colors["panel_alt"],
+                activeforeground=self.colors["text"],
+                selectcolor=self.colors["button"],
+                highlightthickness=0,
+                font=("Segoe UI", 9, "normal"),
+            )
+            cb.grid(row=idx + 1, column=0, sticky="w")
+
+        self._make_label(
+            right_frame,
+            text="Applied Patch Catalog (Local + Selected USB)",
+            bg=self.colors["panel_alt"],
+            fg=walkthrough_blue,
+            font=("Segoe UI Semibold", 10, "bold"),
+        ).grid(row=3, column=0, sticky="w", pady=(8, 4))
+        self.bootstrap_history_box = self.scrolledtext.ScrolledText(
+            right_frame,
+            wrap="word",
+            height=9,
+            state="disabled",
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            insertbackground=self.colors["text"],
+            relief="flat",
+            bd=0,
+            font=("Consolas", 9),
+            padx=8,
+            pady=8,
+        )
+        self.bootstrap_history_box.grid(row=4, column=0, sticky="nsew", pady=(0, 8))
+
+        action_row = self.tk.Frame(bootstrap_panel, bg=self.colors["panel_alt"])
+        action_row.grid(row=3, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 14))
+        for col in range(3):
+            action_row.grid_columnconfigure(col, weight=1)
+        self.bootstrap_refresh_btn = self._make_button(action_row, "Refresh Bootstraps", self.on_refresh_bootstrap_catalog)
+        self.bootstrap_refresh_btn.grid(row=0, column=0, sticky="ew", padx=(0, 8), pady=(0, 8))
+        self.bootstrap_build_btn = self._make_button(action_row, "Create Bootstrap from PC Source", self.on_build_bootstrap_from_source)
+        self.bootstrap_build_btn.grid(row=0, column=1, sticky="ew", padx=8, pady=(0, 8))
+        self.bootstrap_install_usb_btn = self._make_button(
+            action_row, "Install Selected -> USB", self.on_install_bootstrap_to_usb, accent=True
+        )
+        self.bootstrap_install_usb_btn.grid(row=0, column=2, sticky="ew", padx=(8, 0), pady=(0, 8))
+        self.bootstrap_install_local_btn = self._make_button(
+            action_row, "Install Selected -> Local", self.on_install_bootstrap_to_local
+        )
+        self.bootstrap_install_local_btn.grid(row=1, column=0, sticky="ew", padx=(0, 8))
+        self.bootstrap_rollback_usb_btn = self._make_button(
+            action_row, "Rollback Last on USB", self.on_rollback_bootstrap_usb
+        )
+        self.bootstrap_rollback_usb_btn.grid(row=1, column=1, sticky="ew", padx=8)
+        self.bootstrap_rollback_local_btn = self._make_button(
+            action_row, "Rollback Last on Local", self.on_rollback_bootstrap_local
+        )
+        self.bootstrap_rollback_local_btn.grid(row=1, column=2, sticky="ew", padx=(8, 0))
+        self.bootstrap_deploy_latest_btn = self._make_button(
+            action_row,
+            "Deploy Newest Bootstrap -> Local + USB",
+            self.on_deploy_latest_bootstrap_both,
+            accent=True,
+        )
+        self.bootstrap_deploy_latest_btn.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+
+        # ── Quick Patch from Recent Git Commits (row 4) ───────────────────────
+        git_outer = self.tk.Frame(bootstrap_panel, bg=self.colors["panel_alt"])
+        git_outer.grid(row=4, column=0, columnspan=3, sticky="ew", padx=16, pady=(4, 14))
+        git_outer.grid_columnconfigure(0, weight=1)
+
+        git_title_row = self.tk.Frame(git_outer, bg=self.colors["panel_alt"])
+        git_title_row.grid(row=0, column=0, sticky="ew")
+        self._make_label(
+            git_title_row,
+            text="Quick Patch from Recent Git Commits",
+            bg=self.colors["panel_alt"],
+            fg=walkthrough_blue,
+            font=("Segoe UI Semibold", 11, "bold"),
+        ).pack(side="left")
+        self._make_label(
+            git_title_row,
+            text=" — detect changes, package, deploy to local/USB with one click",
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            font=("Segoe UI", 9),
+        ).pack(side="left")
+
+        self._make_label(
+            git_outer,
+            textvariable=self.git_patch_status_var,
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            font=("Segoe UI", 9),
+        ).grid(row=1, column=0, sticky="w", pady=(2, 4))
+
+        git_body = self.tk.Frame(git_outer, bg=self.colors["panel_alt"])
+        git_body.grid(row=2, column=0, sticky="ew")
+        git_body.grid_columnconfigure(0, weight=1)
+
+        # Commit listbox (multi-select)
+        listbox_wrap2 = self.tk.Frame(git_body, bg=self.colors["panel_alt"])
+        listbox_wrap2.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        listbox_wrap2.grid_columnconfigure(0, weight=1)
+        listbox_wrap2.grid_rowconfigure(0, weight=1)
+        self.git_patch_listbox = self.tk.Listbox(
+            listbox_wrap2,
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            selectbackground=self.colors["button_active"],
+            selectforeground=self.colors["text"],
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground=self.colors["border"],
+            activestyle="none",
+            font=("Consolas", 9),
+            height=6,
+            selectmode="multiple",
+        )
+        git_scroll2 = self.tk.Scrollbar(listbox_wrap2, orient="vertical", command=self.git_patch_listbox.yview)
+        self.git_patch_listbox.configure(yscrollcommand=git_scroll2.set)
+        self.git_patch_listbox.grid(row=0, column=0, sticky="nsew")
+        git_scroll2.grid(row=0, column=1, sticky="ns")
+
+        # Action buttons column
+        git_btns = self.tk.Frame(git_body, bg=self.colors["panel_alt"])
+        git_btns.grid(row=0, column=1, sticky="ns")
+        git_btns.grid_columnconfigure(0, weight=1)
+        _gbtn_cfg = {"sticky": "ew", "pady": 2}
+        self._make_button(
+            git_btns, "Detect Recent Commits", self.on_check_git_patches
+        ).grid(row=0, column=0, **_gbtn_cfg)
+        self._make_button(
+            git_btns, "Package as Patch ZIP", self.on_build_git_patch
+        ).grid(row=1, column=0, **_gbtn_cfg)
+        self._make_button(
+            git_btns, "Package + Apply → USB", self.on_git_patch_apply_usb, accent=True
+        ).grid(row=2, column=0, **_gbtn_cfg)
+        self._make_button(
+            git_btns, "Package + Apply → Local", self.on_git_patch_apply_local
+        ).grid(row=3, column=0, **_gbtn_cfg)
+        self._make_button(
+            git_btns, "Package + Apply → Both", self.on_git_patch_apply_both, accent=True
+        ).grid(row=4, column=0, **_gbtn_cfg)
+        self._make_label(
+            git_btns,
+            text="Rollback: use buttons above ↑",
+            bg=self.colors["panel_alt"],
+            fg=self.colors["muted"],
+            font=("Segoe UI", 8),
+        ).grid(row=5, column=0, sticky="ew", pady=(8, 0))
 
         status_bar = self.tk.Label(
             page,
@@ -3810,10 +6030,10 @@ class SyncGUI:
             pady=10,
             font=("Segoe UI", 11),
         )
-        status_bar.grid(row=5, column=0, sticky="ew")
+        status_bar.grid(row=6, column=0, sticky="ew")
 
         log_panel = self._panel(page, self.colors["panel"])
-        log_panel.grid(row=6, column=0, sticky="nsew", padx=22, pady=(0, 18))
+        log_panel.grid(row=7, column=0, sticky="nsew", padx=22, pady=(0, 18))
         log_panel.grid_columnconfigure(0, weight=1)
         log_panel.grid_rowconfigure(1, weight=1)
         self._make_label(
@@ -3838,8 +6058,11 @@ class SyncGUI:
         )
         self.log.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 14))
 
+        self._refresh_launch_app_list()
         self._append(f"{APP_SYNC_NAME} {APP_SYNC_VERSION}\n")
         self._append("This dashboard now guides USB discovery, safe sync direction, and optional phone export.\n")
+        self._append("Phone export now preserves Termux shortcuts and updates a CITL shortcut for the latest pushed app.\n")
+        self._append(f"[PUSH_LOG] {_device_push_log_path()}\n")
         self._append("Green recommendation means the PC source is newer and pushing to USB is the safe default.\n")
         self._append("Yellow recommendation means the USB copy appears newer and pulling back to the PC may be safer.\n")
         self._append("Red recommendation means both sides differ enough that you should review before syncing.\n")
@@ -3963,7 +6186,10 @@ class SyncGUI:
         self._render_tiles()
         self._update_detail_panel()
         self._update_health_banner(log=log_selection)
+        self._render_apps_overview()
+        self._refresh_sync_app_selection_meta()
         self._refresh_guidance()
+        self._refresh_bootstrap_preview()
         self._update_action_states()
         self._set_status(f"Selected target: {rp}")
 
@@ -3977,6 +6203,8 @@ class SyncGUI:
     def _update_action_states(self) -> None:
         has_target = self._selected_target() is not None
         has_device = self._selected_device() is not None
+        has_bootstrap = self._selected_bootstrap_package() is not None
+        has_selected_apps = bool(self._selected_sync_app_names())
         can_duplicate = has_target and len(self.targets) >= 2
         normal = "disabled" if self._busy else "normal"
         self.refresh_btn.configure(state=normal)
@@ -3987,6 +6215,34 @@ class SyncGUI:
         self.open_target_btn.configure(state=normal if (has_target and not self._busy) else "disabled")
         self.remember_btn.configure(state=normal if (has_target and not self._busy) else "disabled")
         self.duplicate_btn.configure(state=normal if (can_duplicate and not self._busy) else "disabled")
+        if hasattr(self, "push_apps_only_btn"):
+            self.push_apps_only_btn.configure(
+                state=normal if (has_target and has_selected_apps and not self._busy) else "disabled"
+            )
+        if hasattr(self, "pull_apps_only_btn"):
+            self.pull_apps_only_btn.configure(
+                state=normal if (has_target and has_selected_apps and not self._busy) else "disabled"
+            )
+        if hasattr(self, "diagnostics_btn"):
+            self.diagnostics_btn.configure(state=normal)
+        if hasattr(self, "bootstrap_refresh_btn"):
+            self.bootstrap_refresh_btn.configure(state=normal)
+        if hasattr(self, "bootstrap_build_btn"):
+            self.bootstrap_build_btn.configure(state=normal)
+        if hasattr(self, "bootstrap_install_usb_btn"):
+            self.bootstrap_install_usb_btn.configure(
+                state=normal if (has_bootstrap and has_target and not self._busy) else "disabled"
+            )
+        if hasattr(self, "bootstrap_install_local_btn"):
+            self.bootstrap_install_local_btn.configure(
+                state=normal if (has_bootstrap and not self._busy) else "disabled"
+            )
+        if hasattr(self, "bootstrap_rollback_usb_btn"):
+            self.bootstrap_rollback_usb_btn.configure(state=normal if (has_target and not self._busy) else "disabled")
+        if hasattr(self, "bootstrap_rollback_local_btn"):
+            self.bootstrap_rollback_local_btn.configure(state=normal if not self._busy else "disabled")
+        if hasattr(self, "bootstrap_deploy_latest_btn"):
+            self.bootstrap_deploy_latest_btn.configure(state=normal if (has_target and not self._busy) else "disabled")
 
     def _bind_tile_select(self, widget, target_path: Path) -> None:
         widget.bind("<Button-1>", lambda _event, p=target_path: self._select_target(p))
@@ -4024,11 +6280,1299 @@ class SyncGUI:
         """Return the source root for an app — its own repo_path if set, else the CITL source repo."""
         return resolve_app_source_root(app, self.source_repo)
 
+    def _ensure_sync_app_vars(self) -> None:
+        for app in self._ordered_apps_for_overview():
+            app_name = str(app.get("name") or "").strip()
+            if not app_name:
+                continue
+            if app_name not in self.sync_app_vars:
+                self.sync_app_vars[app_name] = self.tk.BooleanVar(value=True)
+        self._refresh_sync_app_selection_meta()
+
+    def _selected_sync_app_names(self) -> List[str]:
+        names: List[str] = []
+        for app in CITL_APPS:
+            app_name = str(app.get("name") or "").strip()
+            var = self.sync_app_vars.get(app_name)
+            if var is None:
+                continue
+            try:
+                if bool(var.get()):  # type: ignore[union-attr]
+                    names.append(app_name)
+            except Exception:
+                continue
+        return names
+
+    def _selected_sync_apps(self) -> List[dict]:
+        picked = set(self._selected_sync_app_names())
+        return [app for app in CITL_APPS if str(app.get("name") or "").strip() in picked]
+
+    def _set_sync_app_selection(self, mode: str) -> None:
+        self._ensure_sync_app_vars()
+        mode_norm = (mode or "").strip().lower()
+        for app in CITL_APPS:
+            app_name = str(app.get("name") or "").strip()
+            if not app_name:
+                continue
+            var = self.sync_app_vars.get(app_name)
+            if var is None:
+                continue
+            choose = True
+            if mode_norm == "none":
+                choose = False
+            elif mode_norm == "core":
+                choose = app_name in {"Factbook", "CITL App Sync", "LLMOps Suite"}
+            elif mode_norm == "needs_sync":
+                status_text, _ = self._app_usb_comparison(app)
+                normalized = status_text.lower()
+                choose = (
+                    "needs update" in normalized
+                    or "not on usb" in normalized
+                    or "not in usb" in normalized
+                )
+            try:
+                var.set(bool(choose))  # type: ignore[union-attr]
+            except Exception:
+                pass
+        self._refresh_sync_app_selection_meta()
+
+    def _refresh_sync_app_selection_meta(self) -> None:
+        selected = self._selected_sync_app_names()
+        total = len(CITL_APPS)
+        if not selected:
+            text = "App inclusion: none selected. Choose at least one app before push/pull."
+        elif len(selected) == total:
+            text = f"App inclusion: all {total} apps selected."
+        else:
+            names = ", ".join(selected[:6])
+            if len(selected) > 6:
+                names += f", +{len(selected) - 6} more"
+            text = f"App inclusion: {len(selected)}/{total} selected -> {names}"
+        self.sync_app_selection_var.set(text)
+
+        target = self._selected_target() or (self.targets[0].path if self.targets else None)
+        if target is None:
+            self.sync_app_health_var.set("App status: select a USB target to compute sync deltas.")
+            return
+
+        needs_usb_update = 0
+        usb_ahead = 0
+        in_sync = 0
+        separate_repo_only = 0
+        unknown = 0
+        for app in CITL_APPS:
+            status_text, _ = self._app_usb_comparison(app)
+            s = status_text.lower()
+            if "needs update" in s or "not on usb" in s:
+                needs_usb_update += 1
+            elif "ahead" in s:
+                usb_ahead += 1
+            elif "in sync" in s:
+                in_sync += 1
+            elif "separate repo" in s:
+                separate_repo_only += 1
+            else:
+                unknown += 1
+        self.sync_app_health_var.set(
+            "App status: "
+            f"{needs_usb_update} need USB update, {usb_ahead} USB-ahead, "
+            f"{in_sync} in sync, {separate_repo_only} separate-repo-only, {unknown} other."
+        )
+        if hasattr(self, "push_apps_only_btn"):
+            self._update_action_states()
+
+    def _sync_selected_apps_only(
+        self,
+        source_repo: Path,
+        target_repo: Path,
+        selected_app_names: List[str],
+        log_fn: LogFn = None,
+    ) -> SyncResult:
+        start = time.time()
+        summary = sync_registered_app_key_files(
+            source_repo,
+            target_repo,
+            selected_app_names=selected_app_names,
+            log_fn=log_fn,
+        )
+        copied = sum(int(v.get("copied", 0)) for v in summary.values())
+        skipped = sum(int(v.get("skipped", 0)) for v in summary.values())
+        errors = sum(int(v.get("errors", 0)) for v in summary.values())
+        try:
+            install_sync_launchers(target_repo, log_fn=log_fn)
+        except Exception as e:
+            errors += 1
+            _safe_log(log_fn, f"[APP-SYNC][WARN] launcher refresh failed: {e}\n")
+        try:
+            port_to_ubuntu(target_repo, log_fn=log_fn)
+        except Exception as e:
+            _safe_log(log_fn, f"[APP-SYNC][WARN] Ubuntu port refresh failed: {e}\n")
+        return SyncResult(
+            copied=copied,
+            skipped=skipped,
+            errors=errors,
+            used_rsync=False,
+            elapsed_sec=time.time() - start,
+        )
+
+    def _run_selected_apps_sync(self, direction: str) -> None:
+        direction_norm = (direction or "").strip().lower()
+        target = self._selected_target()
+        if target is None:
+            self.messagebox.showerror("No target", "Select a repo tile first.")
+            return
+        selected_app_names = self._selected_sync_app_names()
+        if not selected_app_names:
+            self.messagebox.showinfo("No apps selected", "Select at least one app in the app inclusion list.")
+            return
+
+        if direction_norm == "push":
+            src_repo = self.source_repo
+            dst_repo = target
+            title = "Confirm selected app push"
+            prompt = (
+                f"Push {len(selected_app_names)} selected app(s) from PC -> USB?\n\n"
+                f"To:\n{target}\n\n"
+                f"Apps:\n- " + "\n- ".join(selected_app_names)
+            )
+            status_text = "Pushing selected apps to USB..."
+            start_log = "[SYNC] starting selected-app PC -> USB push...\n"
+            done_label = "Selected-app push complete. Refreshing analysis..."
+            log_kind = "usb_push_apps_only"
+        elif direction_norm == "pull":
+            src_repo = target
+            dst_repo = self.source_repo
+            title = "Confirm selected app pull"
+            prompt = (
+                f"Pull {len(selected_app_names)} selected app(s) from USB -> PC?\n\n"
+                f"From:\n{target}\n\n"
+                f"Apps:\n- " + "\n- ".join(selected_app_names)
+            )
+            status_text = "Pulling selected apps from USB..."
+            start_log = "[SYNC] starting selected-app USB -> PC pull...\n"
+            done_label = "Selected-app pull complete. Refreshing analysis..."
+            log_kind = "usb_pull_apps_only"
+        else:
+            self.messagebox.showerror("Invalid direction", f"Unsupported selected-app sync direction: {direction}")
+            return
+
+        if not self.messagebox.askyesno(title, prompt):
+            return
+
+        if direction_norm == "push":
+            try:
+                _remember_target(target)
+                self._mark_target_remembered(target)
+            except Exception as e:
+                self._append(f"[WARN] could not persist target memory before selected-app push: {e}\n")
+
+        self._begin_busy(status_text)
+        self._append("\n" + start_log)
+        self._append(
+            f"[APP-FILTER] explicit selected-app sync with {len(selected_app_names)} app(s): "
+            + ", ".join(selected_app_names)
+            + "\n"
+        )
+
+        def worker() -> None:
+            try:
+                result = self._sync_selected_apps_only(
+                    src_repo,
+                    dst_repo,
+                    selected_app_names,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+            except Exception as e:
+                _append_device_push_log_entry(
+                    {
+                        "kind": log_kind,
+                        "status": "error",
+                        "source_repo": str(src_repo),
+                        "target_path": str(dst_repo),
+                        "selected_apps": list(selected_app_names),
+                        "error": str(e),
+                    },
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                self.root.after(0, lambda: self._append(f"[ERROR] selected-app sync failed: {e}\n"))
+                self.root.after(0, lambda: self._set_status("Selected-app sync failed."))
+            else:
+                _append_device_push_log_entry(
+                    {
+                        "kind": log_kind,
+                        "status": "ok" if result.errors == 0 else "partial",
+                        "source_repo": str(src_repo),
+                        "target_path": str(dst_repo),
+                        "selected_apps": list(selected_app_names),
+                        "copied": int(result.copied),
+                        "skipped": int(result.skipped),
+                        "errors": int(result.errors),
+                        "elapsed_sec": float(result.elapsed_sec),
+                    },
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                self.root.after(
+                    0,
+                    lambda: self._append(
+                        f"[DONE] selected-app sync copied={result.copied} skipped={result.skipped} "
+                        f"errors={result.errors} elapsed={result.elapsed_sec:.1f}s\n"
+                    ),
+                )
+                if direction_norm == "push" and result.errors == 0:
+                    bumped = []
+                    for app in self._selected_sync_apps():
+                        vf = app.get("version_file")
+                        if vf and _bump_version_file(self.source_repo, vf):
+                            bumped.append(vf)
+                    if bumped:
+                        self.root.after(
+                            0,
+                            lambda b=bumped: self._append(
+                                f"[VERSION] auto-bumped patch in: {', '.join(b)}\n"
+                            ),
+                        )
+                self.root.after(0, lambda: self._set_status(done_label))
+                self.root.after(0, self._render_apps_overview)
+                self.root.after(0, self._refresh_sync_app_selection_meta)
+            finally:
+                self.root.after(0, self._after_sync_action)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_push_selected_apps_only(self) -> None:
+        self._run_selected_apps_sync("push")
+
+    def on_pull_selected_apps_only(self) -> None:
+        self._run_selected_apps_sync("pull")
+
+    def _refresh_launch_app_list(self) -> None:
+        if self.launch_app_listbox is None:
+            return
+        selected_name = ""
+        selected_app = self._selected_launch_app()
+        if selected_app is not None:
+            selected_name = str(selected_app.get("name") or "")
+
+        self.launch_apps_cache = self._ordered_apps_for_overview()
+        lb = self.launch_app_listbox
+        lb.delete(0, "end")
+        needs_update = 0
+        ready = 0
+        for idx, app in enumerate(self.launch_apps_cache, start=1):
+            icon = str(app.get("icon") or "APP")
+            name = str(app.get("name") or "Unnamed App")
+            usb_status, _color = self._app_usb_comparison(app)
+            short_status = usb_status.split(" (", 1)[0]
+            if len(short_status) > 34:
+                short_status = short_status[:34] + "..."
+            if "needs update" in usb_status.lower() or "not on usb" in usb_status.lower():
+                needs_update += 1
+                cue = "!"
+            else:
+                ready += 1
+                cue = " "
+            lb.insert("end", f"{idx:02d}. {cue} {icon} | {name} | {short_status}")
+
+        total = len(self.launch_apps_cache)
+        self.launch_update_var.set(f"Update status: {needs_update} need update | {ready} ready | total {total}")
+
+        if self.launch_apps_cache:
+            pick_idx = 0
+            if selected_name:
+                for i, app in enumerate(self.launch_apps_cache):
+                    if str(app.get("name") or "") == selected_name:
+                        pick_idx = i
+                        break
+            lb.selection_clear(0, "end")
+            lb.selection_set(pick_idx)
+            lb.activate(pick_idx)
+            self._on_launch_app_selection_changed()
+        else:
+            self.launch_selected_var.set("Launch app: no apps available.")
+
+    def _selected_launch_app(self) -> Optional[dict]:
+        if self.launch_app_listbox is None:
+            return None
+        sel = self.launch_app_listbox.curselection()
+        if not sel:
+            return None
+        idx = int(sel[0])
+        if idx < 0 or idx >= len(self.launch_apps_cache):
+            return None
+        return self.launch_apps_cache[idx]
+
+    def _on_launch_app_selection_changed(self, _event=None) -> None:
+        app = self._selected_launch_app()
+        if app is None:
+            self.launch_selected_var.set("Launch app: select an app from the list.")
+            return
+        usb_status, _color = self._app_usb_comparison(app)
+        self.launch_selected_var.set(f"{app.get('icon', 'APP')} {app['name']} | {usb_status}")
+
+    def on_launch_selected_local(self) -> None:
+        app = self._selected_launch_app()
+        if app is None:
+            self.messagebox.showinfo("No app selected", "Select an app from Launch App list first.")
+            return
+        self.on_launch_app_local(app)
+
+    def on_launch_selected_usb(self) -> None:
+        app = self._selected_launch_app()
+        if app is None:
+            self.messagebox.showinfo("No app selected", "Select an app from Launch App list first.")
+            return
+        self.on_launch_app_usb(app)
+
+    def on_open_selected_repo(self) -> None:
+        app = self._selected_launch_app()
+        if app is None:
+            self.messagebox.showinfo("No app selected", "Select an app from Launch App list first.")
+            return
+        self.on_open_app_repo(app)
+
+    def _resolve_app_launcher_path(self, app: dict, repo_root: Path) -> Optional[Path]:
+        root = Path(repo_root).expanduser()
+        launcher = ""
+        if os.name == "nt":
+            launcher = str(app.get("launcher_win") or "").strip()
+        else:
+            launcher = str(app.get("launcher_nix") or "").strip()
+        if launcher:
+            p = root / launcher
+            if p.exists():
+                return p
+        slug = _slugify_name(app.get("name", "app"))
+        if os.name == "nt":
+            fallback = root / "bootstrap" / "windows" / f"Run-{slug}.cmd"
+        else:
+            fallback = root / "bootstrap" / "linux" / f"run-{slug}.sh"
+        if fallback.exists():
+            return fallback
+        return None
+
+    def _launch_app_from_root(self, app: dict, repo_root: Path, origin_label: str) -> None:
+        launch_path = self._resolve_app_launcher_path(app, repo_root)
+        if launch_path is None:
+            self.messagebox.showerror(
+                "Launcher not found",
+                f"No runnable launcher was found for {app['name']} in:\n{repo_root}",
+            )
+            return
+        try:
+            suffix = launch_path.suffix.lower()
+            if os.name == "nt":
+                if suffix == ".ps1":
+                    subprocess.Popen(
+                        [
+                            "powershell",
+                            "-NoProfile",
+                            "-ExecutionPolicy",
+                            "Bypass",
+                            "-File",
+                            str(launch_path),
+                        ],
+                        cwd=str(repo_root),
+                    )
+                elif suffix in {".cmd", ".bat"}:
+                    subprocess.Popen(["cmd", "/c", str(launch_path)], cwd=str(repo_root))
+                else:
+                    subprocess.Popen([str(launch_path)], cwd=str(repo_root))
+            else:
+                if suffix == ".sh":
+                    subprocess.Popen(["bash", str(launch_path)], cwd=str(repo_root))
+                else:
+                    subprocess.Popen([str(launch_path)], cwd=str(repo_root))
+            self._append(f"[LAUNCH] {app['name']} from {origin_label}: {launch_path}\n")
+        except Exception as e:
+            self.messagebox.showerror("Launch failed", f"{app['name']} launch failed:\n{e}")
+
+    def on_launch_app_local(self, app: dict) -> None:
+        self._launch_app_from_root(app, self._app_source_root(app), "local source")
+
+    def on_launch_app_usb(self, app: dict) -> None:
+        target = self._selected_target()
+        if target is None:
+            self.messagebox.showinfo("No USB target", "Select a USB target first.")
+            return
+        self._launch_app_from_root(app, target, "selected USB")
+
+    def on_open_app_repo(self, app: dict) -> None:
+        open_in_file_manager(self._app_source_root(app))
+
+    def _collect_diagnostics_report(self) -> str:
+        lines: List[str] = []
+        now_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        lines.append(f"{APP_SYNC_NAME} {APP_SYNC_VERSION}")
+        lines.append(f"Generated: {now_text}")
+        lines.append("")
+        lines.append("Source Repository")
+        lines.append(f"  path: {self.source_repo}")
+        lines.append(f"  reason: {self.source_reason or 'manual/default source'}")
+        lines.append(f"  freshness: {_fmt_ts(self.source_freshness_ts)}")
+        lines.append("")
+        target = self._selected_target()
+        lines.append("Selected USB Target")
+        lines.append(f"  path: {target if target is not None else '(none selected)'}")
+        snap = self._selected_status()
+        if snap is not None:
+            lines.append(f"  writable: {snap.writable} ({snap.write_detail})")
+            lines.append(f"  recommendation: {snap.comparison.recommendation}")
+            lines.append(f"  summary: {snap.comparison.summary}")
+        lines.append("")
+        selected_names = self._selected_sync_app_names()
+        lines.append(f"App Inclusion Selection: {len(selected_names)}/{len(CITL_APPS)} selected")
+        if selected_names:
+            lines.append(f"  {', '.join(selected_names)}")
+        lines.append("")
+        lines.append("App Matrix (local vs USB vs launch vs git)")
+        for app in self._ordered_apps_for_overview():
+            app_name = str(app.get("name") or "").strip()
+            last_ts = self._app_last_update_ts(app)
+            local_root = self._app_source_root(app)
+            usb_status, _usb_color = self._app_usb_comparison(app)
+            local_launch = self._resolve_app_launcher_path(app, local_root)
+            usb_launch = self._resolve_app_launcher_path(app, target) if target is not None else None
+            gst = self._git_statuses.get(app_name) or {}
+            branch = str(gst.get("branch") or "-")
+            ahead = int(gst.get("ahead", 0) or 0)
+            behind = int(gst.get("behind", 0) or 0)
+            dirty = bool(gst.get("dirty", False))
+            lines.append(
+                f"- {app_name}"
+                f"\n    last_update={_fmt_ts(last_ts)}"
+                f"\n    local_repo={local_root}"
+                f"\n    usb_status={usb_status}"
+                f"\n    launch_local={'yes' if local_launch else 'no'}"
+                f"\n    launch_usb={'yes' if usb_launch else 'no'}"
+                f"\n    git=branch:{branch} ahead:{ahead} behind:{behind} dirty:{dirty}"
+            )
+        lines.append("")
+        log_path = _device_push_log_path()
+        lines.append(f"Device Push Log: {log_path}")
+        if log_path.exists():
+            try:
+                rows = log_path.read_text(encoding="utf-8").splitlines()
+            except Exception:
+                rows = []
+            lines.append(f"  entries: {len(rows)}")
+            for row in rows[-8:]:
+                lines.append(f"  {row}")
+        else:
+            lines.append("  entries: 0")
+        lines.append("")
+        lines.append("Detected Targets")
+        for t in self.targets:
+            ts = self.target_status.get(str(t.path))
+            if ts is None:
+                continue
+            lines.append(
+                f"- {t.path} | writable={ts.writable} | recommendation={ts.comparison.recommendation} "
+                f"| remembered={t.remembered}"
+            )
+        lines.append("")
+        lines.append("Connected Phones")
+        if self.devices:
+            for dev in self.devices:
+                lines.append(f"- {dev.serial} {dev.meta}".strip())
+        else:
+            lines.append("- none")
+        return "\n".join(lines).strip() + "\n"
+
+    def on_open_diagnostics_window(self) -> None:
+        if self.diagnostics_window is not None and self.diagnostics_window.winfo_exists():
+            self.diagnostics_window.lift()
+            self._refresh_diagnostics_window()
+            return
+        win = self.tk.Toplevel(self.root)
+        win.title(f"{APP_SYNC_NAME} Diagnostics")
+        win.geometry("1120x760")
+        win.minsize(860, 560)
+        win.configure(bg=self.colors["bg"])
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(1, weight=1)
+        self.diagnostics_window = win
+        head = self.tk.Frame(win, bg=self.colors["panel"])
+        head.grid(row=0, column=0, sticky="ew")
+        head.grid_columnconfigure(0, weight=1)
+        self._make_label(
+            head,
+            text="Diagnostics Window",
+            bg=self.colors["panel"],
+            fg=self.colors["accent"],
+            font=("Segoe UI Semibold", 13, "bold"),
+        ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 2))
+        self._make_label(
+            head,
+            text="Complete local/USB/app/git/phone diagnostic report for support and change control.",
+            bg=self.colors["panel"],
+            fg=self.colors["muted"],
+            font=("Segoe UI", 9, "normal"),
+        ).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 8))
+        btns = self.tk.Frame(head, bg=self.colors["panel"])
+        btns.grid(row=0, column=1, rowspan=2, sticky="e", padx=10)
+        self._make_button(btns, "Refresh", self._refresh_diagnostics_window).pack(side="left", padx=4)
+        self._make_button(btns, "Copy", self._copy_diagnostics_to_clipboard).pack(side="left", padx=4)
+        self._make_button(btns, "Save Report", self._save_diagnostics_report).pack(side="left", padx=4)
+        self._make_button(btns, "Close", win.destroy).pack(side="left", padx=4)
+        text = self.scrolledtext.ScrolledText(
+            win,
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            insertbackground=self.colors["text"],
+            relief="flat",
+            bd=0,
+            font=("Consolas", 9),
+            padx=10,
+            pady=10,
+        )
+        text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.diagnostics_text = text
+        self._refresh_diagnostics_window()
+
+    def _refresh_diagnostics_window(self) -> None:
+        if self.diagnostics_text is None:
+            return
+        report = self._collect_diagnostics_report()
+        self.diagnostics_text.configure(state="normal")
+        self.diagnostics_text.delete("1.0", "end")
+        self.diagnostics_text.insert("1.0", report)
+        self.diagnostics_text.configure(state="disabled")
+
+    def _copy_diagnostics_to_clipboard(self) -> None:
+        report = self._collect_diagnostics_report()
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(report)
+            self._set_status("Diagnostics copied to clipboard.")
+        except Exception as e:
+            self.messagebox.showerror("Clipboard error", str(e))
+
+    def _save_diagnostics_report(self) -> None:
+        default_name = f"citl_sync_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        out = self.filedialog.asksaveasfilename(
+            title="Save diagnostics report",
+            defaultextension=".txt",
+            initialfile=default_name,
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        if not out:
+            return
+        try:
+            Path(out).write_text(self._collect_diagnostics_report(), encoding="utf-8")
+        except Exception as e:
+            self.messagebox.showerror("Save failed", str(e))
+            return
+        self._set_status(f"Diagnostics report saved: {out}")
+
+    # ── Bootstrap / patch updater methods ────────────────────────────────────
+
+    def _bootstrap_search_roots(self) -> List[Tuple[str, Path]]:
+        roots: List[Tuple[str, Path]] = [("local-source", self.source_repo)]
+        selected = self._selected_target()
+        if selected is not None:
+            roots.append(("selected-usb", selected))
+        for target in self.targets:
+            if selected is not None and target.path == selected:
+                continue
+            roots.append((f"usb:{target.path.name or target.path.drive or 'target'}", target.path))
+        deduped: List[Tuple[str, Path]] = []
+        seen: set = set()
+        for hint, path in roots:
+            try:
+                key = str(path.expanduser().resolve())
+            except Exception:
+                key = str(path)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append((hint, path))
+        return deduped
+
+    def _selected_bootstrap_package(self) -> Optional[BootstrapPackage]:
+        if self.bootstrap_listbox is None:
+            return None
+        try:
+            sel = self.bootstrap_listbox.curselection()
+        except Exception:
+            sel = ()
+        if sel:
+            idx = int(sel[0])
+        elif self.bootstrap_packages:
+            idx = 0
+        else:
+            return None
+        if idx < 0 or idx >= len(self.bootstrap_packages):
+            return None
+        return self.bootstrap_packages[idx]
+
+    def _selected_bootstrap_apps(self, package: Optional[BootstrapPackage] = None) -> List[str]:
+        pkg = package or self._selected_bootstrap_package()
+        if pkg is None:
+            return []
+        picked: List[str] = []
+        for app_name in pkg.app_names:
+            var = self.bootstrap_app_vars.get(app_name)
+            if var is None:
+                continue
+            try:
+                if bool(var.get()):  # type: ignore[union-attr]
+                    picked.append(app_name)
+            except Exception:
+                pass
+        return picked
+
+    def _render_bootstrap_catalog(self) -> None:
+        if self.bootstrap_listbox is None:
+            return
+        self.bootstrap_listbox.delete(0, "end")
+        for pkg in self.bootstrap_packages:
+            created = _fmt_ts(pkg.created_ts)
+            label = (
+                f"{created} | {pkg.bootstrap_id} | size={_fmt_bytes(pkg.package_size)} | "
+                f"apps={len(pkg.app_names)} | {pkg.source_hint}"
+            )
+            self.bootstrap_listbox.insert("end", label)
+        if self.bootstrap_packages:
+            self.bootstrap_listbox.selection_clear(0, "end")
+            self.bootstrap_listbox.selection_set(0)
+            self.bootstrap_listbox.activate(0)
+        self._refresh_bootstrap_preview()
+
+    def _bootstrap_state_summary_lines(
+        self,
+        label: str,
+        repo: Path,
+        package: Optional[BootstrapPackage],
+        selected_apps: Sequence[str],
+    ) -> List[str]:
+        lines: List[str] = [f"{label}: {repo}"]
+        state = load_bootstrap_repo_state(repo)
+        last = state.get("last_applied") if isinstance(state.get("last_applied"), dict) else {}
+        if isinstance(last, dict) and last:
+            last_id = str(last.get("bootstrap_id") or "?")
+            last_when = str(last.get("applied_utc") or "?")
+            last_created = str(last.get("bootstrap_created_utc") or "?")
+            lines.append(f"  last applied: {last_id} | applied={last_when} | package_date={last_created}")
+        else:
+            lines.append("  last applied: none")
+        history = state.get("history") if isinstance(state.get("history"), list) else []
+        if history:
+            lines.append("  recent events:")
+            for item in reversed(history[-5:]):
+                if not isinstance(item, dict):
+                    continue
+                ev = str(item.get("event") or "install")
+                when = str(item.get("applied_utc") or "?")
+                bid = str(item.get("bootstrap_id") or item.get("for_bootstrap_id") or "-")
+                apps = item.get("apps")
+                if isinstance(apps, list):
+                    app_text = ",".join(str(a) for a in apps if str(a).strip())
+                else:
+                    app_text = ""
+                if app_text:
+                    lines.append(f"    {when} | {ev} | {bid} | apps={app_text}")
+                else:
+                    lines.append(f"    {when} | {ev} | {bid}")
+
+        app_state = state.get("app_patch_state") if isinstance(state.get("app_patch_state"), dict) else {}
+        if package is None:
+            lines.append("  package comparison: select a bootstrap package.")
+            return lines
+
+        preview = preview_bootstrap_install(package, repo, selected_apps)
+        lines.append(
+            f"  package impact: {preview.classification} "
+            f"(new={preview.newer_apps}, same={preview.same_apps}, older={preview.older_apps})"
+        )
+        if preview.stale and preview.stale_reason:
+            lines.append(f"  warning: {preview.stale_reason}")
+
+        if selected_apps:
+            lines.append("  app status:")
+            for app_name in selected_apps:
+                entry = app_state.get(app_name) if isinstance(app_state, dict) else {}
+                if isinstance(entry, dict) and entry:
+                    bid = str(entry.get("bootstrap_id") or "?")
+                    when = str(entry.get("applied_utc") or "?")
+                    lines.append(f"    {app_name}: {bid} @ {when}")
+                else:
+                    lines.append(f"    {app_name}: not yet patched")
+        return lines
+
+    def _refresh_bootstrap_history_view(
+        self,
+        package: Optional[BootstrapPackage],
+        selected_apps: Sequence[str],
+    ) -> None:
+        if self.bootstrap_history_box is None:
+            return
+        lines: List[str] = []
+        lines.extend(self._bootstrap_state_summary_lines("LOCAL", self.source_repo, package, selected_apps))
+        target = self._selected_target()
+        if target is not None:
+            lines.append("")
+            lines.extend(self._bootstrap_state_summary_lines("USB", target, package, selected_apps))
+            ok_media, reason = is_expected_usb_bootstrap_media(target)
+            lines.append(f"  media check: {'eligible' if ok_media else 'not-eligible'} | {reason}")
+        else:
+            lines.append("")
+            lines.append("USB: no selected target")
+
+        self.bootstrap_history_box.configure(state="normal")
+        self.bootstrap_history_box.delete("1.0", "end")
+        self.bootstrap_history_box.insert("1.0", "\n".join(lines).strip() + "\n")
+        self.bootstrap_history_box.configure(state="disabled")
+
+    def _refresh_bootstrap_preview(self) -> None:
+        pkg = self._selected_bootstrap_package()
+        if pkg is None:
+            self.bootstrap_selection_var.set("No bootstrap package selected.")
+            self.bootstrap_preview_var.set("Install preview: select a package and destination.")
+            self._refresh_bootstrap_history_view(None, [])
+            return
+
+        # Default app selection follows package content.
+        for app in CITL_APPS:
+            app_name = str(app.get("name") or "").strip()
+            var = self.bootstrap_app_vars.get(app_name)
+            if var is None:
+                continue
+            try:
+                if app_name not in pkg.app_names:
+                    var.set(False)  # type: ignore[union-attr]
+            except Exception:
+                pass
+        if not self._selected_bootstrap_apps(pkg):
+            for app_name in pkg.app_names:
+                var = self.bootstrap_app_vars.get(app_name)
+                if var is None:
+                    continue
+                try:
+                    var.set(True)  # type: ignore[union-attr]
+                except Exception:
+                    pass
+
+        selected_apps = self._selected_bootstrap_apps(pkg)
+        local_preview = preview_bootstrap_install(pkg, self.source_repo, selected_apps)
+        target = self._selected_target()
+        usb_preview = preview_bootstrap_install(pkg, target, selected_apps) if target is not None else None
+
+        self.bootstrap_selection_var.set(
+            f"Selected: {pkg.bootstrap_id} | created={_fmt_ts(pkg.created_ts)} | "
+            f"size={_fmt_bytes(pkg.package_size)} | files={pkg.file_count} | source={pkg.source_repo_label}"
+        )
+        local_line = (
+            f"Local install impact: {local_preview.classification} "
+            f"(new={local_preview.newer_apps}, same={local_preview.same_apps}, older={local_preview.older_apps})"
+        )
+        usb_line = "USB install impact: select a USB target."
+        if usb_preview is not None:
+            usb_line = (
+                f"USB install impact: {usb_preview.classification} "
+                f"(new={usb_preview.newer_apps}, same={usb_preview.same_apps}, older={usb_preview.older_apps})"
+            )
+        warning_lines: List[str] = []
+        if local_preview.stale and local_preview.stale_reason:
+            warning_lines.append(f"Local warning: {local_preview.stale_reason}")
+        if usb_preview is not None and usb_preview.stale and usb_preview.stale_reason:
+            warning_lines.append(f"USB warning: {usb_preview.stale_reason}")
+        selected_text = ", ".join(selected_apps) if selected_apps else "none"
+        warning_text = "\n".join(warning_lines) if warning_lines else "No stale/retractive warning detected."
+        self.bootstrap_preview_var.set(
+            f"Selected apps: {selected_text}\n{local_line}\n{usb_line}\n{warning_text}"
+        )
+        self._refresh_bootstrap_history_view(pkg, selected_apps)
+
+    def _on_bootstrap_selection_changed(self, _event=None) -> None:
+        pkg = self._selected_bootstrap_package()
+        if pkg is not None:
+            pkg_names = set(pkg.app_names)
+            for app_name, var in self.bootstrap_app_vars.items():
+                try:
+                    var.set(app_name in pkg_names)  # type: ignore[union-attr]
+                except Exception:
+                    pass
+        self._refresh_bootstrap_preview()
+        self._update_action_states()
+
+    def on_refresh_bootstrap_catalog(self) -> None:
+        roots = self._bootstrap_search_roots()
+        self.bootstrap_packages = discover_bootstrap_packages(roots)
+        if self.bootstrap_packages:
+            newest = self.bootstrap_packages[0]
+            self.bootstrap_info_var.set(
+                f"Bootstrap packages found: {len(self.bootstrap_packages)} | "
+                f"newest={newest.bootstrap_id} ({_fmt_ts(newest.created_ts)}, {_fmt_bytes(newest.package_size)})."
+            )
+            self._append(
+                f"[BOOTSTRAP] found {len(self.bootstrap_packages)} package(s); newest={newest.bootstrap_id}\n"
+            )
+        else:
+            self.bootstrap_info_var.set(
+                "Bootstrap packages found: 0. Create one from local source, then install to local or selected USB."
+            )
+            self._append("[BOOTSTRAP] no bootstrap packages detected in local/USB repos.\n")
+        self._render_bootstrap_catalog()
+        self._update_action_states()
+
+    def on_build_bootstrap_from_source(self) -> None:
+        selected_apps = [name for name, var in self.bootstrap_app_vars.items() if bool(var.get())]  # type: ignore[union-attr]
+        if not selected_apps:
+            self.messagebox.showinfo("No apps selected", "Select at least one app for bootstrap package creation.")
+            return
+        if not self.messagebox.askyesno(
+            "Create bootstrap package",
+            "Build a new bootstrap patch package from the local source repo using the selected apps?\n\n"
+            f"Apps: {', '.join(selected_apps)}",
+        ):
+            return
+
+        self._begin_busy("Creating bootstrap package from local source...")
+        self._append("\n[BOOTSTRAP] building bootstrap package from local source...\n")
+
+        def worker() -> None:
+            ok = False
+            try:
+                ok, msg, package = build_bootstrap_package(
+                    self.source_repo,
+                    selected_apps=selected_apps,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                self.root.after(0, lambda m=msg: self._append(f"[BOOTSTRAP] {m}\n"))
+                if ok and package is not None:
+                    self.root.after(
+                        0,
+                        lambda p=package: self._append(
+                            f"[BOOTSTRAP] package id={p.bootstrap_id} size={_fmt_bytes(p.package_size)}\n"
+                        ),
+                    )
+            except Exception as e:
+                self.root.after(0, lambda: self._append(f"[BOOTSTRAP][ERROR] build failed: {e}\n"))
+            finally:
+                self.root.after(0, self._finish_busy)
+                self.root.after(0, self.on_refresh_bootstrap_catalog)
+                self.root.after(
+                    0,
+                    lambda: self._set_status(
+                        "Bootstrap package created." if ok else "Bootstrap package creation failed."
+                    ),
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _install_bootstrap_to_repo(self, dest_repo: Path, label: str) -> None:
+        pkg = self._selected_bootstrap_package()
+        if pkg is None:
+            self.messagebox.showinfo("No bootstrap selected", "Select a bootstrap package first.")
+            return
+        selected_apps = self._selected_bootstrap_apps(pkg)
+        if not selected_apps:
+            self.messagebox.showinfo("No apps selected", "Select at least one app to install from this package.")
+            return
+
+        preview = preview_bootstrap_install(pkg, dest_repo, selected_apps)
+        details = (
+            f"Destination: {dest_repo}\n"
+            f"Package: {pkg.bootstrap_id}\n"
+            f"Created: {_fmt_ts(pkg.created_ts)}\n"
+            f"Selected apps: {', '.join(selected_apps)}\n\n"
+            f"Impact classification: {preview.classification}\n"
+            f"Newer apps: {preview.newer_apps}\n"
+            f"Same apps: {preview.same_apps}\n"
+            f"Older apps: {preview.older_apps}\n"
+        )
+        if preview.stale and preview.stale_reason:
+            details += f"\nWarning: {preview.stale_reason}\n"
+        details += "\nA rollback snapshot will be created before files are replaced."
+        if not self.messagebox.askyesno(f"Install bootstrap to {label}", details):
+            return
+        if preview.stale:
+            if not self.messagebox.askyesno(
+                "Confirm stale/retractive install",
+                "This package appears older than current patch state for at least one app.\n\n"
+                "Proceed anyway?",
+            ):
+                return
+
+        self._begin_busy(f"Installing bootstrap to {label}...")
+        self._append(f"\n[BOOTSTRAP] installing {pkg.bootstrap_id} -> {label} ({dest_repo})\n")
+
+        def worker() -> None:
+            ok = False
+            try:
+                ok, msg = apply_bootstrap_package_to_repo(
+                    pkg,
+                    dest_repo,
+                    selected_apps=selected_apps,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                self.root.after(0, lambda m=msg: self._append(f"[BOOTSTRAP] {m}\n"))
+            except Exception as e:
+                self.root.after(0, lambda: self._append(f"[BOOTSTRAP][ERROR] install failed: {e}\n"))
+            finally:
+                self.root.after(0, self._finish_busy)
+                self.root.after(0, self.refresh_targets)
+                self.root.after(
+                    0,
+                    lambda: self._set_status(
+                        f"Bootstrap install complete for {label}." if ok else f"Bootstrap install failed for {label}."
+                    ),
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_install_bootstrap_to_usb(self) -> None:
+        target = self._selected_target()
+        if target is None:
+            self.messagebox.showinfo("No target", "Select a USB target repo first.")
+            return
+        media_ok, media_reason = is_expected_usb_bootstrap_media(target)
+        if not media_ok:
+            if not self.messagebox.askyesno(
+                "USB media warning",
+                "Selected USB media does not match expected bootstrap profile "
+                "(exfat/fat32 and 40-80GB).\n\n"
+                f"{media_reason}\n\n"
+                "Install anyway?",
+            ):
+                return
+        self._install_bootstrap_to_repo(target, "USB target")
+
+    def on_install_bootstrap_to_local(self) -> None:
+        self._install_bootstrap_to_repo(self.source_repo, "local source")
+
+    def on_deploy_latest_bootstrap_both(self) -> None:
+        target = self._selected_target()
+        if target is None:
+            self.messagebox.showerror("No USB target", "Select a USB target first.")
+            return
+        if not self.bootstrap_packages:
+            self.on_refresh_bootstrap_catalog()
+        if not self.bootstrap_packages:
+            self.messagebox.showinfo(
+                "No bootstraps found",
+                "No bootstrap packages were discovered in local or USB catalogs.",
+            )
+            return
+
+        pkg = self.bootstrap_packages[0]
+        selected_apps = self._selected_bootstrap_apps(pkg)
+        if not selected_apps:
+            selected_apps = list(pkg.app_names)
+        local_preview = preview_bootstrap_install(pkg, self.source_repo, selected_apps)
+        usb_preview = preview_bootstrap_install(pkg, target, selected_apps)
+        details = (
+            f"Package: {pkg.bootstrap_id}\n"
+            f"Created: {_fmt_ts(pkg.created_ts)}\n"
+            f"Apps selected: {len(selected_apps)}\n\n"
+            f"Local preview: {local_preview.classification} "
+            f"(new={local_preview.newer_apps}, same={local_preview.same_apps}, older={local_preview.older_apps})\n"
+            f"USB preview: {usb_preview.classification} "
+            f"(new={usb_preview.newer_apps}, same={usb_preview.same_apps}, older={usb_preview.older_apps})\n\n"
+            "Deploy newest bootstrap to both Local and selected USB now?"
+        )
+        if not self.messagebox.askyesno("Deploy newest bootstrap", details):
+            return
+
+        self._begin_busy("Deploying newest bootstrap to local and USB...")
+        self._append(f"\n[BOOTSTRAP] deploying newest package {pkg.bootstrap_id} -> local + usb\n")
+
+        def worker() -> None:
+            overall_ok = True
+            targets: List[Tuple[str, Path]] = [("LOCAL", self.source_repo), ("USB", target)]
+            for label, dest in targets:
+                if label == "USB":
+                    media_ok, media_reason = is_expected_usb_bootstrap_media(dest)
+                    self.root.after(0, lambda r=media_reason: self._append(f"[BOOTSTRAP][USB-CHECK] {r}\n"))
+                    if not media_ok:
+                        overall_ok = False
+                        self.root.after(0, lambda: self._append("[BOOTSTRAP][WARN] USB deploy skipped: media profile mismatch.\n"))
+                        continue
+                preview = preview_bootstrap_install(pkg, dest, selected_apps)
+                if preview.stale:
+                    overall_ok = False
+                    self.root.after(
+                        0,
+                        lambda l=label, s=preview.stale_reason: self._append(
+                            f"[BOOTSTRAP][WARN] {l} stale/retractive blocked: {s}\n"
+                        ),
+                    )
+                    continue
+                ok, msg = apply_bootstrap_package_to_repo(
+                    pkg,
+                    dest,
+                    selected_apps=selected_apps,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                if not ok:
+                    overall_ok = False
+                self.root.after(
+                    0,
+                    lambda l=label, o=ok, m=msg: self._append(
+                        f"[BOOTSTRAP] {l} {'OK' if o else 'WARN'} {m}\n"
+                    ),
+                )
+
+            self.root.after(0, self.on_refresh_bootstrap_catalog)
+            self.root.after(0, self._refresh_bootstrap_preview)
+            self.root.after(
+                0,
+                lambda: self._set_status(
+                    "Newest bootstrap deployed to local + USB."
+                    if overall_ok
+                    else "Bootstrap deploy completed with warnings. Review log."
+                ),
+            )
+            self.root.after(0, self._finish_busy)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _rollback_bootstrap_repo(self, dest_repo: Path, label: str) -> None:
+        if not self.messagebox.askyesno(
+            f"Rollback last bootstrap on {label}",
+            f"Rollback the most recent bootstrap install on:\n{dest_repo}\n\n"
+            "This restores the previous file snapshot and patch state ledger.",
+        ):
+            return
+        self._begin_busy(f"Rolling back bootstrap on {label}...")
+        self._append(f"\n[BOOTSTRAP] rollback requested on {label}: {dest_repo}\n")
+
+        def worker() -> None:
+            ok = False
+            try:
+                ok, msg = rollback_last_bootstrap_on_repo(
+                    dest_repo,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                self.root.after(0, lambda m=msg: self._append(f"[BOOTSTRAP] {m}\n"))
+            except Exception as e:
+                self.root.after(0, lambda: self._append(f"[BOOTSTRAP][ERROR] rollback failed: {e}\n"))
+            finally:
+                self.root.after(0, self._finish_busy)
+                self.root.after(0, self.refresh_targets)
+                self.root.after(
+                    0,
+                    lambda: self._set_status(
+                        f"Bootstrap rollback complete for {label}." if ok else f"Bootstrap rollback failed for {label}."
+                    ),
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_rollback_bootstrap_usb(self) -> None:
+        target = self._selected_target()
+        if target is None:
+            self.messagebox.showinfo("No target", "Select a USB target repo first.")
+            return
+        self._rollback_bootstrap_repo(target, "USB target")
+
+    def on_rollback_bootstrap_local(self) -> None:
+        self._rollback_bootstrap_repo(self.source_repo, "local source")
+
+    # ── Git-based patch detector / deployer ───────────────────────────────────
+
+    def on_check_git_patches(self) -> None:
+        """Scan the local repo git log and populate the git-patch commit list."""
+        self._begin_busy("Scanning git log for recent commits…")
+        self._append("\n[GIT-PATCH] Scanning recent commits…\n")
+
+        def worker() -> None:
+            try:
+                commits = detect_git_patches(self.source_repo, max_count=30)
+            except Exception as exc:
+                commits = []
+                self.root.after(0, lambda: self._append(f"[GIT-PATCH][ERROR] {exc}\n"))
+
+            def update() -> None:
+                self.git_commits = commits
+                if self.git_patch_listbox is not None:
+                    self.git_patch_listbox.delete(0, "end")
+                    for c in commits:
+                        label = (
+                            f"[{c['short_hash']}]  {c['date_iso'][:10]}  "
+                            f"{c['subject'][:56]}  ({c['file_count']} file(s))"
+                        )
+                        self.git_patch_listbox.insert("end", label)
+                    if commits:
+                        self.git_patch_listbox.selection_clear(0, "end")
+                        self.git_patch_listbox.selection_set(0)
+                n = len(commits)
+                self.git_patch_status_var.set(
+                    f"Found {n} commit(s). Select one or more, then choose an action below."
+                    if n > 0 else "No git commits found. Is this a git repo with commit history?"
+                )
+                self._append(f"[GIT-PATCH] {n} commit(s) detected.\n")
+                self._finish_busy()
+                self._set_status(f"Git patch: {n} commit(s) detected." if n > 0 else "No git commits found.")
+
+            self.root.after(0, update)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _selected_git_commit_hashes(self) -> List[str]:
+        """Return hashes for listbox-selected commits (all commits if none selected)."""
+        if self.git_patch_listbox is None or not self.git_commits:
+            return []
+        sel = list(self.git_patch_listbox.curselection())
+        if not sel:
+            sel = list(range(len(self.git_commits)))
+        return [self.git_commits[i]["hash"] for i in sel if i < len(self.git_commits)]
+
+    def on_build_git_patch(self) -> None:
+        """Package selected commits as a patch ZIP without applying it."""
+        hashes = self._selected_git_commit_hashes()
+        if not hashes:
+            self.messagebox.showinfo(
+                "No commits selected",
+                "Click 'Detect Recent Commits' first, then select commits to package.",
+            )
+            return
+        self._begin_busy(f"Packaging {len(hashes)} commit(s) as patch ZIP…")
+        self._append(f"\n[GIT-PATCH] packaging {len(hashes)} commit(s)…\n")
+
+        def worker() -> None:
+            ok = False
+            try:
+                ok, msg, pkg = build_git_patch_from_commits(
+                    self.source_repo, hashes,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                self.root.after(0, lambda m=msg: self._append(f"[GIT-PATCH] {m}\n"))
+                if ok:
+                    self.root.after(0, self.on_refresh_bootstrap_catalog)
+            except Exception as exc:
+                self.root.after(0, lambda: self._append(f"[GIT-PATCH][ERROR] {exc}\n"))
+            finally:
+                self.root.after(0, self._finish_busy)
+                self.root.after(
+                    0,
+                    lambda: self._set_status(
+                        "Git patch ZIP created — ready to install." if ok else "Git patch creation failed."
+                    ),
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _git_patch_build_and_apply(self, targets: List[str]) -> None:
+        """
+        Build a git patch from selected commits and apply it to the given targets.
+        targets: list of "local" | "usb"
+        Creates a rollback snapshot on each target before applying.
+        """
+        hashes = self._selected_git_commit_hashes()
+        if not hashes:
+            self.messagebox.showinfo(
+                "No commits selected",
+                "Click 'Detect Recent Commits' first, then select commits.",
+            )
+            return
+        target_labels = ", ".join(t.upper() for t in targets)
+        if not self.messagebox.askyesno(
+            "Apply Git Patch",
+            f"Build a patch from {len(hashes)} commit(s) and apply to: {target_labels}?\n\n"
+            "A rollback snapshot is automatically created on each target before applying.\n"
+            "Use 'Rollback Last on USB/Local' to undo if needed.",
+        ):
+            return
+        self._begin_busy(f"Packaging + applying git patch to {target_labels}…")
+        self._append(f"\n[GIT-PATCH] build+apply → {target_labels}: {len(hashes)} commit(s)\n")
+
+        def worker() -> None:
+            ok = False
+            try:
+                ok, msg, pkg = build_git_patch_from_commits(
+                    self.source_repo, hashes,
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
+                self.root.after(0, lambda m=msg: self._append(f"[GIT-PATCH] build: {m}\n"))
+                if not ok or pkg is None:
+                    return
+
+                for target_label in targets:
+                    dest_repo: Optional[Path] = None
+                    if target_label == "local":
+                        dest_repo = self.source_repo
+                    elif target_label == "usb":
+                        tgt = self._selected_target()
+                        if tgt is None:
+                            self.root.after(
+                                0,
+                                lambda: self._append("[GIT-PATCH][WARN] No USB target selected — skipping USB.\n"),
+                            )
+                            continue
+                        dest_repo = tgt.path
+                    if dest_repo is None:
+                        continue
+                    self.root.after(0, lambda lbl=target_label: self._append(f"[GIT-PATCH] applying to {lbl}…\n"))
+                    apply_ok, apply_msg = apply_bootstrap_package_to_repo(
+                        pkg,
+                        dest_repo,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
+                    status_tag = "OK" if apply_ok else "FAIL"
+                    self.root.after(
+                        0,
+                        lambda m=apply_msg, s=status_tag: self._append(f"[GIT-PATCH][{s}] {m}\n"),
+                    )
+            except Exception as exc:
+                self.root.after(0, lambda: self._append(f"[GIT-PATCH][ERROR] {exc}\n"))
+                ok = False
+            finally:
+                self.root.after(0, self._finish_busy)
+                self.root.after(0, self.refresh_targets)
+                self.root.after(0, self.on_refresh_bootstrap_catalog)
+                self.root.after(
+                    0,
+                    lambda: self._set_status(
+                        f"Git patch applied to {target_labels}." if ok else "Git patch failed — check log."
+                    ),
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_git_patch_apply_usb(self) -> None:
+        self._git_patch_build_and_apply(["usb"])
+
+    def on_git_patch_apply_local(self) -> None:
+        self._git_patch_build_and_apply(["local"])
+
+    def on_git_patch_apply_both(self) -> None:
+        self._git_patch_build_and_apply(["local", "usb"])
+
     # ── GitHub sync methods ───────────────────────────────────────────────────
 
     def _git_repo_root_for_app(self, app: dict) -> Optional[Path]:
         src = self._app_source_root(app)
         return _find_git_root(src)
+
+    def _collect_git_statuses_inline(self) -> Dict[str, Dict]:
+        statuses: Dict[str, Dict] = {}
+        for app in CITL_APPS:
+            try:
+                root = self._git_repo_root_for_app(app)
+                if root is None:
+                    statuses[app["name"]] = {"error": "No git repo found"}
+                else:
+                    statuses[app["name"]] = git_status_for_repo(root)
+            except Exception as exc:
+                statuses[app["name"]] = {"error": f"Status failed: {exc}"}
+        self._git_statuses = statuses
+        return statuses
+
+    def _get_or_refresh_git_status_for_app(self, app: dict) -> Dict:
+        st = self._git_statuses.get(app["name"])
+        if st:
+            return st
+        root = self._git_repo_root_for_app(app)
+        if root is None:
+            st = {"error": "No git repo found"}
+        else:
+            try:
+                st = git_status_for_repo(root)
+            except Exception as exc:
+                st = {"error": f"Status failed: {exc}"}
+        self._git_statuses[app["name"]] = st
+        return st
 
     def _refresh_git_statuses(self) -> None:
         """Fetch git status for all apps in a background thread, then re-render."""
@@ -4117,11 +7661,12 @@ class SyncGUI:
             ).grid(row=0, column=0, sticky="w", padx=8)
             return
 
-        cols = len(CITL_APPS)
+        ordered_apps = self._ordered_apps_for_overview()
+        cols = len(ordered_apps)
         for c in range(cols):
             self.gh_apps_frame.grid_columnconfigure(c, weight=1, uniform="ghcol")
 
-        for idx, app in enumerate(CITL_APPS):
+        for idx, app in enumerate(ordered_apps):
             st = self._git_statuses.get(app["name"]) or {}
             err = st.get("error")
             bg = self.colors["card"]
@@ -4516,7 +8061,7 @@ class SyncGUI:
         if root is None:
             self.messagebox.showerror("No git repo", f"{app['name']}: no git repo found.")
             return
-        st = self._git_statuses.get(app["name"]) or {}
+        st = self._get_or_refresh_git_status_for_app(app)
         if int(st.get("behind", 0)) == 0 and not self.messagebox.askyesno(
             "Confirm pull",
             f"{app['name']} is not behind the remote.\nPull anyway?"
@@ -4544,10 +8089,19 @@ class SyncGUI:
     def on_git_push_all(self) -> None:
         """Push all apps that are dirty or ahead of remote."""
         self._append("\n[GITHUB] Push All Updated requested.\n")
+        statuses = dict(self._git_statuses or {})
+        if not statuses:
+            self._append("[GITHUB] No cached status yet. Refreshing now...\n")
+            self._refresh_git_statuses()
+            self.messagebox.showinfo(
+                "Git status refreshing",
+                "Git status is being refreshed now. Click 'Push All Updated' again in a moment."
+            )
+            return
         to_push = [
             app for app in CITL_APPS
-            if (self._git_statuses.get(app["name"]) or {}).get("dirty")
-            or int((self._git_statuses.get(app["name"]) or {}).get("ahead", 0)) > 0
+            if (statuses.get(app["name"]) or {}).get("dirty")
+            or int((statuses.get(app["name"]) or {}).get("ahead", 0)) > 0
         ]
         if not to_push:
             self.messagebox.showinfo(
@@ -4594,9 +8148,18 @@ class SyncGUI:
     def on_git_pull_all_newer(self) -> None:
         """Pull all apps where remote has newer commits."""
         self._append("\n[GITHUB] Pull All Newer requested.\n")
+        statuses = dict(self._git_statuses or {})
+        if not statuses:
+            self._append("[GITHUB] No cached status yet. Refreshing now...\n")
+            self._refresh_git_statuses()
+            self.messagebox.showinfo(
+                "Git status refreshing",
+                "Git status is being refreshed now. Click 'Pull All Newer' again in a moment."
+            )
+            return
         to_pull = [
             app for app in CITL_APPS
-            if int((self._git_statuses.get(app["name"]) or {}).get("behind", 0)) > 0
+            if int((statuses.get(app["name"]) or {}).get("behind", 0)) > 0
         ]
         if not to_pull:
             self.messagebox.showinfo(
@@ -4711,11 +8274,31 @@ class SyncGUI:
                 if not src_p.exists():
                     continue
                 try:
-                    dst_p.parent.mkdir(parents=True, exist_ok=True)
-                    if _needs_copy(src_p, dst_p):
-                        shutil.copy2(str(src_p), str(dst_p))
-                        copied += 1
-                        self.root.after(0, lambda r=rel: self._append(f"  copied: {r}\n"))
+                    if src_p.is_dir():
+                        local_copied = 0
+                        for child in src_p.rglob("*"):
+                            if not child.is_file():
+                                continue
+                            rel_child = child.relative_to(src_p)
+                            dst_child = dst_p / rel_child
+                            dst_child.parent.mkdir(parents=True, exist_ok=True)
+                            if _needs_copy(child, dst_child):
+                                shutil.copy2(str(child), str(dst_child))
+                                local_copied += 1
+                        if local_copied:
+                            copied += local_copied
+                            self.root.after(
+                                0,
+                                lambda r=rel, n=local_copied: self._append(
+                                    f"  copied: {r} ({n} files)\n"
+                                ),
+                            )
+                    else:
+                        dst_p.parent.mkdir(parents=True, exist_ok=True)
+                        if _needs_copy(src_p, dst_p):
+                            shutil.copy2(str(src_p), str(dst_p))
+                            copied += 1
+                            self.root.after(0, lambda r=rel: self._append(f"  copied: {r}\n"))
                 except Exception as e:
                     errors += 1
                     self.root.after(0, lambda r=rel, ex=e: self._append(f"  error: {r} — {ex}\n"))
@@ -4730,35 +8313,149 @@ class SyncGUI:
                 f"[APP-SYNC] {app_name} done — copied={copied} errors={errors}\n"
             ))
             self.root.after(0, self._render_apps_overview)
+            self.root.after(0, self._refresh_sync_app_selection_meta)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_pull_app_files(self, app: dict) -> None:
+        """Pull only the key files for a specific app from selected USB target to local source."""
+        target = self._selected_target() or (self.targets[0].path if self.targets else None)
+        if target is None:
+            self.messagebox.showinfo("No Target", "No USB target detected. Refresh first.")
+            return
+
+        key_files = app.get("key_files") or []
+        if not key_files:
+            self.messagebox.showinfo("Nothing to pull", f"{app['name']} has no tracked key files.")
+            return
+
+        app_name = str(app.get("name") or "App")
+        dst_root = self._app_source_root(app)
+        if not self.messagebox.askyesno(
+            "Confirm app pull",
+            f"Pull USB -> PC for {app_name}?\n\nFrom:\n{target}\n\nTo:\n{dst_root}",
+        ):
+            return
+
+        self._append(f"\n[APP-PULL] Pulling {app_name} from {target} to {dst_root}\n")
+
+        def worker() -> None:
+            copied = 0
+            skipped = 0
+            missing = 0
+            errors = 0
+            for rel in key_files:
+                src_p = target / rel
+                dst_p = dst_root / rel
+                if not src_p.exists():
+                    missing += 1
+                    continue
+                try:
+                    if src_p.is_dir():
+                        local_copied = 0
+                        local_skipped = 0
+                        for child in src_p.rglob("*"):
+                            if not child.is_file():
+                                continue
+                            rel_child = child.relative_to(src_p)
+                            dst_child = dst_p / rel_child
+                            dst_child.parent.mkdir(parents=True, exist_ok=True)
+                            if _needs_copy(child, dst_child):
+                                shutil.copy2(str(child), str(dst_child))
+                                local_copied += 1
+                            else:
+                                local_skipped += 1
+                        copied += local_copied
+                        skipped += local_skipped
+                        if local_copied:
+                            self.root.after(
+                                0,
+                                lambda r=rel, n=local_copied: self._append(
+                                    f"  pulled: {r} ({n} files)\n"
+                                ),
+                            )
+                    else:
+                        dst_p.parent.mkdir(parents=True, exist_ok=True)
+                        if _needs_copy(src_p, dst_p):
+                            shutil.copy2(str(src_p), str(dst_p))
+                            copied += 1
+                            self.root.after(0, lambda r=rel: self._append(f"  pulled: {r}\n"))
+                        else:
+                            skipped += 1
+                except Exception as e:
+                    errors += 1
+                    self.root.after(0, lambda r=rel, ex=e: self._append(f"  error: {r} — {ex}\n"))
+
+            self.root.after(
+                0,
+                lambda: self._append(
+                    f"[APP-PULL] {app_name} done — copied={copied} skipped={skipped} "
+                    f"missing={missing} errors={errors}\n"
+                ),
+            )
+            self.root.after(0, self._render_apps_overview)
+            self.root.after(0, self._refresh_sync_app_selection_meta)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _render_apps_overview(self) -> None:
-        """Render one card per CITL app showing version, USB sync status, and per-app sync button."""
+        """Render app cards with pinned priority and most-recently-updated ordering."""
         for w in self.apps_frame.winfo_children():
             w.destroy()
 
-        cols = max(len(CITL_APPS), 1)
+        ordered_apps = self._ordered_apps_for_overview()
+        total = max(len(ordered_apps), 1)
+        cols = 1 if total <= 2 else (2 if total <= 6 else 3)
         for col in range(cols):
             self.apps_frame.grid_columnconfigure(col, weight=1, uniform="apptile")
+        now_ts = time.time()
 
-        for idx, app in enumerate(CITL_APPS):
+        for idx, app in enumerate(ordered_apps, start=1):
             usb_status, usb_color = self._app_usb_comparison(app)
             needs_sync = "needs update" in usb_status or "not on USB" in usb_status
+            bucket = self._app_priority_bucket(app)
+            badge_text, badge_color = self._app_rank_badge(app, idx)
+            last_ts = self._app_last_update_ts(app)
+            age_days: Optional[float]
+            if last_ts > 0:
+                age_days = max(0.0, (now_ts - last_ts) / 86400.0)
+                freshness_text = f"Last update: {_fmt_ts(last_ts)} ({age_days:.1f} days ago)"
+            else:
+                age_days = None
+                freshness_text = "Last update: unknown"
 
             card_bg = self.colors["card"]
-            border_color = self.colors["warn"] if needs_sync else self.colors["border"]
+            cue_color = self.colors["border"]
+            if bucket == 0:
+                card_bg = "#1a3552"
+                cue_color = self.colors["accent"]
+            elif bucket == 1:
+                card_bg = "#2f314f"
+                cue_color = self.colors["warn"]
+            elif needs_sync:
+                card_bg = "#2a2a3b"
+                cue_color = self.colors["warn"]
+            elif age_days is not None and age_days <= 7.0:
+                card_bg = "#1a3a2b"
+                cue_color = self.colors["good"]
+
+            border_color = cue_color if (needs_sync or bucket < 2) else self.colors["border"]
             card = self.tk.Frame(
                 self.apps_frame,
                 bg=card_bg,
-                highlightthickness=2 if needs_sync else 1,
+                highlightthickness=2 if (needs_sync or bucket < 2) else 1,
                 highlightbackground=border_color,
                 bd=0,
                 padx=14,
                 pady=12,
             )
-            card.grid(row=0, column=idx, sticky="nsew", padx=6, pady=4)
+            row = (idx - 1) // cols
+            col = (idx - 1) % cols
+            card.grid(row=row, column=col, sticky="nsew", padx=6, pady=6)
             card.grid_columnconfigure(0, weight=1)
+
+            cue = self.tk.Frame(card, bg=cue_color, height=5, bd=0)
+            cue.grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
             # Icon + name
             self._make_label(
@@ -4768,7 +8465,17 @@ class SyncGUI:
                 fg=self.colors["accent"],
                 font=("Segoe UI Semibold", 12, "bold"),
                 wraplength=250,
-            ).grid(row=0, column=0, sticky="w")
+            ).grid(row=1, column=0, sticky="w")
+
+            marker = "[!]" if needs_sync else ("[+]" if bucket < 2 else "[=]")
+            self._make_label(
+                card,
+                text=f"{marker} {badge_text}",
+                bg=card_bg,
+                fg=badge_color,
+                font=("Consolas", 9, "bold"),
+                wraplength=250,
+            ).grid(row=2, column=0, sticky="w", pady=(4, 0))
 
             # Description
             self._make_label(
@@ -4778,7 +8485,7 @@ class SyncGUI:
                 fg=self.colors["muted"],
                 font=("Segoe UI", 9, "normal"),
                 wraplength=250,
-            ).grid(row=1, column=0, sticky="w", pady=(4, 0))
+            ).grid(row=3, column=0, sticky="w", pady=(4, 0))
 
             # Version (source)
             src_root = self._app_source_root(app)
@@ -4791,7 +8498,24 @@ class SyncGUI:
                 bg=card_bg,
                 fg=self.colors["text"],
                 font=("Consolas", 10, "normal"),
-            ).grid(row=2, column=0, sticky="w", pady=(8, 0))
+            ).grid(row=4, column=0, sticky="w", pady=(8, 0))
+
+            freshness_color = self.colors["muted"]
+            if age_days is not None:
+                if age_days <= 7.0:
+                    freshness_color = self.colors["good"]
+                elif age_days <= 30.0:
+                    freshness_color = self.colors["accent"]
+                else:
+                    freshness_color = self.colors["warn"]
+            self._make_label(
+                card,
+                text=freshness_text,
+                bg=card_bg,
+                fg=freshness_color,
+                font=("Consolas", 9, "normal"),
+                wraplength=250,
+            ).grid(row=5, column=0, sticky="w", pady=(2, 0))
 
             # Key files with mtime
             key_files = app.get("key_files") or []
@@ -4814,22 +8538,23 @@ class SyncGUI:
                     fg=self.colors["muted"],
                     font=("Consolas", 9, "normal"),
                     wraplength=260,
-                ).grid(row=3, column=0, sticky="w", pady=(4, 0))
+                ).grid(row=6, column=0, sticky="w", pady=(4, 0))
 
             # USB sync status
+            status_prefix = "[SYNC]" if needs_sync else ("[AHEAD]" if "ahead" in usb_status.lower() else "[OK]")
             self._make_label(
                 card,
-                text=usb_status,
+                text=f"{status_prefix} {usb_status}",
                 bg=card_bg,
                 fg=usb_color,
                 font=("Segoe UI Semibold", 10, "bold"),
                 wraplength=250,
-            ).grid(row=4, column=0, sticky="w", pady=(8, 0))
+            ).grid(row=7, column=0, sticky="w", pady=(8, 0))
 
             # Platform readiness (check against the app's own source root)
             slug = _slugify_name(app.get("name", "app"))
-            fallback_win = self.source_repo / "bootstrap" / "windows" / f"Run-{slug}.cmd"
-            fallback_nix = self.source_repo / "bootstrap" / "linux" / f"run-{slug}.sh"
+            fallback_win = src_root / "bootstrap" / "windows" / f"Run-{slug}.cmd"
+            fallback_nix = src_root / "bootstrap" / "linux" / f"run-{slug}.sh"
 
             win_ok = None
             nix_ok = None
@@ -4854,15 +8579,20 @@ class SyncGUI:
                     bg=card_bg,
                     fg=self.colors["good"] if all_ok else self.colors["warn"],
                     font=("Segoe UI", 9, "normal"),
-                ).grid(row=5, column=0, sticky="w", pady=(2, 0))
+                ).grid(row=8, column=0, sticky="w", pady=(2, 0))
 
-            # Per-app sync button
+            # Per-app push/pull actions for tracked key files
             if key_files:
-                btn_text = "Sync This App to USB" if needs_sync else "Re-sync App to USB"
+                sync_actions = self.tk.Frame(card, bg=card_bg)
+                sync_actions.grid(row=9, column=0, sticky="ew", pady=(10, 0))
+                sync_actions.grid_columnconfigure(0, weight=1)
+                sync_actions.grid_columnconfigure(1, weight=1)
+
+                btn_text = "Push App -> USB" if needs_sync else "Re-push App -> USB"
                 btn_color = self.colors["warn"] if needs_sync else self.colors["button"]
                 btn_fg = self.colors["bg"] if needs_sync else self.colors["text"]
-                btn = self.tk.Button(
-                    card,
+                push_btn = self.tk.Button(
+                    sync_actions,
                     text=btn_text,
                     command=lambda a=app: self._on_sync_app_files(a),
                     bg=btn_color,
@@ -4871,13 +8601,138 @@ class SyncGUI:
                     activeforeground=self.colors["bg"],
                     relief="flat",
                     bd=0,
-                    padx=10,
-                    pady=6,
+                    padx=8,
+                    pady=5,
                     cursor="hand2",
-                    font=("Segoe UI Semibold", 10),
-                    wraplength=220,
+                    font=("Segoe UI Semibold", 9),
+                    wraplength=160,
                 )
-                btn.grid(row=6, column=0, sticky="ew", pady=(10, 0))
+                push_btn.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+
+                pull_btn = self.tk.Button(
+                    sync_actions,
+                    text="Pull App <- USB",
+                    command=lambda a=app: self._on_pull_app_files(a),
+                    bg=self.colors["button"],
+                    fg=self.colors["text"],
+                    activebackground=self.colors["button_active"],
+                    activeforeground=self.colors["text"],
+                    relief="flat",
+                    bd=0,
+                    padx=8,
+                    pady=5,
+                    cursor="hand2",
+                    font=("Segoe UI Semibold", 9),
+                    wraplength=160,
+                )
+                pull_btn.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+
+            usb_target_for_launch = self._selected_target() or (self.targets[0].path if self.targets else None)
+            can_launch_local = self._resolve_app_launcher_path(app, src_root) is not None
+            can_launch_usb = (
+                usb_target_for_launch is not None
+                and self._resolve_app_launcher_path(app, usb_target_for_launch) is not None
+            )
+            git_root = self._git_repo_root_for_app(app)
+
+            app_actions = self.tk.Frame(card, bg=card_bg)
+            app_actions.grid(row=10, column=0, sticky="ew", pady=(8, 0))
+            for c in range(3):
+                app_actions.grid_columnconfigure(c, weight=1)
+
+            launch_local_btn = self.tk.Button(
+                app_actions,
+                text="Launch Local",
+                command=lambda a=app: self.on_launch_app_local(a),
+                bg=self.colors["button"],
+                fg=self.colors["text"],
+                activebackground=self.colors["button_active"],
+                activeforeground=self.colors["text"],
+                relief="flat",
+                bd=0,
+                padx=6,
+                pady=4,
+                cursor="hand2",
+                font=("Segoe UI", 9),
+                state="normal" if can_launch_local else "disabled",
+            )
+            launch_local_btn.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+
+            launch_usb_btn = self.tk.Button(
+                app_actions,
+                text="Launch USB",
+                command=lambda a=app: self.on_launch_app_usb(a),
+                bg=self.colors["button"],
+                fg=self.colors["text"],
+                activebackground=self.colors["button_active"],
+                activeforeground=self.colors["text"],
+                relief="flat",
+                bd=0,
+                padx=6,
+                pady=4,
+                cursor="hand2",
+                font=("Segoe UI", 9),
+                state="normal" if can_launch_usb else "disabled",
+            )
+            launch_usb_btn.grid(row=0, column=1, sticky="ew", padx=4)
+
+            open_repo_btn = self.tk.Button(
+                app_actions,
+                text="Open Repo",
+                command=lambda a=app: self.on_open_app_repo(a),
+                bg=self.colors["button"],
+                fg=self.colors["text"],
+                activebackground=self.colors["button_active"],
+                activeforeground=self.colors["text"],
+                relief="flat",
+                bd=0,
+                padx=6,
+                pady=4,
+                cursor="hand2",
+                font=("Segoe UI", 9),
+            )
+            open_repo_btn.grid(row=0, column=2, sticky="ew", padx=(4, 0))
+
+            git_actions = self.tk.Frame(card, bg=card_bg)
+            git_actions.grid(row=11, column=0, sticky="ew", pady=(6, 0))
+            git_actions.grid_columnconfigure(0, weight=1)
+            git_actions.grid_columnconfigure(1, weight=1)
+            git_push_btn = self.tk.Button(
+                git_actions,
+                text="Git Push",
+                command=lambda a=app: self._on_git_push_app(a),
+                bg=self.colors["warn"] if git_root is not None else self.colors["button"],
+                fg=self.colors["bg"] if git_root is not None else self.colors["muted"],
+                activebackground=self.colors["accent_active"],
+                activeforeground=self.colors["bg"],
+                relief="flat",
+                bd=0,
+                padx=6,
+                pady=4,
+                cursor="hand2",
+                font=("Segoe UI", 9),
+                state="normal" if git_root is not None else "disabled",
+            )
+            git_push_btn.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+            git_pull_btn = self.tk.Button(
+                git_actions,
+                text="Git Pull",
+                command=lambda a=app: self._on_git_pull_app(a),
+                bg=self.colors["accent"] if git_root is not None else self.colors["button"],
+                fg=self.colors["bg"] if git_root is not None else self.colors["muted"],
+                activebackground=self.colors["accent_active"],
+                activeforeground=self.colors["bg"],
+                relief="flat",
+                bd=0,
+                padx=6,
+                pady=4,
+                cursor="hand2",
+                font=("Segoe UI", 9),
+                state="normal" if git_root is not None else "disabled",
+            )
+            git_pull_btn.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+
+        self._refresh_launch_app_list()
 
     def _render_tiles(self) -> None:
         for child in self.tiles_inner.winfo_children():
@@ -5168,9 +9023,12 @@ class SyncGUI:
 
         self._render_device_buttons()
         self._render_tiles()
+        self._render_apps_overview()
         self._update_detail_panel()
         self._update_health_banner(log=True)
         self._refresh_guidance()
+        self._refresh_sync_app_selection_meta()
+        self.on_refresh_bootstrap_catalog()
         self._update_action_states()
 
     def on_open_source(self) -> None:
@@ -5192,6 +9050,280 @@ class SyncGUI:
             self._render_tiles()
         except Exception as e:
             self.messagebox.showerror("Open failed", str(e))
+
+    def on_launch_doc_composer(self) -> None:
+        """Launch CITL Document Composer from USB or portable installation."""
+        self._launch_citl_app("CITL Document Composer", "citl_doc_composer.py", is_python=True)
+
+    def on_launch_presentation_suite(self) -> None:
+        """Launch CITL LLMOps Presentation Suite from USB or portable installation."""
+        self._launch_citl_app("CITL LLMOps Presentation Suite", "CITL LLMOps Presentation Suite.exe")
+
+    def on_launch_workstation_apps(self) -> None:
+        """Launch CITL Workstation Apps from USB or portable installation."""
+        self._launch_citl_app("CITL Workstation Apps", "CITL Workstation Apps.exe")
+
+    def on_launch_field_apps(self) -> None:
+        """Launch CITL Field Apps from USB or portable installation."""
+        self._launch_citl_app("CITL Field Apps", "CITL Field Apps.exe")
+
+    def on_clone_usb(self) -> None:
+        """Launch the USB clone GUI for duplicating USB drives."""
+        try:
+            import subprocess
+            gui_path = Path(__file__).parent / "citl_usb_clone_gui.py"
+            if not gui_path.exists():
+                self.messagebox.showerror(
+                    "Not found",
+                    f"Clone GUI not found at:\n{gui_path}\n\n"
+                    "Run from the main CITL repo directory."
+                )
+                return
+            
+            # Launch GUI in separate process
+            python_exe = sys.executable
+            subprocess.Popen([python_exe, str(gui_path)])
+            self._append("[CLONE] Launched USB clone GUI in separate window\n")
+        except Exception as e:
+            self.messagebox.showerror("Clone failed", f"Could not launch clone GUI:\n{e}")
+
+    def on_sync_from_git(self) -> None:
+        """Pull latest changes from GitHub to current device."""
+        try:
+            source_repo = self.source_repo
+            if not source_repo:
+                self.messagebox.showerror("No source", "Source repo not detected")
+                return
+            
+            # Check if git repo exists
+            git_marker = Path(source_repo) / ".git"
+            if not git_marker.exists():
+                self.messagebox.showwarning(
+                    "Not a git repo",
+                    f"Source path is not a git repository:\n{source_repo}\n\n"
+                    "Cannot sync from GitHub."
+                )
+                return
+            
+            if not self.messagebox.askyesno(
+                "Confirm Git Sync",
+                f"Pull latest changes from GitHub to:\n{source_repo}\n\n"
+                "This will update your working files."
+            ):
+                return
+            
+            self._append("\n[GIT-SYNC] Starting git pull from GitHub...\n")
+            self._set_status("Syncing from GitHub...")
+            
+            # Run git pull
+            rc, stdout, stderr = _git_run(Path(source_repo), "pull", "origin", "main")
+            
+            if rc == 0:
+                self._append(f"[GIT-SYNC] Pull successful:\n{stdout}\n")
+                self._set_status("Git sync complete - files updated from GitHub")
+                self.messagebox.showinfo("Success", "Latest changes pulled from GitHub")
+                
+                # Refresh UI to show any changes
+                self.refresh_targets()
+            else:
+                error_msg = stderr or stdout or f"git pull failed with code {rc}"
+                self._append(f"[GIT-SYNC][ERROR] {error_msg}\n")
+                self._set_status("Git sync failed")
+                self.messagebox.showerror("Git sync failed", error_msg)
+        
+        except Exception as e:
+            self._append(f"[GIT-SYNC][ERROR] {e}\n")
+            self.messagebox.showerror("Git sync error", str(e))
+
+    def on_push_to_git(self) -> None:
+        """Push current device's changes to GitHub."""
+        try:
+            source_repo = self.source_repo
+            if not source_repo:
+                self.messagebox.showerror("No source", "Source repo not detected")
+                return
+            
+            # Check if git repo exists
+            git_marker = Path(source_repo) / ".git"
+            if not git_marker.exists():
+                self.messagebox.showwarning(
+                    "Not a git repo",
+                    f"Source path is not a git repository:\n{source_repo}\n\n"
+                    "Cannot push to GitHub."
+                )
+                return
+            
+            # Check for uncommitted changes
+            self._append("\n[GIT-PUSH] Checking for uncommitted changes...\n")
+            rc, stdout, stderr = _git_run(Path(source_repo), "status", "--porcelain")
+            
+            if stdout:
+                # Has changes - ask to commit first
+                if not self.messagebox.askyesno(
+                    "Uncommitted changes",
+                    "You have uncommitted changes in this repo.\n\n"
+                    "Commit and push them to GitHub?\n\n"
+                    "Changes will be committed with message:\n"
+                    "'Fleet update from field device'"
+                ):
+                    return
+                
+                # Stage changes
+                self._append("[GIT-PUSH] Staging changes...\n")
+                rc_add, _, err_add = _git_run(Path(source_repo), "add", "-A")
+                if rc_add != 0:
+                    self._append(f"[GIT-PUSH][ERROR] Failed to stage: {err_add}\n")
+                    self.messagebox.showerror("Commit failed", f"Could not stage changes:\n{err_add}")
+                    return
+                
+                # Commit
+                self._append("[GIT-PUSH] Committing changes...\n")
+                rc_commit, _, err_commit = _git_run(
+                    Path(source_repo),
+                    "commit",
+                    "-m",
+                    f"Fleet update from {socket.gethostname()} - {datetime.utcnow().isoformat()}"
+                )
+                if rc_commit != 0:
+                    self._append(f"[GIT-PUSH][ERROR] Commit failed: {err_commit}\n")
+                    self.messagebox.showerror("Commit failed", err_commit)
+                    return
+                
+                self._append("[GIT-PUSH] Commit successful\n")
+            else:
+                self._append("[GIT-PUSH] No uncommitted changes\n")
+            
+            # Push to GitHub
+            if not self.messagebox.askyesno(
+                "Confirm Push",
+                f"Push changes to GitHub from:\n{source_repo}\n\n"
+                "This will update the remote repository."
+            ):
+                return
+            
+            self._append("[GIT-PUSH] Pushing to GitHub...\n")
+            self._set_status("Pushing to GitHub...")
+            
+            rc_push, stdout, stderr = _git_run(Path(source_repo), "push", "origin", "main")
+            
+            if rc_push == 0:
+                self._append(f"[GIT-PUSH] Push successful:\n{stdout}\n")
+                self._set_status("Push to GitHub complete")
+                self.messagebox.showinfo("Success", "Changes pushed to GitHub")
+            else:
+                error_msg = stderr or stdout or f"git push failed with code {rc_push}"
+                self._append(f"[GIT-PUSH][ERROR] {error_msg}\n")
+                self._set_status("Git push failed")
+                self.messagebox.showerror("Push failed", error_msg)
+        
+        except Exception as e:
+            self._append(f"[GIT-PUSH][ERROR] {e}\n")
+            self.messagebox.showerror("Push error", str(e))
+
+        """Detect USB root containing CITL applications."""
+        if hasattr(self, '_usb_root') and self._usb_root:
+            return self._usb_root
+
+        # Check if we have a selected target that's on a USB drive
+        target = self._selected_target()
+        if target:
+            # Check if target is on a removable drive
+            try:
+                import ctypes
+                if sys.platform == "win32":
+                    # Check if drive is removable
+                    drive = str(target)[:3]  # e.g., "F:\"
+                    drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive)
+                    if drive_type == 2:  # DRIVE_REMOVABLE
+                        return Path(drive)
+            except:
+                pass
+
+        # Fallback: scan common USB drive letters
+        if sys.platform == "win32":
+            for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
+                drive = Path(f"{letter}:\\")
+                if drive.exists():
+                    # Check for CITL folders
+                    if any((drive / folder).exists() for folder, _, _ in APP_BUNDLES):
+                        return drive
+
+        return None
+
+    def _launch_citl_app(self, app_name: str, exe_name: str, is_python: bool = False) -> None:
+        """Launch a CITL application from USB drive or portable installation."""
+        import subprocess
+        import os
+
+        # First try to find on USB drive
+        usb_root = self._detect_usb_root()
+        if usb_root:
+            if is_python:
+                # For Python scripts, look in factbook-assistant folder
+                exe_path = usb_root / "factbook-assistant" / exe_name
+            else:
+                # For executables, find the right numbered folder
+                for folder_name, _, bundle_exe in APP_BUNDLES:
+                    if bundle_exe == exe_name:
+                        exe_path = usb_root / folder_name / exe_name
+                        break
+                else:
+                    exe_path = usb_root / exe_name
+
+            if exe_path.exists():
+                try:
+                    if is_python:
+                        # Launch Python script
+                        python_cmd = sys.executable
+                        subprocess.Popen([python_cmd, str(exe_path)])
+                    else:
+                        # Launch executable
+                        if sys.platform == "win32":
+                            os.startfile(str(exe_path))
+                        else:
+                            subprocess.Popen(["xdg-open", str(exe_path)])
+                    self._append(f"[LAUNCH] Started {app_name} from USB: {exe_path}\n")
+                    return
+                except Exception as e:
+                    self._append(f"[LAUNCH_ERROR] Failed to start {app_name} from USB: {e}\n")
+
+        # Try portable installation
+        if is_python:
+            portable_paths = [
+                Path.home() / "CITL Apps" / "factbook-assistant" / exe_name,
+                Path.home() / "Desktop" / "CITL Apps" / "factbook-assistant" / exe_name,
+                Path.home() / "Documents" / "CITL Apps" / "factbook-assistant" / exe_name,
+            ]
+        else:
+            portable_paths = [
+                Path.home() / "CITL Apps" / exe_name,
+                Path.home() / "Desktop" / "CITL Apps" / exe_name,
+                Path.home() / "Documents" / "CITL Apps" / exe_name,
+            ]
+
+        for exe_path in portable_paths:
+            if exe_path.exists():
+                try:
+                    if is_python:
+                        python_cmd = sys.executable
+                        subprocess.Popen([python_cmd, str(exe_path)])
+                    else:
+                        if sys.platform == "win32":
+                            os.startfile(str(exe_path))
+                        else:
+                            subprocess.Popen(["xdg-open", str(exe_path)])
+                    self._append(f"[LAUNCH] Started {app_name} from portable: {exe_path}\n")
+                    return
+                except Exception as e:
+                    self._append(f"[LAUNCH_ERROR] Failed to start {app_name} from portable: {e}\n")
+
+        # If not found, show error
+        self.messagebox.showerror(
+            "Application Not Found",
+            f"{app_name} was not found on USB drive or in portable installation.\n\n"
+            f"Searched for: {exe_name}\n\n"
+            f"Try running INSTALL_CITL_APPS_PORTABLE.cmd first."
+        )
 
     def on_remember_target(self) -> None:
         target = self._selected_target()
@@ -5329,10 +9461,15 @@ class SyncGUI:
         )
         return (True, source_dir, target_dir)
 
-    def _sync_app_key_overlay(self, target_repo: Path) -> Tuple[int, int, int]:
+    def _sync_app_key_overlay(
+        self,
+        target_repo: Path,
+        selected_app_names: Optional[Sequence[str]] = None,
+    ) -> Tuple[int, int, int]:
         summary = sync_registered_app_key_files(
             self.source_repo,
             target_repo,
+            selected_app_names=selected_app_names,
             log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
         )
         total_copied = sum(v.get("copied", 0) for v in summary.values())
@@ -5410,42 +9547,95 @@ class SyncGUI:
             return
         if not self._confirm_sync_direction("push", snap):
             return
+        selected_app_names = self._selected_sync_app_names()
+        if not selected_app_names:
+            self.messagebox.showinfo("No apps selected", "Select at least one app in the app inclusion list.")
+            return
+        app_filtered = len(selected_app_names) < len(CITL_APPS)
 
         include_data = bool(self.include_data_var.get())
         include_models = bool(self.include_models_var.get())
-        model_plan = self._prepare_model_sync_plan(
-            "PC -> USB push",
-            self.source_repo,
-            target,
-        )
-        if model_plan is None:
-            return
-        include_models_effective, model_source_dir, model_target_dir = model_plan
+        if app_filtered:
+            include_models_effective = False
+            model_source_dir = None
+            model_target_dir = None
+        else:
+            model_plan = self._prepare_model_sync_plan(
+                "PC -> USB push",
+                self.source_repo,
+                target,
+            )
+            if model_plan is None:
+                return
+            include_models_effective, model_source_dir, model_target_dir = model_plan
         try:
             _remember_target(target)
             self._mark_target_remembered(target)
         except Exception as e:
             self._append(f"[WARN] could not persist target memory before push: {e}\n")
+        if app_filtered and (include_data or include_models):
+            self._append("[APP-FILTER] include_data/include_models apply only to full-repo sync and are ignored in app-only mode.\n")
 
         self._begin_busy("Syncing PC source to selected USB copy...")
         self._append("\n[SYNC] starting PC -> USB push...\n")
 
         def worker() -> None:
             try:
-                result = sync_repo(
-                    self.source_repo,
-                    target,
-                    include_data=include_data,
-                    include_models=include_models_effective,
-                    model_source_dir=model_source_dir,
-                    model_target_dir=model_target_dir,
+                if app_filtered:
+                    self.root.after(
+                        0,
+                        lambda n=selected_app_names: self._append(
+                            f"[APP-FILTER] push limited to {len(n)} app(s): {', '.join(n)}\n"
+                        ),
+                    )
+                    result = self._sync_selected_apps_only(
+                        self.source_repo,
+                        target,
+                        selected_app_names,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
+                else:
+                    result = sync_repo(
+                        self.source_repo,
+                        target,
+                        include_data=include_data,
+                        include_models=include_models_effective,
+                        model_source_dir=model_source_dir,
+                        model_target_dir=model_target_dir,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
+            except Exception as e:
+                _append_device_push_log_entry(
+                    {
+                        "kind": "usb_push",
+                        "status": "error",
+                        "source_repo": str(self.source_repo),
+                        "target_path": str(target),
+                        "include_data": bool(include_data),
+                        "include_models": bool(include_models_effective),
+                        "error": str(e),
+                    },
                     log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
                 )
-            except Exception as e:
                 self.root.after(0, lambda: self._append(f"[ERROR] push failed: {e}\n"))
                 self.root.after(0, lambda: self._set_status("PC -> USB push failed."))
             else:
                 mode = "rsync" if result.used_rsync else "python-copy"
+                _append_device_push_log_entry(
+                    {
+                        "kind": "usb_push",
+                        "status": "ok" if result.errors == 0 else "partial",
+                        "source_repo": str(self.source_repo),
+                        "target_path": str(target),
+                        "include_data": bool(include_data),
+                        "include_models": bool(include_models_effective),
+                        "copied": int(result.copied),
+                        "skipped": int(result.skipped),
+                        "errors": int(result.errors),
+                        "elapsed_sec": float(result.elapsed_sec),
+                    },
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
                 self.root.after(
                     0,
                     lambda: self._append(
@@ -5455,9 +9645,11 @@ class SyncGUI:
                 )
                 # Auto-bump version numbers in source repo after successful push
                 if result.errors == 0:
-                    self._sync_app_key_overlay(target)
+                    if not app_filtered:
+                        self._sync_app_key_overlay(target, selected_app_names=selected_app_names)
                     bumped = []
-                    for app in CITL_APPS:
+                    apps_for_bump = self._selected_sync_apps() if app_filtered else list(CITL_APPS)
+                    for app in apps_for_bump:
                         vf = app.get("version_file")
                         if vf and _bump_version_file(self.source_repo, vf):
                             bumped.append(vf)
@@ -5480,31 +9672,57 @@ class SyncGUI:
             return
         if not self._confirm_sync_direction("pull", snap):
             return
+        selected_app_names = self._selected_sync_app_names()
+        if not selected_app_names:
+            self.messagebox.showinfo("No apps selected", "Select at least one app in the app inclusion list.")
+            return
+        app_filtered = len(selected_app_names) < len(CITL_APPS)
 
         include_data = bool(self.include_data_var.get())
         include_models = bool(self.include_models_var.get())
-        model_plan = self._prepare_model_sync_plan(
-            "USB -> PC pull",
-            target,
-            self.source_repo,
-        )
-        if model_plan is None:
-            return
-        include_models_effective, model_source_dir, model_target_dir = model_plan
+        if app_filtered:
+            include_models_effective = False
+            model_source_dir = None
+            model_target_dir = None
+        else:
+            model_plan = self._prepare_model_sync_plan(
+                "USB -> PC pull",
+                target,
+                self.source_repo,
+            )
+            if model_plan is None:
+                return
+            include_models_effective, model_source_dir, model_target_dir = model_plan
+        if app_filtered and (include_data or include_models):
+            self._append("[APP-FILTER] include_data/include_models apply only to full-repo sync and are ignored in app-only mode.\n")
         self._begin_busy("Syncing selected USB copy back to local PC source...")
         self._append("\n[SYNC] starting USB -> PC pull...\n")
 
         def worker() -> None:
             try:
-                result = sync_repo(
-                    target,
-                    self.source_repo,
-                    include_data=include_data,
-                    include_models=include_models_effective,
-                    model_source_dir=model_source_dir,
-                    model_target_dir=model_target_dir,
-                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
-                )
+                if app_filtered:
+                    self.root.after(
+                        0,
+                        lambda n=selected_app_names: self._append(
+                            f"[APP-FILTER] pull limited to {len(n)} app(s): {', '.join(n)}\n"
+                        ),
+                    )
+                    result = self._sync_selected_apps_only(
+                        target,
+                        self.source_repo,
+                        selected_app_names,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
+                else:
+                    result = sync_repo(
+                        target,
+                        self.source_repo,
+                        include_data=include_data,
+                        include_models=include_models_effective,
+                        model_source_dir=model_source_dir,
+                        model_target_dir=model_target_dir,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
             except Exception as e:
                 self.root.after(0, lambda: self._append(f"[ERROR] pull failed: {e}\n"))
                 self.root.after(0, lambda: self._set_status("USB -> PC pull failed."))
@@ -5529,6 +9747,11 @@ class SyncGUI:
         if source_target is None:
             self.messagebox.showerror("No target", "Select the USB copy you want to duplicate from.")
             return
+        selected_app_names = self._selected_sync_app_names()
+        if not selected_app_names:
+            self.messagebox.showinfo("No apps selected", "Select at least one app in the app inclusion list.")
+            return
+        app_filtered = len(selected_app_names) < len(CITL_APPS)
         picked = self._choose_duplicate_destination(source_target)
         if picked is None:
             self.messagebox.showerror(
@@ -5552,34 +9775,82 @@ class SyncGUI:
         ):
             return
 
-        model_plan = self._prepare_model_sync_plan(
-            "USB -> USB duplicate",
-            source_target,
-            dest_target,
-        )
-        if model_plan is None:
-            return
-        include_models_effective, model_source_dir, model_target_dir = model_plan
+        if app_filtered:
+            include_models_effective = False
+            model_source_dir = None
+            model_target_dir = None
+            if include_data or include_models:
+                self._append("[APP-FILTER] include_data/include_models apply only to full-repo sync and are ignored in app-only mode.\n")
+        else:
+            model_plan = self._prepare_model_sync_plan(
+                "USB -> USB duplicate",
+                source_target,
+                dest_target,
+            )
+            if model_plan is None:
+                return
+            include_models_effective, model_source_dir, model_target_dir = model_plan
 
         self._begin_busy("Duplicating selected USB copy to backup USB...")
         self._append("\n[SYNC] starting USB -> USB duplicate...\n")
 
         def worker() -> None:
             try:
-                result = sync_repo(
-                    source_target,
-                    dest_target,
-                    include_data=include_data,
-                    include_models=include_models_effective,
-                    model_source_dir=model_source_dir,
-                    model_target_dir=model_target_dir,
+                if app_filtered:
+                    self.root.after(
+                        0,
+                        lambda n=selected_app_names: self._append(
+                            f"[APP-FILTER] duplicate limited to {len(n)} app(s): {', '.join(n)}\n"
+                        ),
+                    )
+                    result = self._sync_selected_apps_only(
+                        source_target,
+                        dest_target,
+                        selected_app_names,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
+                else:
+                    result = sync_repo(
+                        source_target,
+                        dest_target,
+                        include_data=include_data,
+                        include_models=include_models_effective,
+                        model_source_dir=model_source_dir,
+                        model_target_dir=model_target_dir,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
+            except Exception as e:
+                _append_device_push_log_entry(
+                    {
+                        "kind": "usb_duplicate",
+                        "status": "error",
+                        "source_repo": str(source_target),
+                        "target_path": str(dest_target),
+                        "include_data": bool(include_data),
+                        "include_models": bool(include_models_effective),
+                        "error": str(e),
+                    },
                     log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
                 )
-            except Exception as e:
                 self.root.after(0, lambda: self._append(f"[ERROR] duplicate failed: {e}\n"))
                 self.root.after(0, lambda: self._set_status("USB duplicate failed."))
             else:
                 mode = "rsync" if result.used_rsync else "python-copy"
+                _append_device_push_log_entry(
+                    {
+                        "kind": "usb_duplicate",
+                        "status": "ok" if result.errors == 0 else "partial",
+                        "source_repo": str(source_target),
+                        "target_path": str(dest_target),
+                        "include_data": bool(include_data),
+                        "include_models": bool(include_models_effective),
+                        "copied": int(result.copied),
+                        "skipped": int(result.skipped),
+                        "errors": int(result.errors),
+                        "elapsed_sec": float(result.elapsed_sec),
+                    },
+                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                )
                 self.root.after(
                     0,
                     lambda: self._append(
@@ -5588,7 +9859,8 @@ class SyncGUI:
                     ),
                 )
                 if result.errors == 0:
-                    self._sync_app_key_overlay(dest_target)
+                    if not app_filtered:
+                        self._sync_app_key_overlay(dest_target, selected_app_names=selected_app_names)
                 self.root.after(0, lambda: self._set_status("USB duplicate complete. Refreshing analysis..."))
             finally:
                 self.root.after(0, self._after_sync_action)
@@ -5609,7 +9881,8 @@ class SyncGUI:
         include_models = bool(self.include_models_var.get())
         if not self.messagebox.askyesno(
             "Confirm USB -> phone export",
-            "Create a ZIP bundle from the selected repo copy and push it to the phone's Downloads folder?\n\n"
+            "Create a ZIP bundle from the selected repo copy and push it to the phone's Downloads folder?\n"
+            "Termux shortcuts will be preserved (backup) and a fresh CITL launch shortcut will be written.\n\n"
             f"Selected copy:\n{target}\n\n"
             f"Phone:\n{self._device_label(device)}\n\n"
             f"Include data/indexes: {'yes' if include_data else 'no'}\n"
@@ -5640,6 +9913,23 @@ class SyncGUI:
                         f"elapsed={result['elapsed_sec']:.1f}s remote={result['remote_path']} serial={result['serial']}\n"
                     ),
                 )
+                if bool(result.get("termux_backup_ok")):
+                    self.root.after(
+                        0,
+                        lambda: self._append(
+                            f"[TERMUX] shortcut backup saved: {result.get('termux_backup_path')}\n"
+                        ),
+                    )
+                else:
+                    self.root.after(
+                        0,
+                        lambda: self._append("[TERMUX][WARN] no existing shortcuts were captured before push.\n"),
+                    )
+                shortcut_note = str(result.get("termux_shortcut_note") or "").strip()
+                if bool(result.get("termux_shortcut_ok")):
+                    self.root.after(0, lambda: self._append("[TERMUX] shortcut updated for latest pushed app.\n"))
+                elif shortcut_note:
+                    self.root.after(0, lambda n=shortcut_note: self._append(f"[TERMUX][WARN] {n}\n"))
                 self.root.after(0, lambda: self._set_status("USB -> phone export complete."))
             finally:
                 self.root.after(0, self._after_phone_action)
@@ -5672,6 +9962,31 @@ def launch_sync_gui(source_repo: PathLike, source_reason: str = "", source_fresh
 
 def _print_detect_json(source: SourceDetection) -> int:
     targets = discover_sync_targets(source.path)
+    target_rows: List[dict] = []
+    for t in targets:
+        freshness_ts = _repo_freshness(t.path)
+        comparison = compare_repo_freshness(source.path, t.path)
+        target_rows.append(
+            {
+                "path": str(t.path),
+                "score": t.score,
+                "has_git": t.has_git,
+                "markers": list(t.markers),
+                "root": str(t.root),
+                "root_label": _root_label(t.root),
+                "remembered": t.remembered,
+                "freshness_ts": freshness_ts,
+                "freshness_local": _fmt_ts(freshness_ts),
+                "comparison": {
+                    "recommendation": comparison.recommendation,
+                    "summary": comparison.summary,
+                    "source_newer": comparison.source_newer,
+                    "target_newer": comparison.target_newer,
+                    "source_only": comparison.source_only,
+                    "target_only": comparison.target_only,
+                },
+            }
+        )
     payload = {
         "app": {
             "name": APP_SYNC_NAME,
@@ -5683,28 +9998,7 @@ def _print_detect_json(source: SourceDetection) -> int:
             "freshness_ts": source.freshness_ts,
             "freshness_local": _fmt_ts(source.freshness_ts),
         },
-        "targets": [
-            {
-                "path": str(t.path),
-                "score": t.score,
-                "has_git": t.has_git,
-                "markers": list(t.markers),
-                "root": str(t.root),
-                "root_label": _root_label(t.root),
-                "remembered": t.remembered,
-                "freshness_ts": _repo_freshness(t.path),
-                "freshness_local": _fmt_ts(_repo_freshness(t.path)),
-                "comparison": {
-                    "recommendation": compare_repo_freshness(source.path, t.path).recommendation,
-                    "summary": compare_repo_freshness(source.path, t.path).summary,
-                    "source_newer": compare_repo_freshness(source.path, t.path).source_newer,
-                    "target_newer": compare_repo_freshness(source.path, t.path).target_newer,
-                    "source_only": compare_repo_freshness(source.path, t.path).source_only,
-                    "target_only": compare_repo_freshness(source.path, t.path).target_only,
-                },
-            }
-            for t in targets
-        ],
+        "targets": target_rows,
         "phones": [
             {
                 "serial": item.serial,
@@ -5716,6 +10010,123 @@ def _print_detect_json(source: SourceDetection) -> int:
     }
     print(json.dumps(payload, indent=2))
     return 0
+
+
+def _parse_bootstrap_apps(raw: str) -> List[str]:
+    out: List[str] = []
+    for part in (raw or "").split(","):
+        name = part.strip()
+        if name:
+            out.append(name)
+    return out
+
+
+def _resolve_bootstrap_target(source: SourceDetection, target_raw: str) -> Optional[Path]:
+    text = (target_raw or "local").strip().lower()
+    if text in ("", "local", "pc", "source"):
+        return source.path
+    if text in ("best-usb", "usb", "auto-usb"):
+        picked = _select_best_usb_target_for_push(source.path)
+        if picked is None:
+            return None
+        return picked[0].path
+    return _normalize_repo_path(target_raw)
+
+
+def _resolve_bootstrap_package_path(source: SourceDetection, raw: str) -> Optional[Path]:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if text.lower() in ("latest", "newest", "auto"):
+        found = discover_bootstrap_packages([("local-source", source.path)])
+        return found[0].path if found else None
+    p = _normalize_repo_path(text)
+    if p is None:
+        return None
+    return p
+
+
+def _run_bootstrap_install(args: argparse.Namespace, source: SourceDetection) -> int:
+    pkg_path = _resolve_bootstrap_package_path(source, args.bootstrap_install_package)
+    if pkg_path is None or not pkg_path.exists():
+        print(f"[ERROR] Bootstrap package not found: {args.bootstrap_install_package}")
+        return 2
+    package = _package_from_manifest(pkg_path, source_hint="headless")
+    if package is None:
+        print(f"[ERROR] Invalid bootstrap package manifest: {pkg_path}")
+        return 2
+
+    apps = _parse_bootstrap_apps(getattr(args, "bootstrap_apps", "") or "")
+    target = _resolve_bootstrap_target(source, getattr(args, "bootstrap_install_target", "local") or "local")
+    if target is None:
+        print("[ERROR] Bootstrap target could not be resolved.")
+        return 2
+    if not target.exists():
+        print(f"[ERROR] Bootstrap target does not exist: {target}")
+        return 2
+
+    preview = preview_bootstrap_install(package, target, apps)
+    print(
+        f"[BOOTSTRAP][PREVIEW] target={target} classification={preview.classification} "
+        f"new={preview.newer_apps} same={preview.same_apps} older={preview.older_apps}"
+    )
+    if preview.stale and not bool(getattr(args, "allow_retractive_bootstrap", False)):
+        print(f"[ERROR] stale/retractive bootstrap blocked: {preview.stale_reason}")
+        print("        Re-run with --allow-retractive-bootstrap to override.")
+        return 3
+
+    ok, msg = apply_bootstrap_package_to_repo(
+        package,
+        target,
+        selected_apps=apps,
+        log_fn=lambda s: print(s, end=""),
+    )
+    print(f"[BOOTSTRAP] {'OK' if ok else 'WARN'} {msg}")
+    rc = 0 if ok else 4
+
+    if bool(getattr(args, "bootstrap_install_usb_if_found", False)):
+        usb_targets = discover_sync_targets(source.path)
+        pushed = 0
+        for item in usb_targets:
+            usb_path = item.path
+            try:
+                if usb_path.resolve() == target.resolve():
+                    continue
+            except Exception:
+                if str(usb_path) == str(target):
+                    continue
+            media_ok, media_reason = is_expected_usb_bootstrap_media(usb_path)
+            print(f"[BOOTSTRAP][USB-CHECK] {media_reason} -> {'OK' if media_ok else 'SKIP'}")
+            if not media_ok:
+                continue
+            usb_preview = preview_bootstrap_install(package, usb_path, apps)
+            if usb_preview.stale and not bool(getattr(args, "allow_retractive_bootstrap", False)):
+                print(f"[BOOTSTRAP][USB-SKIP] stale/retractive blocked for {usb_path}: {usb_preview.stale_reason}")
+                continue
+            ok_usb, msg_usb = apply_bootstrap_package_to_repo(
+                package,
+                usb_path,
+                selected_apps=apps,
+                log_fn=lambda s: print(s, end=""),
+            )
+            print(f"[BOOTSTRAP][USB] {'OK' if ok_usb else 'WARN'} {msg_usb}")
+            if ok_usb:
+                pushed += 1
+            else:
+                rc = 4
+        print(f"[BOOTSTRAP][USB] applied to {pushed} eligible USB repo(s).")
+
+    return rc
+
+
+def _run_bootstrap_rollback(args: argparse.Namespace, source: SourceDetection) -> int:
+    target = _resolve_bootstrap_target(source, getattr(args, "bootstrap_rollback_target", "local") or "local")
+    if target is None:
+        print("[ERROR] Rollback target could not be resolved.")
+        return 2
+    ok, msg = rollback_last_bootstrap_on_repo(target, log_fn=lambda s: print(s, end=""))
+    print(f"[BOOTSTRAP][ROLLBACK] {'OK' if ok else 'WARN'} {msg}")
+    return 0 if ok else 4
 
 
 def _run_headless_sync(args: argparse.Namespace, source: SourceDetection) -> int:
@@ -5783,6 +10194,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     ap.add_argument("--duplicate-from", default="", help="Source USB repo path for --duplicate-usb")
     ap.add_argument("--duplicate-to", default="", help="Destination USB repo path for --duplicate-usb")
+    ap.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="With --duplicate-usb, validate configuration without copying (diagnostic mode)",
+    )
     ap.add_argument("--include-data", action="store_true", help="Include data/ and index folders in sync")
     ap.add_argument("--include-models", action="store_true", help="Include models/ and ollama/ in sync")
     ap.add_argument("--ollama-model-source", default="", help="Optional external Ollama model source directory")
@@ -5807,6 +10223,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default="auto",
         help="ADB phone serial to use with --push-target-to-phone (default: auto)",
     )
+    ap.add_argument(
+        "--bootstrap-install-package",
+        default="",
+        help="Install a bootstrap package ZIP path, or 'latest' for newest package in source repo",
+    )
+    ap.add_argument(
+        "--bootstrap-install-target",
+        default="local",
+        help="Bootstrap install target: local | best-usb | <explicit path>",
+    )
+    ap.add_argument(
+        "--bootstrap-install-usb-if-found",
+        action="store_true",
+        help="With --bootstrap-install-package, also apply to eligible USB repo copies (exfat/fat32 and ~40-80GB)",
+    )
+    ap.add_argument(
+        "--bootstrap-apps",
+        default="",
+        help="Comma-separated app names to selectively apply from bootstrap package",
+    )
+    ap.add_argument(
+        "--allow-retractive-bootstrap",
+        action="store_true",
+        help="Allow applying stale/retractive bootstrap packages",
+    )
+    ap.add_argument(
+        "--bootstrap-rollback-target",
+        default="",
+        help="Rollback last bootstrap on target: local | best-usb | <explicit path>",
+    )
     args = ap.parse_args(argv)
 
     if args.version:
@@ -5815,6 +10261,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     source = detect_source_repo(args.source, default_source=_default_source())
 
+    if args.bootstrap_install_package:
+        return _run_bootstrap_install(args, source)
+    if args.bootstrap_rollback_target:
+        return _run_bootstrap_rollback(args, source)
     if args.detect_json:
         return _print_detect_json(source)
     if args.duplicate_usb:

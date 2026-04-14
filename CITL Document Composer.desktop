@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=CITL Document Composer
+Comment=CITL - RTC/Whatcom Community College
+Exec=bash -c 'HERE="$(dirname "$0")"; "$HERE/CITL Document Composer.sh"' %k
+Terminal=false
+Categories=Utility;Education;
+StartupNotify=true

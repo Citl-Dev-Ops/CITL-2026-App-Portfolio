@@ -7,8 +7,58 @@ results/
 LAST_GUI_CRASH.txt
 profile/
 
+# --- build artifacts & binaries ---
+dist/
+build/
+*.exe
+*.msi
+*.dmg
+*.spec
+
+# --- portable/installer bundles ---
+PORTABLE_APPS/
+AI-TRAINING-HUB*/
+AI-TRAINING-HUB-INSTALLER*/
+CITL-Portable-Suite_*.zip
+CITL-LLM-Studio-Kit/
+CITL_Toolkit/
+CITL-UTILITIES-EASY-RUN-v2/
+*.zip
+*.7z
+*.tar.gz
+
+# --- temp & cache ---
+.edge_headless_tmp/
+tmp_decomp/
+__pycache__/
+*.py[cod]
+*.pyo
+.mypy_cache/
+.ruff_cache/
+
+# --- Word/Office lock files ---
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# --- large media / scratch ---
+Clipboard\ Image.jpg
+Clipboard Image.jpg
+recordings/
+*.mp4
+*.mkv
+*.avi
+
+# --- USB/installer tools ---
+rufus-*.exe
+BENCH_TEST_USB_SYNC_INSTALL.ps1
+
 # --- local/runtime outputs ---
 factbook-assistant/data/config.json
 factbook-assistant/data/recordings/
 factbook-assistant/*_embeddings.json
 factbook-assistant/index/
+factbook-assistant/bin/
+
+# --- claude local settings ---
+.claude/settings.local.json

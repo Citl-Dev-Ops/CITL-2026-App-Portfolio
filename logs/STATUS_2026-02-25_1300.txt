@@ -1,0 +1,36 @@
+﻿On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   scripts/bootstrap_ubuntu.sh
+	new file:   scripts/linux/run.sh
+	new file:   scripts/linux/setup.sh
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   factbook-assistant/citl_audio_ffmpeg_graceful_v2.py
+	modified:   factbook-assistant/factbook_assistant_gui.py
+	modified:   factbook-assistant/query_factbook.py
+	modified:   scripts/bootstrap_ubuntu.sh
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/
+	USB-INSTALL-CITL.cmd
+	USB-RUN-CITL.cmd
+	factbook-assistant/citl_audio_devices.py
+	factbook-assistant/citl_modelfile.py
+	factbook-assistant/citl_theme.py
+	factbook-assistant/citl_translation.py
+	factbook-assistant/factbook_assistant_gui_entry.py
+	logs/
+	requirements-all.txt
+	requirements-base.txt
+	requirements-linux.txt
+	requirements-transcribe.txt
+	requirements-translate.txt
+	requirements-windows.txt
+	scripts/windows/
+

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=CITL Sync Hub
+Comment=CITL - RTC/Whatcom Community College
+Exec=bash -c 'HERE="$(dirname "$0")"; "$HERE/CITL Sync Hub.sh"' %k
+Terminal=false
+Categories=Utility;Education;
+StartupNotify=true

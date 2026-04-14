@@ -1,0 +1,5 @@
+﻿ .../citl_audio_ffmpeg_graceful_v2.py               |  33 +-
+ factbook-assistant/factbook_assistant_gui.py       | 636 +++++++++++++++++----
+ factbook-assistant/query_factbook.py               |   1 +
+ scripts/bootstrap_ubuntu.sh                        |  51 +-
+ 4 files changed, 542 insertions(+), 179 deletions(-)

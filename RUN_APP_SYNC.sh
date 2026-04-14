@@ -40,7 +40,7 @@ LOG_FILE="$LOG_DIR/run_app_sync.log"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] RUN_APP_SYNC start"
   echo "DIR=$DIR"
   echo "PY=$PY"
-  "$PY" "$SCRIPT" --source auto
+  "$PY" "$SCRIPT" --source "$DIR"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] RUN_APP_SYNC exit=0"
 } >>"$LOG_FILE" 2>&1 || {
   RC=$?

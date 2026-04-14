@@ -1,0 +1,9 @@
+; CITL Install USB
+; Windows AutoPlay descriptor.
+; Note: AutoRun is disabled in Windows 10/11 for security.
+; This file sets the USB label and icon in Explorer,
+; and appears as an option in the AutoPlay dialog.
+[AutoRun]
+label=CITL App Suite USB
+open=START_CITL_WINDOWS.cmd
+action=Launch CITL App Suite (install or update)

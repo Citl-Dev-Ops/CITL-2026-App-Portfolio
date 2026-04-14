@@ -10,7 +10,7 @@ if (Test-Path ".\.venv\Scripts\Activate.ps1") {
   . ".\.venv\Scripts\Activate.ps1"
 }
 
-$argList = @($script, "--source", "auto") + $args
+$argList = @($script, "--source", ".") + $args
 
 if (Test-Path ".\.venv\Scripts\python.exe") {
   & ".\.venv\Scripts\python.exe" @argList

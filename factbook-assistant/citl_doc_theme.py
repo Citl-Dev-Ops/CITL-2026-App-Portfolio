@@ -2,12 +2,12 @@
 """
 citl_doc_theme.py
 CITL document print theme: colors, fonts, python-docx style application,
-and font installation from the E READER REPO font pack.
+style presets, and font installation from repo/external font packs.
 """
 from __future__ import annotations
 import ctypes, os, re, shutil, sys
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 # ── Font pack location ────────────────────────────────────────────────────────
 FONT_PACK = Path(r"C:\00 HENOSIS CODING PROJECTS\E READER REPO\fonts\reader-pack")
@@ -42,6 +42,155 @@ FONT_FILES = {
         "FranklinGothic Bold Italic.ttf",
     ],
 }
+
+_HERE = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    _env_repo = os.environ.get("CITL_REPO", "").strip()
+    if _env_repo and Path(_env_repo).is_dir():
+        REPO = Path(_env_repo)
+    else:
+        REPO = Path(sys.executable).resolve().parent.parent.parent
+else:
+    REPO = _HERE.parent
+
+# Repo-native font library for Doc Composer.
+REPO_FONT_PACK = REPO / "factbook-assistant" / "fonts" / "doc_composer"
+
+# External/legacy sources used for curated import fallback.
+APOTHECARY_FONT_PACK = Path(
+    r"M:\00 FONTS FONTS FONTS\QSL CARD FONTS\VINTAGE HEADER AND SUBHEADER\Apothecary Font Collection"
+)
+
+FONT_SOURCE_DIRS: Tuple[Path, ...] = (
+    REPO_FONT_PACK,
+    FONT_PACK,
+    APOTHECARY_FONT_PACK,
+)
+
+DOC_STYLE_PRESETS: Dict[str, Dict[str, str]] = {
+    "CITL Classic": {
+        "body": "Berthold Baskerville",
+        "heading": "Cheltenham",
+        "caption": "Franklin Gothic Book",
+        "fallback": "Georgia",
+    },
+    "State Grant Serif": {
+        # Always-available Georgia — no font installation required.
+        # Navy / maroon palette. Suitable for grant proposals and policy briefs.
+        "body":     "Georgia",
+        "heading":  "Georgia",
+        "caption":  "Franklin Gothic Book",
+        "fallback": "Georgia",
+    },
+    "Executive Sans": {
+        "body": "Helvetica",
+        "heading": "Avenir Next",
+        "caption": "FF DIN",
+        "fallback": "Arial",
+    },
+    "Humanist Professional": {
+        "body": "Frutiger",
+        "heading": "Avenir",
+        "caption": "Trade Gothic",
+        "fallback": "Arial",
+    },
+    "Editorial Modern": {
+        "body": "Proxima Nova",
+        "heading": "Futura",
+        "caption": "Univers",
+        "fallback": "Arial",
+    },
+    "Contemporary Clean": {
+        "body": "Century Gothic",
+        "heading": "Avenir Next",
+        "caption": "Arial",
+        "fallback": "Arial",
+    },
+    "Staff Walkthrough Blue": {
+        "body": "Avenir Next",
+        "heading": "Helvetica",
+        "caption": "Arial",
+        "fallback": "Arial",
+    },
+}
+DOC_STYLE_NAMES: List[str] = list(DOC_STYLE_PRESETS.keys())
+DEFAULT_DOC_STYLE = "Executive Sans"
+_ACTIVE_DOC_STYLE = DEFAULT_DOC_STYLE
+
+FONT_MATCH_RULES: Dict[str, List[Tuple[str, ...]]] = {
+    "Berthold Baskerville": [("berthold", "baskerville"), ("baskerville",)],
+    "Cheltenham": [("cheltenham",)],
+    "Franklin Gothic Book": [("franklin", "gothic"), ("franklingothic",)],
+    "Helvetica": [("helvetica",), ("lte5",)],
+    "Avenir": [("avenir",)],
+    "Avenir Next": [("avenirnext",), ("avenir", "next")],
+    "FF DIN": [("dinpro",), ("ff", "din"), ("din", "next")],
+    "Frutiger": [("frutiger",)],
+    "Trade Gothic": [("trade", "gothic")],
+    "Univers": [("univers",)],
+    "Proxima Nova": [("proxima", "nova")],
+    "Futura": [("futura",)],
+    "Century Gothic": [("century", "gothic"), ("centurygothic",)],
+    "Arial": [("arial",)],
+    "Georgia": [("georgia",)],
+}
+FONT_FILE_EXTS = {".ttf", ".otf", ".ttc"}
+MAX_FILES_PER_FAMILY = 40
+
+
+def get_doc_style_names() -> List[str]:
+    return list(DOC_STYLE_NAMES)
+
+
+def _style_payload(style_name: Optional[str] = None) -> Dict[str, str]:
+    key = (style_name or _ACTIVE_DOC_STYLE).strip()
+    if key not in DOC_STYLE_PRESETS:
+        key = DEFAULT_DOC_STYLE
+    payload = dict(DOC_STYLE_PRESETS[key])
+    payload["style"] = key
+    return payload
+
+
+def get_active_doc_style() -> str:
+    return _ACTIVE_DOC_STYLE
+
+
+def get_doc_style_fonts(style_name: Optional[str] = None) -> Dict[str, str]:
+    return _style_payload(style_name)
+
+
+def set_doc_style(style_name: Optional[str] = None) -> Dict[str, str]:
+    global _ACTIVE_DOC_STYLE, FONT_BODY, FONT_BODY_B, FONT_BODY_I
+    global FONT_HEAD, FONT_CAPTION, FONT_FALLBACK
+    payload = _style_payload(style_name)
+    _ACTIVE_DOC_STYLE = payload["style"]
+    FONT_BODY = payload["body"]
+    FONT_BODY_B = payload["body"]
+    FONT_BODY_I = payload["body"]
+    FONT_HEAD = payload["heading"]
+    FONT_CAPTION = payload["caption"]
+    FONT_FALLBACK = payload["fallback"]
+    return payload
+
+
+def get_required_families(style_name: Optional[str] = None, include_all_styles: bool = False) -> List[str]:
+    if include_all_styles:
+        families = set()
+        for item in DOC_STYLE_PRESETS.values():
+            families.add(item["body"])
+            families.add(item["heading"])
+            families.add(item["caption"])
+        return sorted(families)
+    payload = _style_payload(style_name)
+    return [payload["body"], payload["heading"], payload["caption"]]
+
+
+def get_missing_fonts(style_name: Optional[str] = None) -> List[str]:
+    return [f for f in get_required_families(style_name) if not is_font_installed(f)]
+
+
+# Initialize active style constants for import-time consumers.
+set_doc_style(DEFAULT_DOC_STYLE)
 
 # ── CITL print color palette ──────────────────────────────────────────────────
 # Used as RGBColor(r, g, b) in python-docx calls
@@ -86,50 +235,107 @@ def is_font_installed(family: str) -> bool:
     return False
 
 
-def install_citl_fonts(log=print) -> dict:
+def _iter_font_sources() -> Iterable[Path]:
+    for src in FONT_SOURCE_DIRS:
+        if src and src.exists():
+            yield src
+
+
+def _scan_source_font_files() -> List[Path]:
+    files: List[Path] = []
+    for src in _iter_font_sources():
+        for p in src.rglob("*"):
+            if p.is_file() and p.suffix.lower() in FONT_FILE_EXTS:
+                files.append(p)
+    return files
+
+
+def _matches_family(file_name: str, family: str) -> bool:
+    name = file_name.lower()
+    rules = FONT_MATCH_RULES.get(family, [(family.lower(),)])
+    for rule in rules:
+        if all(token in name for token in rule):
+            return True
+    return False
+
+
+def _family_candidates(family: str, all_files: List[Path]) -> List[Path]:
+    picks = [p for p in all_files if _matches_family(p.name, family)]
+    picks.sort(key=lambda p: (len(p.name), p.name.lower()))
+    uniq: List[Path] = []
+    seen = set()
+    for p in picks:
+        key = p.name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(p)
+    return uniq[:MAX_FILES_PER_FAMILY]
+
+
+def install_citl_fonts(
+    log=print,
+    style_name: Optional[str] = None,
+    include_all_styles: bool = True,
+) -> dict:
     """
-    Install all CITL reader-pack fonts for the current user (no admin needed).
-    Copies TTFs to %LOCALAPPDATA%\\Microsoft\\Windows\\Fonts and registers them.
-    Returns {font_file: True/False} success map.
+    Install Doc Composer fonts for current user (Windows, no admin).
+    Sources are searched in repo pack first, then legacy/external locations.
+    Returns {font_key: True/False} success map.
     """
     if sys.platform != "win32":
         log("[SKIP] Font install is Windows-only.")
         return {}
-    if not FONT_PACK.exists():
-        log(f"[WARN] Font pack not found: {FONT_PACK}")
+
+    source_roots = list(_iter_font_sources())
+    if not source_roots:
+        log("[WARN] No font source folders found.")
         return {}
 
     import winreg
+
     font_dir = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Windows" / "Fonts"
     font_dir.mkdir(parents=True, exist_ok=True)
 
+    all_files = _scan_source_font_files()
+    families = get_required_families(style_name, include_all_styles=include_all_styles)
     results = {}
-    all_ttfs = [f for fam in FONT_FILES.values() for f in fam]
-    for ttf_name in all_ttfs:
-        src = FONT_PACK / ttf_name
-        if not src.exists():
-            log(f"[MISS] {ttf_name}")
-            results[ttf_name] = False
+    installed_any = False
+
+    for family in families:
+        candidates = _family_candidates(family, all_files)
+        if not candidates:
+            key = f"{family}::(missing)"
+            results[key] = False
+            log(f"[MISS] {family}: no matching font files found in configured sources.")
             continue
-        dst = font_dir / ttf_name
+
+        for src in candidates:
+            dst = font_dir / src.name
+            result_key = f"{family}::{src.name}"
+            try:
+                if not dst.exists():
+                    shutil.copy2(src, dst)
+                with winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts",
+                    access=winreg.KEY_SET_VALUE,
+                ) as k:
+                    label_kind = "OpenType" if src.suffix.lower() == ".otf" else "TrueType"
+                    label = f"{src.stem} ({label_kind})"
+                    winreg.SetValueEx(k, label, 0, winreg.REG_SZ, str(dst))
+                ctypes.windll.gdi32.AddFontResourceW(str(dst))
+                results[result_key] = True
+                installed_any = True
+            except Exception as exc:
+                results[result_key] = False
+                log(f"[ERR] {result_key}: {exc}")
+
+    if installed_any:
         try:
-            shutil.copy2(src, dst)
-            # Register in user font registry
-            with winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts",
-                access=winreg.KEY_SET_VALUE,
-            ) as k:
-                label = f"{src.stem} (TrueType)"
-                winreg.SetValueEx(k, label, 0, winreg.REG_SZ, str(dst))
-            # Notify GDI (temporary session load)
-            ctypes.windll.gdi32.AddFontResourceW(str(dst))
             ctypes.windll.user32.SendMessageW(0xFFFF, 0x001D, 0, 0)
-            log(f"[OK]   {ttf_name}")
-            results[ttf_name] = True
-        except Exception as exc:
-            log(f"[ERR]  {ttf_name}: {exc}")
-            results[ttf_name] = False
+        except Exception:
+            pass
     return results
 
 
@@ -139,7 +345,7 @@ def resolve_font(preferred: str) -> str:
 
 
 # ── python-docx style application ────────────────────────────────────────────
-def apply_citl_styles(doc) -> None:
+def apply_citl_styles(doc, style_name: Optional[str] = None) -> None:
     """
     Apply CITL print styles to a python-docx Document.
     Must be called before adding any content.
@@ -149,9 +355,13 @@ def apply_citl_styles(doc) -> None:
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
 
-    body_font    = resolve_font(FONT_BODY)
-    heading_font = resolve_font(FONT_HEAD)
-    caption_font = resolve_font(FONT_CAPTION)
+    payload = set_doc_style(style_name) if style_name else get_doc_style_fonts()
+    body_font = resolve_font(payload["body"])
+    heading_font = resolve_font(payload["heading"])
+    caption_font = resolve_font(payload["caption"])
+    is_staff_walkthrough = payload.get("style") == "Staff Walkthrough Blue"
+    walkthrough_blue = (0x2E, 0x75, 0xB6)   # From "Staff Bot Creation Walkthrough" heading tone.
+    walkthrough_gray = (0x55, 0x55, 0x55)
 
     # ---- Page layout --------------------------------------------------------
     sec = doc.sections[0]
@@ -175,8 +385,8 @@ def apply_citl_styles(doc) -> None:
     h1f = h1.font
     h1f.name  = heading_font
     h1f.bold  = True
-    h1f.size  = Pt(18)
-    h1f.color.rgb = RGBColor(*PAL.SLATE_DARK)
+    h1f.size  = Pt(15.5 if is_staff_walkthrough else 18)
+    h1f.color.rgb = RGBColor(*(walkthrough_blue if is_staff_walkthrough else PAL.SLATE_DARK))
     h1f.underline = False
     h1.paragraph_format.space_before = Pt(18)
     h1.paragraph_format.space_after  = Pt(6)
@@ -187,8 +397,8 @@ def apply_citl_styles(doc) -> None:
     h2f = h2.font
     h2f.name  = heading_font
     h2f.bold  = False
-    h2f.size  = Pt(14)
-    h2f.color.rgb = RGBColor(*PAL.SLATE_MED)
+    h2f.size  = Pt(12 if is_staff_walkthrough else 14)
+    h2f.color.rgb = RGBColor(*(walkthrough_blue if is_staff_walkthrough else PAL.SLATE_MED))
     h2f.underline = False
     h2.paragraph_format.space_before = Pt(12)
     h2.paragraph_format.space_after  = Pt(4)
@@ -213,9 +423,9 @@ def apply_citl_styles(doc) -> None:
     except KeyError:
         cap = doc.styles.add_style("Caption", 1)
     cap.font.name  = caption_font
-    cap.font.size  = Pt(9)
+    cap.font.size  = Pt(9.5 if is_staff_walkthrough else 9)
     cap.font.italic = True
-    cap.font.color.rgb = RGBColor(*PAL.CAPTION)
+    cap.font.color.rgb = RGBColor(*(walkthrough_gray if is_staff_walkthrough else PAL.CAPTION))
     cap.paragraph_format.space_after = Pt(8)
 
     # ---- Header / Footer ----------------------------------------------------
@@ -423,9 +633,11 @@ def add_cover_page(doc, meta: dict) -> None:
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
 
-    heading_font = resolve_font(FONT_HEAD)
-    body_font    = resolve_font(FONT_BODY)
-    caption_font = resolve_font(FONT_CAPTION)
+    style_name = (meta or {}).get("doc_style") if isinstance(meta, dict) else None
+    payload = set_doc_style(style_name) if style_name else get_doc_style_fonts()
+    heading_font = resolve_font(payload["heading"])
+    body_font = resolve_font(payload["body"])
+    caption_font = resolve_font(payload["caption"])
 
     def _centered(text, font, size, bold=False, color=PAL.BODY_BLACK, space_before=0, space_after=6):
         p = doc.add_paragraph()
@@ -521,3 +733,251 @@ def _set_cell_border(cell, color: str) -> None:
         bdr.set(qn("w:color"), color.lstrip("#"))
         tcBdr.append(bdr)
     tcPr.append(tcBdr)
+
+
+# ── Grant / Proposal style helpers ────────────────────────────────────────────
+# These are used by the Doc Composer when the "State Grant Serif" style is
+# active and by the standalone _build_grant_doc.py builder script.
+
+class _GrantPalette:
+    """Navy / maroon / gold palette used for grant and policy documents."""
+    NAVY        = (0x1C, 0x34, 0x54)   # deep navy — main headings
+    MAROON      = (0x7B, 0x0C, 0x1A)   # RTC maroon — Part headings
+    GOLD        = (0xB8, 0x8A, 0x00)   # gold accent
+    BODY        = (0x1E, 0x1E, 0x1E)   # near-black body
+    MUTED       = (0x4A, 0x4A, 0x4A)   # footer / captions
+    WHITE       = (0xFF, 0xFF, 0xFF)
+    NAVY_HEX    = "1C3454"
+    MAROON_HEX  = "7B0C1A"
+    INFO_FILL   = "EDF2F7"             # pale blue info-box background
+    KW_FILL     = "F5F0E8"            # tan keyword-block background
+    TBL_HEAD    = "1C3454"             # table header fill
+    TBL_ALT     = "F0F4F8"            # alternating row
+
+GRANT_PAL = _GrantPalette()
+_GRANT_BODY_FONT = "Georgia"
+_GRANT_HEAD_FONT = "Georgia"
+_GRANT_MONO_FONT = "Courier New"
+_GRANT_CAPT_FONT = "Franklin Gothic Book"
+
+
+def _grant_font(family: str) -> str:
+    """Return family if installed, else Georgia."""
+    return family if is_font_installed(family) else "Georgia"
+
+
+def add_grant_cover_page(
+    doc,
+    title: str,
+    subtitle: str,
+    institution: str = "Center for Instructional Technology and Learning (CITL)",
+    college: str = "Renton Technical College",
+    prepared_for: str = "",
+    purpose: str = "",
+) -> None:
+    """
+    Build a grant-style title page: large serif title, ruled divider,
+    institution block, and a shaded "Prepared for / Purpose" box.
+    """
+    from docx.shared import Pt, RGBColor, Inches
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    hf = _grant_font(_GRANT_HEAD_FONT)
+    bf = _grant_font(_GRANT_BODY_FONT)
+
+    def _cen(text, font, size, bold=False, italic=False,
+             color=GRANT_PAL.NAVY, before=0, after=6):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(before)
+        p.paragraph_format.space_after  = Pt(after)
+        r = p.add_run(text)
+        r.font.name   = font
+        r.font.size   = Pt(size)
+        r.font.bold   = bold
+        r.font.italic = italic
+        r.font.color.rgb = RGBColor(*color)
+        return p
+
+    # Spacer
+    for _ in range(3):
+        sp = doc.add_paragraph()
+        sp.paragraph_format.space_after = Pt(0)
+
+    _cen(title,    hf, 22, bold=True, before=0, after=8)
+    _cen(subtitle, hf, 13, italic=True, color=GRANT_PAL.MAROON, after=12)
+
+    # Ruled divider
+    rule_p = doc.add_paragraph()
+    rule_p.paragraph_format.space_before = Pt(8)
+    rule_p.paragraph_format.space_after  = Pt(8)
+    _add_para_border(rule_p, side="bottom", color=GRANT_PAL.NAVY_HEX, sz="6")
+
+    _cen(institution, hf, 11, bold=True, after=4)
+    _cen(college,     hf, 11, bold=True, after=12)
+
+    # "Prepared for / Purpose" info box
+    if prepared_for or purpose:
+        for label, body in [
+            ("Prepared for: ", prepared_for),
+            ("Document purpose: ", purpose),
+        ]:
+            if not body:
+                continue
+            p = doc.add_paragraph()
+            p.paragraph_format.left_indent  = Inches(0.5)
+            p.paragraph_format.right_indent = Inches(0.5)
+            p.paragraph_format.space_after  = Pt(5)
+            _set_para_shading(p, GRANT_PAL.INFO_FILL)
+            rl = p.add_run(label)
+            rl.font.name  = bf
+            rl.font.size  = Pt(10)
+            rl.font.bold  = True
+            rl.font.color.rgb = RGBColor(*GRANT_PAL.NAVY)
+            rb = p.add_run(body)
+            rb.font.name  = bf
+            rb.font.size  = Pt(10)
+            rb.font.color.rgb = RGBColor(*GRANT_PAL.BODY)
+
+    doc.add_page_break()
+
+
+def _set_para_shading(para, fill_hex: str) -> None:
+    """Apply a background shading fill to a paragraph."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    pPr = para._p.get_or_add_pPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"),   "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"),  fill_hex.lstrip("#"))
+    pPr.append(shd)
+
+
+def add_grant_part_heading(doc, text: str) -> None:
+    """
+    Part I / Part II heading — maroon all-caps with a bottom rule.
+    """
+    from docx.shared import Pt, RGBColor
+    hf = _grant_font(_GRANT_HEAD_FONT)
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(18)
+    p.paragraph_format.space_after  = Pt(4)
+    r = p.add_run(text.upper())
+    r.font.name  = hf
+    r.font.size  = Pt(13)
+    r.font.bold  = True
+    r.font.color.rgb = RGBColor(*GRANT_PAL.MAROON)
+    _add_para_border(p, side="bottom", color=GRANT_PAL.MAROON_HEX, sz="4")
+
+
+def add_grant_app_banner(doc, text: str) -> None:
+    """
+    APP N: Title — navy filled banner with white text.
+    """
+    from docx.shared import Pt, RGBColor, Inches
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    hf = _grant_font(_GRANT_HEAD_FONT)
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(16)
+    p.paragraph_format.space_after  = Pt(4)
+    p.paragraph_format.left_indent  = Inches(0)
+    _set_para_shading(p, GRANT_PAL.NAVY_HEX)
+    r = p.add_run("  " + text + "  ")
+    r.font.name  = hf
+    r.font.size  = Pt(11)
+    r.font.bold  = True
+    r.font.color.rgb = RGBColor(*GRANT_PAL.WHITE)
+
+
+def add_grant_info_box(doc, label: str, body_text: str) -> None:
+    """
+    Shaded info / callout box with a bold navy label.
+    Useful for "Prepared for:", "Note:", "Important:" blocks.
+    """
+    from docx.shared import Pt, RGBColor, Inches
+    bf = _grant_font(_GRANT_BODY_FONT)
+    p = doc.add_paragraph()
+    p.paragraph_format.left_indent  = Inches(0.35)
+    p.paragraph_format.right_indent = Inches(0.35)
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after  = Pt(8)
+    _set_para_shading(p, GRANT_PAL.INFO_FILL)
+    rl = p.add_run(label + "  ")
+    rl.font.name  = bf
+    rl.font.size  = Pt(10)
+    rl.font.bold  = True
+    rl.font.color.rgb = RGBColor(*GRANT_PAL.NAVY)
+    rb = p.add_run(body_text)
+    rb.font.name  = bf
+    rb.font.size  = Pt(10)
+    rb.font.color.rgb = RGBColor(*GRANT_PAL.BODY)
+
+
+def add_grant_keyword_block(doc, keywords: str) -> None:
+    """
+    Tan-shaded keyword display block — bold navy label + Courier New keywords.
+    Use for resume/job-board keyword sections.
+    """
+    from docx.shared import Pt, RGBColor, Inches
+    bf = _grant_font(_GRANT_BODY_FONT)
+    p = doc.add_paragraph()
+    p.paragraph_format.left_indent  = Inches(0.35)
+    p.paragraph_format.right_indent = Inches(0.35)
+    p.paragraph_format.space_before = Pt(4)
+    p.paragraph_format.space_after  = Pt(10)
+    _set_para_shading(p, GRANT_PAL.KW_FILL)
+    rl = p.add_run("Resume / Job-Board Keywords:  ")
+    rl.font.name  = bf
+    rl.font.size  = Pt(9.5)
+    rl.font.bold  = True
+    rl.font.color.rgb = RGBColor(*GRANT_PAL.NAVY)
+    rb = p.add_run(keywords)
+    rb.font.name  = _GRANT_MONO_FONT
+    rb.font.size  = Pt(9)
+    rb.font.color.rgb = RGBColor(*GRANT_PAL.MAROON)
+
+
+def add_grant_skills_table(doc, rows: list) -> None:
+    """
+    Build a styled grant skills/alignment table.
+    rows: list of lists of strings. First row is treated as header.
+    """
+    from docx.shared import Pt, RGBColor, Inches
+    from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    if not rows:
+        return
+    n_cols = len(rows[0])
+    table  = doc.add_table(rows=len(rows), cols=n_cols)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.style = "Table Grid"
+
+    bf  = _grant_font(_GRANT_BODY_FONT)
+    alt = (0xF0, 0xF4, 0xF8)
+
+    for r_i, row_data in enumerate(rows):
+        row = table.rows[r_i]
+        for c_i, cell_text in enumerate(row_data):
+            cell = row.cells[c_i]
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            # Background fill
+            fill = GRANT_PAL.TBL_HEAD if r_i == 0 else (GRANT_PAL.TBL_ALT if r_i % 2 == 1 else "FFFFFF")
+            _set_cell_shading(cell, fill)
+            para = cell.paragraphs[0]
+            para.paragraph_format.left_indent = Inches(0.06)
+            para.paragraph_format.space_before = Pt(3)
+            para.paragraph_format.space_after  = Pt(3)
+            run = para.add_run(cell_text.strip())
+            run.font.name  = bf
+            run.font.size  = Pt(9.5)
+            run.font.bold  = (r_i == 0)
+            run.font.color.rgb = RGBColor(
+                *(GRANT_PAL.WHITE if r_i == 0 else (0x1E, 0x1E, 0x1E))
+            )
+    doc.add_paragraph()
