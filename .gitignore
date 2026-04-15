@@ -3,6 +3,13 @@
 venv/
 ~/
 results/
+
+# --- large runtime dependencies (install via bootstrap scripts) ---
+node_modules/
+ollama/
+models/
+.ollama/
+ollama-data/
 *.bak_*
 LAST_GUI_CRASH.txt
 profile/
