@@ -19,6 +19,25 @@ from tkinter import ttk
 # ---------------------------------------------------------------------------
 
 _PALETTES = {
+    # CITL FLEX Troubleshooter: teal/cyan ops room theme.
+    "teal_ops": {
+        "bg":         "#071A1E",
+        "fg":         "#C8E8EC",
+        "accent":     "#00C8A8",
+        "highlight":  "#0A3040",
+        "button_bg":  "#0D2838",
+        "button_fg":  "#B8E8E4",
+        "entry_bg":   "#041214",
+        "entry_fg":   "#C0E4E8",
+        "text_bg":    "#041214",
+        "text_fg":    "#B4DCE0",
+        "select_bg":  "#005A4A",
+        "select_fg":  "#FFFFFF",
+        "tab_bg":     "#0A2030",
+        "tab_fg":     "#80BCBF",
+        "status_fg":  "#00E5C8",
+        "cursor":     "#00E5C8",
+    },
     # Default: institution crimson + graphite gray.
     "ops": {
         "bg":         "#111317",
@@ -262,6 +281,7 @@ _PALETTES = {
 PALETTE_NAMES: list = list(_PALETTES.keys())
 
 PALETTE_DISPLAY: dict = {
+    "teal_ops":      "Teal Ops (FLEX Troubleshooter)",
     "ops":           "Crimson Ops (default)",
     "graphite":      "Graphite Dark (low glare)",
     "soft_midnight": "Soft Midnight (low contrast)",
