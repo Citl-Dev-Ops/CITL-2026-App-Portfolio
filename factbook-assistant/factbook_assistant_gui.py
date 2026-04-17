@@ -146,10 +146,22 @@ def _transcribe_wav(path: str, lang_mode: str) -> tuple:
 # ── Factbook query ─────────────────────────────────────────────────────────
 def _query_factbook(question: str, model: str, host: str) -> str:
     try:
-        from citl_factbook_query import answer_question
-        return answer_question(question, model=model, ollama_host=host)
+        from citl_rag_patch import resilient_answer
+        return resilient_answer(question, model=model, host=host)
     except Exception as e:
-        return f"[Factbook error: {e}]"
+        # Last-resort: try original path before giving up
+        try:
+            from citl_factbook_query import answer_question
+            return answer_question(question, model=model, ollama_host=host)
+        except Exception:
+            pass
+        return (
+            f"Query failed: {e}\n\n"
+            "Checklist:\n"
+            "• Is Ollama running?  →  ollama serve\n"
+            "• Go to Library/Models tab → Rebuild Index\n"
+            "• Check the Corpus Health tab for details"
+        )
 # ── Utilities ──────────────────────────────────────────────────────────────
 def _which_ollama() -> Optional[str]:
     return shutil.which("ollama")
@@ -221,6 +233,12 @@ class App(tk.Tk):
         self._corpus_health_report = None
         self.after(1800, self._maybe_offer_usb_sync)
         self.after(2200, self._auto_index_on_startup)
+        # Resilience patch: validate index + Ollama on startup, update status bar
+        try:
+            from citl_rag_patch import attach_startup_check
+            self.after(800, lambda: attach_startup_check(self))
+        except Exception:
+            pass
 
     # ── UI ────────────────────────────────────────────────────────────────
     def _build_ui(self) -> None:
@@ -335,6 +353,14 @@ class App(tk.Tk):
 
         def _worker():
             try:
+                # Auto-deploy FLEX app to any connected exFAT/FAT removable drives
+                try:
+                    script = REPO_ROOT / "scripts" / "sync_flex_to_exfat.py"
+                    if script.exists():
+                        subprocess.Popen([sys.executable, str(script)])
+                except Exception:
+                    pass
+
                 targets = _discover_sync_targets(REPO_ROOT)
             except Exception:
                 return
@@ -1739,18 +1765,35 @@ class App(tk.Tk):
     # ── Startup auto-index ────────────────────────────────────────────────
 
     def _auto_index_on_startup(self) -> None:
-        """On launch, silently rebuild any stale JSONL indexes in library_raw/."""
+        """On launch, rebuild stale JSONL indexes; force-rebuild if index is thin."""
         def _worker():
             try:
                 from citl_auto_index import auto_index_library, LIB_RAW, IDX_DIR
-                results = auto_index_library(lib_dir=LIB_RAW, idx_dir=IDX_DIR)
+                from citl_rag_patch import _count_all_chunks, _writable_dir
+
+                # Use a writable dir (handles read-only USB)
+                writable = _writable_dir()
+                existing = _count_all_chunks()
+
+                # Force rebuild if fewer than 10 chunks exist regardless of mtime
+                force = existing < 10
+                results = auto_index_library(lib_dir=LIB_RAW, idx_dir=writable, force=force)
+
                 if results:
                     summary = ", ".join(f"{n}: {c} chunks" for n, c in results.items())
                     self.after(0, lambda s=summary:
                         _append(self.idx_log, f"\n[Auto-index] Rebuilt: {s}\n"))
+                    total = sum(results.values())
+                    self.after(0, lambda t=total: self.fb_status_var.set(
+                        f"Index ready — {t:,} total chunks indexed."))
+                elif existing < 10:
+                    self.after(0, lambda: self.fb_status_var.set(
+                        "⚠  Index empty — add documents to data/library_raw/ and rebuild."))
             except Exception as e:
-                self.after(0, lambda: _append(self.idx_log,
-                                              f"\n[Auto-index] {e}\n"))
+                self.after(0, lambda err=str(e): (
+                    _append(self.idx_log, f"\n[Auto-index] {err}\n"),
+                    self.fb_status_var.set(f"⚠  Auto-index error: {err[:80]}")
+                ))
         threading.Thread(target=_worker, daemon=True).start()
 
     # ── Tick ───────────────────────────────────────────────────────────────
