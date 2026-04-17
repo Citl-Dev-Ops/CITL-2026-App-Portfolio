@@ -250,6 +250,7 @@ class App(tk.Tk):
         self._build_translate_tab()
         self._build_library_models_tab()  # RESTORED
         self._build_corpus_health_tab()
+        self._build_heal_tab()
 
     def _build_toolbar(self) -> None:
         bar = ttk.Frame(self)
@@ -1761,6 +1762,32 @@ class App(tk.Tk):
         self.fb_health_var.set(text)
         color_map = {"OK": "#2e7d32", "WARNING": "#e65100", "ERROR": "#c62828"}
         self.fb_health_label.configure(foreground=color_map.get(report.overall_status, "gray"))
+
+    # ── Tab 6: System Diagnostics & Self-Heal ─────────────────────────────
+
+    def _build_heal_tab(self) -> None:
+        tab = ttk.Frame(self.notebook, padding=4)
+        self.notebook.add(tab, text=" System Heal ")
+        try:
+            from citl_heal_panel import HealPanel
+            pal = {}
+            if _HAS_THEME:
+                try:
+                    pname = self.cfg.get("theme", "dark")
+                    pal = _theme.PALETTES.get(pname, {})
+                except Exception:
+                    pass
+            panel = HealPanel(tab, theme=pal or None, quick=False)
+            panel.pack(fill="both", expand=True)
+        except Exception as e:
+            import tkinter.scrolledtext as _st
+            lbl = _st.ScrolledText(tab, height=6, wrap="word", state="normal")
+            lbl.insert("end",
+                f"System Heal panel unavailable: {e}\n\n"
+                "Make sure citl_heal.py and citl_heal_panel.py are in the\n"
+                "factbook-assistant/ directory.\n")
+            lbl.configure(state="disabled")
+            lbl.pack(fill="both", expand=True)
 
     # ── Startup auto-index ────────────────────────────────────────────────
 

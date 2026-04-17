@@ -215,6 +215,7 @@ class FlexTroubleshooterApp(tk.Tk):
         self._build_index_tab(nb)
         self._build_models_tab(nb)
         self._build_settings_tab(nb)
+        self._build_heal_tab(nb)
 
         self._statusbar = tk.Label(self, text="Ready — FLEX corpus loaded.",
                                    anchor=tk.W, padx=6, pady=2,
@@ -1159,6 +1160,27 @@ class FlexTroubleshooterApp(tk.Tk):
         self._theme_status()
         self._log(self._set_log, "Settings saved.\n", "ok")
         self._status("Settings saved.")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TAB 7 — System Diagnostics & Self-Heal
+    # ─────────────────────────────────────────────────────────────────────────
+    def _build_heal_tab(self, nb):
+        f = ttk.Frame(nb, padding=4)
+        nb.add(f, text=" System Heal ")
+        try:
+            from citl_heal_panel import HealPanel
+            pal = {}
+            if _HAS_THEME:
+                try:
+                    pal = _theme.PALETTES.get(self._palette_name, {})
+                except Exception:
+                    pass
+            panel = HealPanel(f, theme=pal or None, quick=False)
+            panel.pack(fill=tk.BOTH, expand=True)
+        except Exception as e:
+            ttk.Label(f, text=f"Heal panel unavailable: {e}\n\n"
+                              "Install citl_heal.py and citl_heal_panel.py in the factbook-assistant folder.",
+                      wraplength=600, justify="left").pack(padx=20, pady=20)
 
 
 # ── Common port names ─────────────────────────────────────────────────────────
