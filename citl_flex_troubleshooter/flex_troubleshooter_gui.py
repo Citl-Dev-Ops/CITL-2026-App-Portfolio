@@ -1167,6 +1167,138 @@ class FlexTroubleshooterApp(tk.Tk):
     def _build_heal_tab(self, nb):
         f = ttk.Frame(nb, padding=4)
         nb.add(f, text=" System Heal ")
+
+        sub_nb = ttk.Notebook(f)
+        sub_nb.pack(fill=tk.BOTH, expand=True)
+
+        # ── Sub-tab 1: Pipeline Diagnostic ────────────────────────────────
+        diag_f = ttk.Frame(sub_nb, padding=4)
+        sub_nb.add(diag_f, text=" Pipeline Diagnostic ")
+
+        try:
+            from citl_factbook_diagnostic import run_diagnostic, StepResult as SR
+            _HAS_DIAG = True
+        except ImportError:
+            _HAS_DIAG = False
+
+        if not _HAS_DIAG:
+            ttk.Label(diag_f,
+                      text="citl_factbook_diagnostic.py not found in factbook-assistant/",
+                      wraplength=500).pack(padx=20, pady=20)
+        else:
+            diag_sv = tk.StringVar(value="Click 'Run' to test the full pipeline.")
+            tk.Label(diag_f, textvariable=diag_sv,
+                     font=("Consolas", 9), anchor="w").pack(fill=tk.X)
+
+            canv = tk.Canvas(diag_f, highlightthickness=0)
+            vsb = ttk.Scrollbar(diag_f, orient="vertical", command=canv.yview)
+            sf = tk.Frame(canv)
+            sf.bind("<Configure>",
+                    lambda e: canv.configure(scrollregion=canv.bbox("all")))
+            canv.create_window((0, 0), window=sf, anchor="nw")
+            canv.configure(yscrollcommand=vsb.set)
+            vsb.pack(side=tk.RIGHT, fill=tk.Y)
+            canv.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+            dlog = scrolledtext.ScrolledText(diag_f, height=4, state="disabled",
+                                             font=("Consolas", 8))
+            dlog.pack(fill=tk.X)
+
+            def _dlog(line: str):
+                def _d():
+                    dlog.configure(state="normal")
+                    dlog.insert("end", line + "\n")
+                    dlog.configure(state="disabled")
+                    dlog.see("end")
+                self.after(0, _d)
+
+            _DOTC = {"pass": "green", "fail": "red", "warn": "orange", "skip": "gray"}
+            _store = []
+            _cnts = {"pass": 0, "fail": 0, "warn": 0, "skip": 0}
+
+            def _add(r: SR):
+                def _ui():
+                    c = _DOTC.get(r.status, "gray")
+                    row = tk.Frame(sf)
+                    row.pack(fill=tk.X, pady=1)
+                    tk.Label(row, text="●", fg=c,
+                             font=("Consolas", 11)).pack(side=tk.LEFT, padx=(4, 4))
+                    inf = tk.Frame(row)
+                    inf.pack(side=tk.LEFT, fill=tk.X, expand=True)
+                    tk.Label(inf,
+                             text=f"[{r.status.upper():4s}] S{r.stage:02d}: {r.name}",
+                             font=("Consolas", 8, "bold"), fg=c, anchor="w").pack(anchor="w")
+                    fl = r.detail.split("\n")[0][:90]
+                    tk.Label(inf, text=fl, font=("Consolas", 8), anchor="w",
+                             wraplength=350, justify="left").pack(anchor="w")
+                    bfr = tk.Frame(row)
+                    bfr.pack(side=tk.RIGHT, padx=2)
+                    _ex = [False]; _df2 = [None]
+                    def _tog(rr=r, ex=_ex, df=_df2, p=inf):
+                        if ex[0]:
+                            if df[0]: df[0].destroy(); df[0] = None; ex[0] = False
+                        else:
+                            df[0] = tk.Frame(p, bg="#111")
+                            df[0].pack(fill=tk.X)
+                            tk.Label(df[0], text=rr.detail, font=("Consolas", 7),
+                                     wraplength=460, justify="left",
+                                     bg="#111", fg="#ccc").pack(anchor="w")
+                            ex[0] = True
+                    tk.Button(bfr, text="Detail", relief="flat", padx=3,
+                               font=("Consolas", 7), command=_tog).pack(side=tk.LEFT)
+                    if r.fix_fn and not r.passed:
+                        def _fix(rr=r):
+                            def _bg():
+                                try:
+                                    ok = rr.fix_fn(rr, _dlog)
+                                    self.after(0, lambda o=ok, n=rr.name: diag_sv.set(
+                                        f"Fix {'OK' if o else 'incomplete'}: {n}"))
+                                except Exception as ex2:
+                                    self.after(0, lambda e=ex2: _dlog(f"ERROR: {e}"))
+                            threading.Thread(target=_bg, daemon=True).start()
+                        tk.Button(bfr, text="Fix", relief="flat", padx=4,
+                                   bg="green", fg="black",
+                                   font=("Consolas", 7, "bold"),
+                                   command=_fix).pack(side=tk.LEFT, padx=2)
+                    tk.Frame(sf, height=1).pack(fill=tk.X)
+                self.after(0, _ui)
+
+            def _run_d():
+                for w in sf.winfo_children():
+                    w.destroy()
+                _store.clear()
+                _cnts.update({"pass": 0, "fail": 0, "warn": 0, "skip": 0})
+                diag_sv.set("Running...")
+
+                def _bg():
+                    def _on(r: SR):
+                        _store.append(r)
+                        _cnts[r.status] = _cnts.get(r.status, 0) + 1
+                        _add(r)
+                        self.after(0, lambda: diag_sv.set(
+                            f"S{r.stage}/18: {r.name} [{r.status.upper()}] | "
+                            f"{_cnts['pass']}P {_cnts['fail']}F {_cnts['warn']}W"))
+                    run_diagnostic(on_result=_on)
+                    failed = [r for r in _store if r.failed]
+                    self.after(0, lambda: diag_sv.set(
+                        f"DONE: {_cnts['pass']} pass, {_cnts['fail']} fail, "
+                        f"{_cnts['warn']} warn"
+                        + (" -- FIX RED STAGES" if failed else " -- PIPELINE OK")))
+                threading.Thread(target=_bg, daemon=True).start()
+
+            btn_r = ttk.Frame(diag_f)
+            btn_r.pack(fill=tk.X)
+            self._btn(btn_r, "Run Pipeline Diagnostic", _run_d).pack(
+                side=tk.LEFT, padx=4, pady=4)
+            self._btn(btn_r, "Open Full Diagnostic Window",
+                      lambda: threading.Thread(
+                          target=lambda: __import__("citl_factbook_diagnostic",
+                                                    fromlist=["run_gui"]).run_gui(),
+                          daemon=True).start()).pack(side=tk.LEFT, padx=2)
+
+        # ── Sub-tab 2: System Heal ─────────────────────────────────────────
+        heal_f = ttk.Frame(sub_nb, padding=2)
+        sub_nb.add(heal_f, text=" System Heal ")
         try:
             from citl_heal_panel import HealPanel
             pal = {}
@@ -1175,12 +1307,12 @@ class FlexTroubleshooterApp(tk.Tk):
                     pal = _theme.PALETTES.get(self._palette_name, {})
                 except Exception:
                     pass
-            panel = HealPanel(f, theme=pal or None, quick=False)
+            panel = HealPanel(heal_f, theme=pal or None, quick=False)
             panel.pack(fill=tk.BOTH, expand=True)
         except Exception as e:
-            ttk.Label(f, text=f"Heal panel unavailable: {e}\n\n"
-                              "Install citl_heal.py and citl_heal_panel.py in the factbook-assistant folder.",
-                      wraplength=600, justify="left").pack(padx=20, pady=20)
+            ttk.Label(heal_f,
+                      text=f"Heal panel unavailable: {e}",
+                      wraplength=500, justify="left").pack(padx=20, pady=20)
 
 
 # ── Common port names ─────────────────────────────────────────────────────────

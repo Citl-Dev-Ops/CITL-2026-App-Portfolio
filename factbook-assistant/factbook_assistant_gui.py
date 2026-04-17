@@ -1768,6 +1768,185 @@ class App(tk.Tk):
     def _build_heal_tab(self) -> None:
         tab = ttk.Frame(self.notebook, padding=4)
         self.notebook.add(tab, text=" System Heal ")
+        self._build_heal_tab_contents(tab)
+
+    def _build_heal_tab_contents(self, tab) -> None:
+        """Build the dual-panel Diagnostics tab: pipeline diagnostic + heal panel."""
+        from tkinter import scrolledtext as _st
+        import tkinter as _tk
+        import tkinter.ttk as _ttk
+
+        # Sub-notebook: Pipeline Diagnostic | Heal Panel
+        sub_nb = _ttk.Notebook(tab)
+        sub_nb.pack(fill="both", expand=True)
+
+        # ── Sub-tab 1: 18-stage pipeline diagnostic ────────────────────────
+        diag_outer = _ttk.Frame(sub_nb, padding=4)
+        sub_nb.add(diag_outer, text=" Pipeline Diagnostic (18 stages) ")
+
+        try:
+            from citl_factbook_diagnostic import run_diagnostic, StepResult
+            _HAS_DIAG = True
+        except ImportError:
+            _HAS_DIAG = False
+
+        if not _HAS_DIAG:
+            lbl = _st.ScrolledText(diag_outer, state="normal", wrap="word")
+            lbl.insert("end", "citl_factbook_diagnostic.py not found.\n"
+                              f"Place it in: {HERE}\n")
+            lbl.configure(state="disabled")
+            lbl.pack(fill="both", expand=True)
+        else:
+            # Status bar
+            diag_status = _tk.StringVar(value="Click 'Run Diagnostic' to test all 18 pipeline stages.")
+            _tk.Label(diag_outer, textvariable=diag_status,
+                      font=("Consolas", 9), anchor="w").pack(fill="x")
+
+            # Stage list canvas
+            canv_outer = _ttk.Frame(diag_outer)
+            canv_outer.pack(fill="both", expand=True)
+            canv = _tk.Canvas(canv_outer, highlightthickness=0)
+            vsb = _ttk.Scrollbar(canv_outer, orient="vertical", command=canv.yview)
+            stage_fr = _tk.Frame(canv)
+            stage_fr.bind("<Configure>",
+                          lambda e: canv.configure(scrollregion=canv.bbox("all")))
+            canv.create_window((0, 0), window=stage_fr, anchor="nw")
+            canv.configure(yscrollcommand=vsb.set)
+            vsb.pack(side="right", fill="y")
+            canv.pack(side="left", fill="both", expand=True)
+
+            # Log area
+            log_fr = _ttk.Frame(diag_outer)
+            log_fr.pack(fill="x")
+            diag_log = _st.ScrolledText(log_fr, height=5, state="disabled",
+                                         wrap="word", font=("Consolas", 8))
+            diag_log.pack(fill="both", expand=True)
+
+            def _dlog(line: str):
+                def _do():
+                    diag_log.configure(state="normal")
+                    diag_log.insert("end", line + "\n")
+                    diag_log.configure(state="disabled")
+                    diag_log.see("end")
+                self.after(0, _do)
+
+            _DOT = {"pass": "green", "fail": "red", "warn": "orange", "skip": "gray"}
+            _result_store = []
+
+            def _add_row(r: StepResult):
+                def _ui():
+                    color = _DOT.get(r.status, "gray")
+                    row = _tk.Frame(stage_fr)
+                    row.pack(fill="x", pady=1)
+                    _tk.Label(row, text="●", fg=color,
+                               font=("Consolas", 11)).pack(side="left", padx=(4, 4))
+                    info = _tk.Frame(row)
+                    info.pack(side="left", fill="x", expand=True)
+                    _tk.Label(info,
+                               text=f"[{r.status.upper():4s}] S{r.stage:02d}: {r.name}",
+                               font=("Consolas", 8, "bold"), anchor="w",
+                               fg=color).pack(anchor="w")
+                    first = r.detail.split("\n")[0][:90]
+                    _tk.Label(info, text=first,
+                               font=("Consolas", 8), anchor="w",
+                               wraplength=380, justify="left").pack(anchor="w")
+
+                    btns = _tk.Frame(row)
+                    btns.pack(side="right", padx=2)
+
+                    _ex = [False]; _df = [None]
+                    def _tog(rr=r, ex=_ex, df=_df, p=info):
+                        if ex[0]:
+                            if df[0]: df[0].destroy(); df[0] = None; ex[0] = False
+                        else:
+                            df[0] = _tk.Frame(p, bg="#222")
+                            df[0].pack(fill="x")
+                            _tk.Label(df[0], text=rr.detail,
+                                       font=("Consolas", 7), wraplength=500,
+                                       justify="left", bg="#222", fg="#ccc").pack(anchor="w")
+                            if rr.fix_cmds:
+                                _tk.Label(df[0],
+                                           text="$ " + "\n$ ".join(rr.fix_cmds),
+                                           font=("Consolas", 7), bg="#222",
+                                           fg="#00E5C8", justify="left").pack(anchor="w")
+                            ex[0] = True
+                    _tk.Button(btns, text="Detail", relief="flat",
+                                padx=4, pady=1, cursor="hand2",
+                                font=("Consolas", 7), command=_tog).pack(side="left", padx=1)
+
+                    if r.fix_fn and not r.passed:
+                        def _fix(rr=r):
+                            _dlog(f"\nFixing: {rr.name}")
+                            def _bg():
+                                try:
+                                    ok = rr.fix_fn(rr, _dlog)
+                                    self.after(0, lambda: diag_status.set(
+                                        f"Fix {'OK' if ok else 'incomplete'}: {rr.name} — re-run to verify"))
+                                except Exception as ex:
+                                    self.after(0, lambda e=ex: _dlog(f"ERROR: {e}"))
+                            threading.Thread(target=_bg, daemon=True).start()
+                        _tk.Button(btns, text=f"Fix", relief="flat",
+                                    padx=4, pady=1, cursor="hand2",
+                                    font=("Consolas", 7, "bold"),
+                                    bg="green", fg="black",
+                                    command=_fix).pack(side="left", padx=1)
+                    _tk.Frame(stage_fr, height=1).pack(fill="x")
+                self.after(0, _ui)
+
+            counts = {"pass": 0, "fail": 0, "warn": 0, "skip": 0}
+
+            def _on_result(r: StepResult):
+                _result_store.append(r)
+                counts[r.status] = counts.get(r.status, 0) + 1
+                _add_row(r)
+                self.after(0, lambda: diag_status.set(
+                    f"Stage {r.stage}/18: {r.name} [{r.status.upper()}] | "
+                    f"{counts['pass']} pass  {counts['fail']} fail  {counts['warn']} warn"
+                ))
+
+            def _run_diag():
+                for w in stage_fr.winfo_children():
+                    w.destroy()
+                _result_store.clear()
+                counts.update({"pass": 0, "fail": 0, "warn": 0, "skip": 0})
+                diag_status.set("Running diagnostic...")
+
+                def _bg():
+                    run_diagnostic(on_result=_on_result)
+                    failed = [r for r in _result_store if r.failed]
+                    def _done():
+                        if failed:
+                            diag_status.set(
+                                f"COMPLETE: {counts['pass']} passed, "
+                                f"{counts['fail']} FAILED — fix the red stages above")
+                        else:
+                            diag_status.set(
+                                f"ALL CLEAR: {counts['pass']} passed, "
+                                f"{counts['warn']} warnings — pipeline healthy")
+                    self.after(0, _done)
+                threading.Thread(target=_bg, daemon=True).start()
+
+            btn_row = _ttk.Frame(diag_outer)
+            btn_row.pack(fill="x", pady=(4, 0))
+            _ttk.Button(btn_row, text="Run Diagnostic (18 stages)",
+                        command=_run_diag).pack(side="left", padx=4)
+            _ttk.Button(btn_row, text="Launch Full Window",
+                        command=lambda: _launch_diag_window()).pack(side="left", padx=2)
+
+            def _launch_diag_window():
+                try:
+                    from citl_factbook_diagnostic import run_gui
+                    threading.Thread(target=run_gui, daemon=True).start()
+                except Exception as ex:
+                    diag_status.set(f"Could not launch: {ex}")
+
+            # Auto-run on tab select
+            sub_nb.bind("<<NotebookTabChanged>>",
+                        lambda e: _run_diag() if sub_nb.index("current") == 0 else None)
+
+        # ── Sub-tab 2: Heal panel ──────────────────────────────────────────
+        heal_outer = _ttk.Frame(sub_nb, padding=2)
+        sub_nb.add(heal_outer, text=" System Heal ")
         try:
             from citl_heal_panel import HealPanel
             pal = {}
@@ -1777,17 +1956,13 @@ class App(tk.Tk):
                     pal = _theme.PALETTES.get(pname, {})
                 except Exception:
                     pass
-            panel = HealPanel(tab, theme=pal or None, quick=False)
+            panel = HealPanel(heal_outer, theme=pal or None, quick=False)
             panel.pack(fill="both", expand=True)
         except Exception as e:
-            import tkinter.scrolledtext as _st
-            lbl = _st.ScrolledText(tab, height=6, wrap="word", state="normal")
-            lbl.insert("end",
-                f"System Heal panel unavailable: {e}\n\n"
-                "Make sure citl_heal.py and citl_heal_panel.py are in the\n"
-                "factbook-assistant/ directory.\n")
-            lbl.configure(state="disabled")
-            lbl.pack(fill="both", expand=True)
+            lbl2 = _st.ScrolledText(heal_outer, state="normal", wrap="word")
+            lbl2.insert("end", f"Heal panel unavailable: {e}\n")
+            lbl2.configure(state="disabled")
+            lbl2.pack(fill="both", expand=True)
 
     # ── Startup auto-index ────────────────────────────────────────────────
 
