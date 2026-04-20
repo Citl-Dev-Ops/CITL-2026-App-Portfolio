@@ -76,6 +76,53 @@ APP_MARKERS = [
 # FINDER
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _home_drive() -> str:
+    """Return the drive letter (Windows) or '/' (Linux) of THIS script."""
+    if platform.system() == "Windows":
+        return str(HERE.resolve()).split(":")[0].upper() + ":"
+    return "/"
+
+
+def _device_memory_path() -> Path:
+    """JSON file that persists known Factbook paths across runs."""
+    try:
+        appdata = Path(os.environ.get("APPDATA", Path.home() / ".config"))
+        mem_dir = appdata / "CITL"
+        mem_dir.mkdir(parents=True, exist_ok=True)
+        return mem_dir / "citl_device_paths.json"
+    except Exception:
+        return HERE / "citl_device_paths.json"
+
+
+def _load_device_memory() -> List[Path]:
+    """Return previously-found Factbook paths that still exist."""
+    mp = _device_memory_path()
+    if not mp.exists():
+        return []
+    try:
+        data = json.loads(mp.read_text(encoding="utf-8"))
+        return [Path(p) for p in data.get("factbook_paths", [])
+                if Path(p).exists()]
+    except Exception:
+        return []
+
+
+def _save_device_memory(paths: List[Path]) -> None:
+    """Persist found Factbook paths for future quick-starts."""
+    mp = _device_memory_path()
+    try:
+        existing = _load_device_memory()
+        combined = list({str(p.resolve()) for p in existing + paths})
+        mp.write_text(
+            json.dumps({"factbook_paths": combined,
+                        "updated": datetime.datetime.now().isoformat()},
+                       indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
 def _all_drives() -> List[Path]:
     """Return all mounted/available root paths."""
     drives: List[Path] = []
@@ -83,8 +130,11 @@ def _all_drives() -> List[Path]:
         import string
         for letter in string.ascii_uppercase:
             p = Path(f"{letter}:/")
-            if p.exists():
-                drives.append(p)
+            try:
+                if p.exists():
+                    drives.append(p)
+            except OSError:
+                pass
     else:
         drives = [Path("/")]
         for mp in ["/media", "/mnt", "/opt", "/srv"]:
@@ -98,40 +148,56 @@ def _all_drives() -> List[Path]:
 
 
 def _quick_candidates() -> List[Path]:
-    """~30 high-probability locations, checked in <1s."""
+    """High-probability locations on THE SAME DRIVE as this script, checked in <1s.
+    Deep search (all drives) is only triggered explicitly."""
     cands: List[Path] = []
-    drives = _all_drives()
 
-    for root in drives:
-        # Root-level CITL folders
-        for name in ["CITL", "citl", "1-CITL-SYNC", "3-CITL-WORKSTATION-APPS"]:
-            p = root / name
-            if p.is_dir():
-                cands.append(p)
-        # Common install paths
-        for rel in [
-            "Users/Doc_M/CITL",
-            "Users/Public/CITL",
-            "opt/citl",
-            "home/citl",
-            "srv/citl",
-        ]:
-            p = root / rel
-            if p.is_dir():
-                cands.append(p)
-        # USB root itself
-        cands.append(root)
+    # ── 1. Previously-seen paths from device memory ──────────────────
+    for p in _load_device_memory():
+        if p.is_dir():
+            cands.append(p)
 
-    # Also add this script's own ancestor directories
-    for anc in [HERE, REPO_ROOT, REPO_ROOT.parent]:
+    # ── 2. This script's own tree (most reliable) ────────────────────
+    for anc in [HERE, REPO_ROOT, REPO_ROOT.parent, REPO_ROOT.parent.parent]:
+        if anc.is_dir():
+            cands.append(anc)
+
+    # ── 3. Same-drive CITL / factbook hot-spots only ─────────────────
+    if platform.system() == "Windows":
+        drive = _home_drive()           # e.g. "C:"
+        home_root = Path(drive + "/")
+    else:
+        home_root = Path("/")
+
+    for name in ["CITL", "citl", "1-CITL-SYNC"]:
+        p = home_root / name
+        if p.is_dir():
+            cands.append(p)
+
+    for rel in [
+        f"Users/{os.environ.get('USERNAME', 'Doc_M')}/CITL",
+        "Users/Public/CITL",
+        "opt/citl",
+        f"home/{os.environ.get('USER', 'user')}/CITL",
+    ]:
+        p = home_root / rel
+        if p.is_dir():
+            cands.append(p)
+
+    # ── 4. CWD and its parent ────────────────────────────────────────
+    cwd = Path.cwd()
+    for anc in [cwd, cwd.parent]:
         if anc.is_dir():
             cands.append(anc)
 
     # Deduplicate preserving order
-    seen = set()
-    out = []
+    seen: set = set()
+    out: List[Path] = []
     for c in cands:
-        k = str(c.resolve())
+        try:
+            k = str(c.resolve())
+        except OSError:
+            continue
         if k not in seen:
             seen.add(k)
             out.append(c)
@@ -139,17 +205,15 @@ def _quick_candidates() -> List[Path]:
 
 
 def _is_factbook_root(path: Path) -> bool:
-    """True if this directory looks like a Factbook repo root."""
+    """True if this directory contains a known CITL marker file.
+    Matches the factbook-assistant/ subfolder, the repo root, or the
+    citl_flex_troubleshooter/ subfolder — nothing else."""
     for _, marker in APP_MARKERS:
-        if (path / marker).exists():
-            return True
-    # Also: contains a subfolder with "factbook" in its name
-    try:
-        for child in path.iterdir():
-            if child.is_dir() and "factbook" in child.name.lower():
+        try:
+            if (path / marker).exists():
                 return True
-    except PermissionError:
-        pass
+        except OSError:
+            pass
     return False
 
 
@@ -158,48 +222,58 @@ def _dir_mtime(path: Path) -> float:
     best = 0.0
     for _, marker in APP_MARKERS:
         f = path / marker
-        if f.exists():
-            try:
+        try:
+            if f.exists():
                 best = max(best, f.stat().st_mtime)
-            except Exception:
-                pass
+        except OSError:
+            pass
     return best
 
 
 def quick_search(log: Callable[[str], None] = print) -> List[Path]:
-    """Fast search: check known hot-spots and immediate subdirs."""
-    log("Quick search — checking common locations...")
+    """Fast search: same-drive hot-spots + device memory. Returns results
+    sorted by most-recently-modified first. Saves found paths to device memory
+    so future runs start faster."""
+    log("Quick search — checking this drive and previously-seen locations...")
     found: List[Path] = []
     seen: set = set()
 
     for cand in _quick_candidates():
         # Cand itself
         if _is_factbook_root(cand):
-            k = str(cand.resolve())
+            try:
+                k = str(cand.resolve())
+            except OSError:
+                continue
             if k not in seen:
                 seen.add(k)
                 found.append(cand)
                 log(f"  Found: {cand}")
-        # Immediate children
+        # Immediate children only (no deep walk here)
         try:
             for child in cand.iterdir():
                 if not child.is_dir():
                     continue
-                if any(skip in child.parts for skip in
-                       ("__pycache__", ".git", ".venv", "node_modules",
-                        "System Volume Information")):
+                if child.name in ("__pycache__", ".git", ".venv", "node_modules",
+                                  "System Volume Information", "$Recycle.Bin"):
                     continue
                 if _is_factbook_root(child):
-                    k = str(child.resolve())
+                    try:
+                        k = str(child.resolve())
+                    except OSError:
+                        continue
                     if k not in seen:
                         seen.add(k)
                         found.append(child)
                         log(f"  Found: {child}")
-        except PermissionError:
+        except (PermissionError, OSError):
             pass
 
-    log(f"Quick search complete: {len(found)} instance(s) found.")
-    return sorted(found, key=lambda p: _dir_mtime(p), reverse=True)
+    ranked = sorted(found, key=lambda p: _dir_mtime(p), reverse=True)
+    if ranked:
+        _save_device_memory(ranked)          # remember for next run
+    log(f"Quick search complete: {len(ranked)} instance(s) found.")
+    return ranked
 
 
 def deep_search(
@@ -848,29 +922,22 @@ def run_cli(start_path: Optional[Path] = None, auto_fix: bool = False):
     else:
         found = quick_search()
         if not found:
-            print("Quick search found nothing. Running deep search...")
-            found = deep_search()
+            print("Quick search found nothing on this drive.")
+            print("Run with --deep to scan all drives, or --path to specify manually.")
+            return
 
-    if not found:
-        print("No Factbook instances found on this device.")
-        print("Try:  python citl_repair_all.py --path /path/to/factbook")
-        return
-
-    print(f"\nFound {len(found)} instance(s):")
-    for i, p in enumerate(found):
-        mark = " [MOST RECENT]" if i == 0 else ""
-        print(f"  [{i+1}] {p}{mark}")
-
-    if len(found) > 1 and sys.stdin.isatty():
-        choice = input(f"\nSelect instance [1-{len(found)}] (Enter=1): ").strip()
-        try:
-            idx = int(choice) - 1
-            target = found[idx]
-        except Exception:
-            target = found[0]
+    # Always use the most-recently-modified instance automatically
+    target = found[0]
+    if len(found) > 1:
+        print(f"\nFound {len(found)} instance(s) — using most recent:")
+        for i, p in enumerate(found):
+            mark = "  <-- SELECTED (most recent)" if i == 0 else ""
+            print(f"  {p}{mark}")
     else:
-        target = found[0]
+        print(f"\nFound: {target}")
 
+    mem = _device_memory_path()
+    print(f"  (Device memory saved to: {mem})")
     print(f"\nTarget: {target}")
     print("Patching diagnostic scripts...")
     patch_target(target)
