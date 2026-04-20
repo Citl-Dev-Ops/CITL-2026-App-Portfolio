@@ -426,6 +426,30 @@ CITL_APPS: Tuple[dict, ...] = (
         "launcher_nix": None,
         "repo_marker": "factbook-assistant/citl_sync_hub.py",
     },
+    {
+        # ── CITL FLEX Troubleshooter ─────────────────────────────────────────
+        "name": "CITL FLEX Troubleshooter",
+        "description": (
+            "FLEX-specific troubleshooting assistant built from the FLEX Team OneNote PDF. "
+            "Includes RAG index, Modelfile template, query CLI, and a lightweight GUI. "
+            "Packable as a standalone EXE for student portfolio demos."
+        ),
+        "icon": "🛡️",
+        "key_files": [
+            "citl_flex_troubleshooter/flex_assistant_gui.py",
+            "citl_flex_troubleshooter/query_flex.py",
+            "citl_flex_troubleshooter/flex_builder.py",
+            "citl_flex_troubleshooter/Modelfile",
+            "citl_flex_troubleshooter/flex_embeddings.json",
+            "RUN_CITL_FLEX_WINDOWS.cmd",
+            "RUN_CITL_FLEX.sh",
+            "scripts/windows/build_flex_exe.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_CITL_FLEX_WINDOWS.cmd",
+        "launcher_nix": "RUN_CITL_FLEX.sh",
+        "repo_marker": "citl_flex_troubleshooter/flex_assistant_gui.py",
+    },
 )
 
 
@@ -5458,6 +5482,30 @@ class SyncGUI:
         )
         self.field_apps_btn.grid(row=1, column=0, sticky="ew", padx=(0, 6))
 
+        # ── Find & Repair Factbook ────────────────────────────────────────────
+        repair_panel = self.tk.Frame(actions_card, bg=self.colors["panel_alt"])
+        repair_panel.grid(row=8, column=0, sticky="ew", padx=16, pady=(4, 16))
+        repair_panel.grid_columnconfigure(0, weight=1)
+        repair_panel.grid_columnconfigure(1, weight=1)
+        self._make_label(
+            repair_panel,
+            text="Factbook Diagnostic & Repair",
+            bg=self.colors["panel_alt"],
+            fg=self.colors["accent"],
+            font=("Segoe UI Semibold", 11, "bold"),
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        self._make_button(
+            repair_panel,
+            "🔍 Find & Repair Factbook",
+            self.on_find_and_repair_factbook,
+            accent=True,
+        ).grid(row=1, column=0, sticky="ew", padx=(0, 6))
+        self._make_button(
+            repair_panel,
+            "🩺 18-Stage Diagnostic",
+            self.on_open_factbook_diagnostic,
+        ).grid(row=1, column=1, sticky="ew", padx=(6, 0))
+
         body = self.tk.Frame(page, bg=self.colors["bg"])
         body.grid(row=3, column=0, sticky="nsew", padx=22, pady=(0, 12))
         body.grid_columnconfigure(0, weight=4)
@@ -6777,6 +6825,49 @@ class SyncGUI:
         else:
             lines.append("- none")
         return "\n".join(lines).strip() + "\n"
+
+    # ------------------------------------------------------------------
+    # Find & Repair Factbook
+    # ------------------------------------------------------------------
+    def on_find_and_repair_factbook(self) -> None:
+        """Open the citl_repair_all GUI — searches for all Factbook installs,
+        runs the 18-stage diagnostic on the selected one, and offers one-click
+        Fix buttons for every identified problem."""
+        import threading, importlib
+        HERE = Path(__file__).parent.resolve()
+        repair_path = HERE / "citl_repair_all.py"
+        if not repair_path.exists():
+            self.messagebox.showerror(
+                "Repair Tool Not Found",
+                f"citl_repair_all.py was not found in:\n{HERE}\n\n"
+                "Sync the USB / repo to get the latest scripts.",
+            )
+            return
+        def _launch():
+            spec = importlib.util.spec_from_file_location("citl_repair_all", repair_path)
+            mod  = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            mod.run_gui()
+        threading.Thread(target=_launch, daemon=True).start()
+
+    def on_open_factbook_diagnostic(self) -> None:
+        """Open the 18-stage pipeline diagnostic GUI directly."""
+        import threading, importlib
+        HERE = Path(__file__).parent.resolve()
+        diag_path = HERE / "citl_factbook_diagnostic.py"
+        if not diag_path.exists():
+            self.messagebox.showerror(
+                "Diagnostic Not Found",
+                f"citl_factbook_diagnostic.py was not found in:\n{HERE}\n\n"
+                "Sync the USB / repo to get the latest scripts.",
+            )
+            return
+        def _launch():
+            spec = importlib.util.spec_from_file_location("citl_factbook_diagnostic", diag_path)
+            mod  = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            mod.run_gui()
+        threading.Thread(target=_launch, daemon=True).start()
 
     def on_open_diagnostics_window(self) -> None:
         if self.diagnostics_window is not None and self.diagnostics_window.winfo_exists():
