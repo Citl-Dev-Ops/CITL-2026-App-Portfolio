@@ -203,6 +203,41 @@ def _find_ai_hub() -> Optional[Path]:
     return _scan_drives(hints, "app/hub.py")
 
 
+def _find_screen_recorder() -> Optional[Path]:
+    """Find the CITL repo root that contains citl_screen_recorder.py.
+    Checks: script's own ancestor dirs first (fastest), then common paths,
+    then scans all drives for any CITL / factbook-assistant folder."""
+    key = "factbook-assistant/citl_screen_recorder.py"
+    # 1. Own tree — works when running from USB or local repo
+    for anc in [_HERE.parent, _HERE.parent.parent, _HERE.parent.parent.parent]:
+        if (anc / key).exists():
+            return anc
+    # 2. Fixed known locations
+    fixed = [
+        Path(r"C:\Users\Doc_M\CITL"),
+        Path(r"C:\CITL"),
+        Path.home() / "CITL",
+    ]
+    for p in fixed:
+        if (p / key).exists():
+            return p
+    # 3. Drive scan — handles any USB drive letter or network path
+    hints = ["CITL", "citl", "1-CITL-SYNC", "3-CITL-WORKSTATION-APPS",
+             "CITL-Desktop-LLM", "factbook-assistant"]
+    found = _scan_drives(hints, key)
+    if found:
+        return found
+    # 4. Search sibling dirs of this script's location
+    for sib in [_HERE.parent, _HERE.parent.parent]:
+        try:
+            for child in sib.iterdir():
+                if child.is_dir() and (child / key).exists():
+                    return child
+        except (PermissionError, OSError):
+            pass
+    return None
+
+
 # aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 # System / Ollama probes
 # aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -651,11 +686,11 @@ def _build_apps() -> List[dict]:
                 "Lossless-to-lossy export pipelines",
                 "Windows GDI screen-capture integration",
             ],
-            "tech_stack": "Python 3.11    FFmpeg (LGPL)    gdigrab    tkinter",
-            "repo_path":    REPO,
-            "launcher_win": REPO / "factbook-assistant" / "citl_screen_recorder.py",
-            "launcher_nix": REPO / "factbook-assistant" / "citl_screen_recorder.py",
-            "key_file":     REPO / "factbook-assistant" / "citl_screen_recorder.py",
+            "tech_stack": "Python 3.11    FFmpeg (LGPL)    gdigrab / x11grab    tkinter",
+            "repo_path":    _find_screen_recorder() or REPO,
+            "launcher_win": (_find_screen_recorder() or REPO) / "factbook-assistant" / "citl_screen_recorder.py",
+            "launcher_nix": (_find_screen_recorder() or REPO) / "factbook-assistant" / "citl_screen_recorder.py",
+            "key_file":     (_find_screen_recorder() or REPO) / "factbook-assistant" / "citl_screen_recorder.py",
             "version_file": None,
             "github_url":   "",
         },

@@ -646,6 +646,7 @@ class RecordingSession:
     audio_enabled: bool
     audio_device: Optional[str]
     quality_crf: str
+    crop_region: Optional[Tuple[int, int, int, int]] = None  # (x, y, w, h) screen coords
     on_log: Optional[Callable[[str], None]] = None
     on_done: Optional[Callable[[int, str], None]] = None
 
@@ -657,38 +658,60 @@ class RecordingSession:
         cmd: List[str] = [self.ffmpeg_path, "-hide_banner"]
 
         if sys.platform == "win32":
-            # Windows: gdigrab by HWND or window title
-            cmd.extend([
-                "-f", "gdigrab",
-                "-framerate", str(self.fps),
-                "-i", (f"hwnd={self.window_hwnd}"
-                       if self.window_hwnd else f"title={self.window_title}"),
-            ])
-        else:
-            # Ubuntu / Linux: x11grab full desktop (window-specific needs xwininfo)
-            display = os.environ.get("DISPLAY", ":0")
-            w, h = _get_screen_size()
-            # Try to get window geometry for targeted capture
-            wgeo = self._get_window_geometry_linux()
-            if wgeo:
-                x, y, ww, wh = wgeo
-                # Align dimensions to even numbers (required by most codecs)
-                ww = ww - (ww % 2)
-                wh = wh - (wh % 2)
+            if self.crop_region:
+                # Region capture: gdigrab desktop with offset + size
+                x, y, w, h = self.crop_region
+                w = w - (w % 2)
+                h = h - (h % 2)
                 cmd.extend([
-                    "-f", "x11grab",
+                    "-f", "gdigrab",
                     "-framerate", str(self.fps),
-                    "-video_size", f"{ww}x{wh}",
-                    "-i", f"{display}+{x},{y}",
+                    "-offset_x", str(x),
+                    "-offset_y", str(y),
+                    "-video_size", f"{w}x{h}",
+                    "-i", "desktop",
                 ])
             else:
-                # Full-screen fallback
+                # Full window capture by HWND or title
+                cmd.extend([
+                    "-f", "gdigrab",
+                    "-framerate", str(self.fps),
+                    "-i", (f"hwnd={self.window_hwnd}"
+                           if self.window_hwnd else f"title={self.window_title}"),
+                ])
+        else:
+            # Ubuntu / Linux: x11grab
+            display = os.environ.get("DISPLAY", ":0")
+            sw, sh = _get_screen_size()
+            if self.crop_region:
+                cx, cy, cw, ch = self.crop_region
+                cw = cw - (cw % 2)
+                ch = ch - (ch % 2)
                 cmd.extend([
                     "-f", "x11grab",
                     "-framerate", str(self.fps),
-                    "-video_size", f"{w}x{h}",
-                    "-i", f"{display}",
+                    "-video_size", f"{cw}x{ch}",
+                    "-i", f"{display}+{cx},{cy}",
                 ])
+            else:
+                wgeo = self._get_window_geometry_linux()
+                if wgeo:
+                    x, y, ww, wh = wgeo
+                    ww = ww - (ww % 2)
+                    wh = wh - (wh % 2)
+                    cmd.extend([
+                        "-f", "x11grab",
+                        "-framerate", str(self.fps),
+                        "-video_size", f"{ww}x{wh}",
+                        "-i", f"{display}+{x},{y}",
+                    ])
+                else:
+                    cmd.extend([
+                        "-f", "x11grab",
+                        "-framerate", str(self.fps),
+                        "-video_size", f"{sw}x{sh}",
+                        "-i", display,
+                    ])
 
         cmd.extend(["-vcodec", str(self.fmt["vcodec"])])
         vflags = list(self.fmt.get("vflags", []))
@@ -811,6 +834,272 @@ class RecordingSession:
         self.running = False
 
 
+# ── Codec / preflight verification ───────────────────────────────────────────
+
+def _verify_codec(ffmpeg: str, vcodec: str, acodec: Optional[str] = None
+                  ) -> Tuple[bool, List[str]]:
+    """Test that codec(s) are usable in this FFmpeg build. Returns (ok, problems)."""
+    problems: List[str] = []
+    ok, enc_out = _run_silent([ffmpeg, "-hide_banner", "-encoders"], timeout=5)
+    if not ok:
+        problems.append("Could not query FFmpeg encoders — FFmpeg may be broken.")
+        return False, problems
+    if vcodec not in enc_out:
+        problems.append(
+            f"Video codec '{vcodec}' not available in this FFmpeg build.\n"
+            f"  Fix: install full FFmpeg build (winget install Gyan.FFmpeg  "
+            f"or  sudo apt install ffmpeg)")
+    if acodec and acodec not in enc_out:
+        problems.append(
+            f"Audio codec '{acodec}' not available in this FFmpeg build.\n"
+            f"  Fix: install full FFmpeg build (same as above)")
+    return len(problems) == 0, problems
+
+
+def _check_disk_space(out_dir: Path, fps: int, width: int, height: int,
+                       vcodec: str) -> Tuple[bool, str]:
+    """Estimate required disk space and check it's available.
+    Returns (ok, message)."""
+    try:
+        stat = shutil.disk_usage(str(out_dir))
+        free_gb = stat.free / (1024 ** 3)
+        # Rough bitrate estimate per codec (Mbps)
+        bitrates = {
+            "libx264": 8, "libvpx-vp9": 4, "huffyuv": 120,
+            "libx265": 5, "libvpx": 6,
+        }
+        mbps = bitrates.get(vcodec, 8)
+        # Estimate for 10 minutes in MB
+        est_10min_mb = mbps * 60 * 10 / 8
+        if free_gb < 0.5:
+            return False, (f"CRITICAL: Only {free_gb:.2f} GB free in {out_dir}. "
+                           f"Need at least 500 MB. Free up disk space first.")
+        if est_10min_mb / 1024 > free_gb * 0.8:
+            return True, (f"Low disk space warning: {free_gb:.1f} GB free. "
+                          f"Estimated ~{est_10min_mb:.0f} MB per 10 min at current settings.")
+        return True, (f"Disk OK: {free_gb:.1f} GB free  "
+                      f"(~{est_10min_mb:.0f} MB per 10 min estimated)")
+    except Exception as e:
+        return True, f"Could not check disk space: {e}"
+
+
+def _preflight_check(ffmpeg: str, fmt_name: str, fmt: Dict,
+                     out_dir: Path, fps: int,
+                     window_title: str, hwnd: Optional[int],
+                     screen_w: int, screen_h: int) -> Tuple[bool, List[str], List[str]]:
+    """Full pre-recording preflight. Returns (go, errors, warnings)."""
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # 1. FFmpeg executable
+    if not ffmpeg or not Path(ffmpeg).exists():
+        errors.append("FFmpeg not found. Click 'Repair FFmpeg' to install.")
+        return False, errors, warnings
+
+    # 2. Codec availability
+    vcodec = str(fmt.get("vcodec", "libx264"))
+    acodec = str(fmt.get("acodec", ""))
+    codec_ok, codec_problems = _verify_codec(ffmpeg, vcodec, acodec or None)
+    if not codec_ok:
+        errors.extend(codec_problems)
+
+    # 3. Output directory writable
+    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        test = out_dir / ".preflight_test"
+        test.write_bytes(b"x")
+        test.unlink()
+    except Exception as e:
+        errors.append(f"Output folder not writable: {out_dir}\n  Error: {e}\n"
+                      f"  Fix: choose a different output folder.")
+
+    # 4. Disk space
+    disk_ok, disk_msg = _check_disk_space(out_dir, fps, screen_w, screen_h, vcodec)
+    if not disk_ok:
+        errors.append(disk_msg)
+    elif "warning" in disk_msg.lower():
+        warnings.append(disk_msg)
+
+    # 5. Window handle (Windows only)
+    if sys.platform == "win32" and not _is_valid_hwnd(hwnd):
+        errors.append(
+            f"Window '{window_title}' is not accessible.\n"
+            f"  Fix: refresh the window list and re-select the target.")
+
+    # 6. Capture backend
+    ok_dev, dev_out = _run_silent([ffmpeg, "-hide_banner", "-devices"], timeout=5)
+    backend = "gdigrab" if sys.platform == "win32" else "x11grab"
+    if backend not in dev_out:
+        errors.append(
+            f"Capture backend '{backend}' not available in this FFmpeg.\n"
+            f"  Fix: install full FFmpeg (winget install Gyan.FFmpeg  or  "
+            f"sudo apt install ffmpeg).")
+
+    return len(errors) == 0, errors, warnings
+
+
+def _show_preflight_dialog(root: tk.Tk, errors: List[str], warnings: List[str],
+                           on_proceed: Callable[[], None]) -> None:
+    """Show go/no-go dialog before recording starts."""
+    if not errors and not warnings:
+        on_proceed()
+        return
+
+    win = tk.Toplevel(root)
+    win.title("Pre-Recording Check")
+    win.configure(bg=COLORS["bg"])
+    win.geometry("640x380")
+    win.grab_set()
+    win.resizable(True, True)
+
+    all_clear = not errors
+    header_color = COLORS["ok"] if all_clear else COLORS["danger"]
+    header_text = ("Preflight: Warnings Only — Ready to Record"
+                   if all_clear else "Preflight: Problems Found — Cannot Record")
+
+    tk.Label(win, text=f"  {header_text}",
+             font=(FONT, 12, "bold"), bg=COLORS["panel"],
+             fg=header_color, anchor="w").pack(fill="x", pady=(0, 6))
+
+    body = scrolledtext.ScrolledText(
+        win, height=10, bg=COLORS["notebk"], fg=COLORS["text"],
+        font=("Courier New", 9), relief="flat", state="normal")
+    body.pack(fill="both", expand=True, padx=10, pady=4)
+    body.tag_configure("err",  foreground=COLORS["danger"])
+    body.tag_configure("warn", foreground=COLORS["warn"])
+    body.tag_configure("ok",   foreground=COLORS["ok"])
+
+    for e in errors:
+        body.insert("end", f"  ERROR: {e}\n\n", "err")
+    for w in warnings:
+        body.insert("end", f"  WARN:  {w}\n\n", "warn")
+    if all_clear:
+        body.insert("end", "  All preflight checks passed.\n", "ok")
+    body.configure(state="disabled")
+
+    btn_row = tk.Frame(win, bg=COLORS["bg"])
+    btn_row.pack(fill="x", padx=10, pady=8)
+
+    if all_clear:
+        tk.Button(btn_row, text="Record Now",
+                  bg=COLORS["ok"], fg=COLORS["bg"],
+                  font=(FONT, 10, "bold"), relief="flat",
+                  padx=12, pady=6,
+                  command=lambda: (win.destroy(), on_proceed())).pack(side="left")
+        tk.Button(btn_row, text="Cancel",
+                  bg=COLORS["btn"], fg=COLORS["muted"],
+                  relief="flat", padx=10, pady=6,
+                  command=win.destroy).pack(side="left", padx=8)
+    else:
+        tk.Label(btn_row,
+                 text="Fix the errors above before recording.",
+                 fg=COLORS["danger"], bg=COLORS["bg"],
+                 font=(FONT, 9)).pack(side="left")
+        tk.Button(btn_row, text="Close",
+                  bg=COLORS["btn"], fg=COLORS["text"],
+                  relief="flat", padx=10, pady=6,
+                  command=win.destroy).pack(side="right")
+
+
+# ── Region selector (drag-to-crop overlay) ────────────────────────────────────
+
+class RegionSelector:
+    """Full-screen transparent overlay.  User drags a rectangle.
+    Calls on_select(x, y, w, h) with screen coordinates on confirm,
+    or on_cancel() if ESC / closed."""
+
+    def __init__(self, root: tk.Tk,
+                 on_select: Callable[[int, int, int, int], None],
+                 on_cancel: Callable[[], None]):
+        self.root = root
+        self.on_select = on_select
+        self.on_cancel = on_cancel
+        self._sx = self._sy = self._ex = self._ey = 0
+        self._dragging = False
+        self._rect_id: Optional[int] = None
+        self._label_id: Optional[int] = None
+
+        sw, sh = _get_screen_size()
+
+        self.win = tk.Toplevel(root)
+        self.win.attributes("-fullscreen", True)
+        self.win.attributes("-topmost", True)
+        # Semi-transparent dark overlay
+        self.win.attributes("-alpha", 0.35)
+        self.win.configure(bg="black")
+        self.win.overrideredirect(True)
+
+        self.canvas = tk.Canvas(self.win, cursor="crosshair",
+                                bg="black", highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+
+        # Instructions
+        self.canvas.create_text(
+            sw // 2, 40,
+            text="Drag to select recording region    |    ESC to cancel    |    Release mouse to confirm",
+            fill="#00E5C8", font=("Consolas", 13, "bold"),
+            tags="hint"
+        )
+
+        self.canvas.bind("<ButtonPress-1>",   self._on_press)
+        self.canvas.bind("<B1-Motion>",       self._on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        self.win.bind("<Escape>", lambda _: self._cancel())
+        self.win.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.win.focus_force()
+
+    def _on_press(self, e):
+        self._sx, self._sy = e.x_root, e.y_root
+        self._dragging = True
+        if self._rect_id:
+            self.canvas.delete(self._rect_id)
+            self._rect_id = None
+
+    def _on_drag(self, e):
+        self._ex, self._ey = e.x_root, e.y_root
+        if self._rect_id:
+            self.canvas.delete(self._rect_id)
+        if self._label_id:
+            self.canvas.delete(self._label_id)
+        x1 = min(self._sx, self._ex)
+        y1 = min(self._sy, self._ey)
+        x2 = max(self._sx, self._ex)
+        y2 = max(self._sy, self._ey)
+        # White selection rectangle
+        self._rect_id = self.canvas.create_rectangle(
+            x1, y1, x2, y2,
+            outline="#FFFFFF", width=2, fill="", dash=(4, 2)
+        )
+        w, h = x2 - x1, y2 - y1
+        self._label_id = self.canvas.create_text(
+            x1 + 4, y1 - 14,
+            text=f"{w} × {h}",
+            fill="#FFFFFF", font=("Consolas", 11, "bold"),
+            anchor="sw"
+        )
+
+    def _on_release(self, e):
+        if not self._dragging:
+            return
+        self._dragging = False
+        self._ex, self._ey = e.x_root, e.y_root
+        x1, y1 = min(self._sx, self._ex), min(self._sy, self._ey)
+        x2, y2 = max(self._sx, self._ex), max(self._sy, self._ey)
+        w, h = x2 - x1, y2 - y1
+        if w < 16 or h < 16:
+            # Too small — let user try again
+            return
+        self.win.destroy()
+        # Make dimensions codec-safe (even numbers)
+        w = w - (w % 2)
+        h = h - (h % 2)
+        self.on_select(x1, y1, w, h)
+
+    def _cancel(self):
+        self.win.destroy()
+        self.on_cancel()
+
+
 _FFMPEG_ERROR_PATTERNS: List[Tuple[str, str]] = [
     # (match fragment, human description)
     ("Could not find a valid device",       "capture device not found"),
@@ -911,6 +1200,12 @@ class ScreenRecorderApp:
         self.auto_retarget_var = tk.BooleanVar(value=True)
         self.pin_target_var = tk.BooleanVar(value=True)
 
+        # Region / crop state
+        self._crop_region: Optional[Tuple[int, int, int, int]] = None
+        self._region_var = tk.StringVar(value="Full window / screen")
+        self._preflight_var = tk.StringVar(value="Preflight: not checked yet")
+        self._disk_var = tk.StringVar(value="")
+
         RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
         SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -920,6 +1215,7 @@ class ScreenRecorderApp:
         self._start_window_watch()
         self.root.after(400, self._update_ffmpeg_label)
         self.root.after(600, self._run_startup_diagnostic)
+        self.root.after(800, self._update_disk_estimate)
 
     def _build_ui(self):
         top = tk.Frame(self.root, bg=COLORS["panel"], padx=12, pady=8)
@@ -1020,15 +1316,63 @@ class ScreenRecorderApp:
         ttk.Combobox(lrow, textvariable=self.launch_var, state="readonly", values=list(CITL_KNOWN.keys()), width=42).pack(side="left", fill="x", expand=True)
         tk.Button(lrow, text="Start + Record", command=self._launch_and_record, bg=COLORS["btn_acc"], fg=COLORS["text"], relief="flat").pack(side="left", padx=(8, 0))
 
+        # ── Region / crop selection ───────────────────────────────────────────
+        region_box = tk.LabelFrame(body, text="Capture Region",
+                                   font=(FONT, 9, "bold"),
+                                   bg=COLORS["card"], fg=COLORS["text"],
+                                   bd=1, relief="solid")
+        region_box.pack(fill="x", pady=(0, 6))
+        rrow = tk.Frame(region_box, bg=COLORS["card"])
+        rrow.pack(fill="x", padx=8, pady=6)
+        tk.Button(rrow, text="Select Region (drag to crop)",
+                  command=self._select_region,
+                  bg=COLORS["btn_hi"], fg=COLORS["text"],
+                  relief="flat", padx=8, pady=4).pack(side="left")
+        self._btn_clear_region = tk.Button(
+            rrow, text="Clear Region (full screen/window)",
+            command=self._clear_region,
+            bg=COLORS["btn"], fg=COLORS["muted"],
+            relief="flat", padx=8, pady=4, state="disabled")
+        self._btn_clear_region.pack(side="left", padx=6)
+        tk.Label(rrow, textvariable=self._region_var,
+                 bg=COLORS["card"], fg=COLORS["ok"],
+                 font=(FONT, 9, "bold")).pack(side="left", padx=8)
+
+        # ── Preflight / disk status ───────────────────────────────────────────
+        pfrow = tk.Frame(body, bg=COLORS["bg"])
+        pfrow.pack(fill="x", pady=(0, 4))
+        tk.Label(pfrow, textvariable=self._preflight_var,
+                 bg=COLORS["bg"], fg=COLORS["warn"],
+                 font=(FONT, 8), anchor="w").pack(side="left", fill="x", expand=True)
+        tk.Label(pfrow, textvariable=self._disk_var,
+                 bg=COLORS["bg"], fg=COLORS["muted"],
+                 font=(FONT, 8), anchor="e").pack(side="right")
+
+        # ── Recording controls ────────────────────────────────────────────────
         controls = tk.Frame(body, bg=COLORS["bg"])
         controls.pack(fill="x", pady=(2, 8))
-        self.btn_start = tk.Button(controls, text="Start Recording", command=self._start_recording, bg=COLORS["btn_acc"], fg=COLORS["text"], relief="flat", font=(FONT, 11, "bold"), padx=14, pady=6)
+        self.btn_start = tk.Button(controls, text="▶  Start Recording",
+                                   command=self._start_recording,
+                                   bg=COLORS["btn_acc"], fg=COLORS["text"],
+                                   relief="flat", font=(FONT, 11, "bold"),
+                                   padx=14, pady=6)
         self.btn_start.pack(side="left")
-        self.btn_stop = tk.Button(controls, text="Stop Recording", command=self._stop_recording, bg=COLORS["btn"], fg=COLORS["muted"], relief="flat", state="disabled", font=(FONT, 11, "bold"), padx=14, pady=6)
+        self.btn_stop = tk.Button(controls, text="■  Stop Recording",
+                                  command=self._stop_recording,
+                                  bg=COLORS["btn"], fg=COLORS["muted"],
+                                  relief="flat", state="disabled",
+                                  font=(FONT, 11, "bold"), padx=14, pady=6)
         self.btn_stop.pack(side="left", padx=8)
-        tk.Label(controls, textvariable=self.elapsed_var, bg=COLORS["bg"], fg=COLORS["text"], font=(FONT, 12, "bold")).pack(side="left", padx=(8, 0))
-        tk.Label(controls, textvariable=self.size_var, bg=COLORS["bg"], fg=COLORS["muted"], font=(FONT, 10)).pack(side="left", padx=8)
-        tk.Label(controls, textvariable=self.status_var, bg=COLORS["bg"], fg=COLORS["accent"], font=(FONT, 9, "bold")).pack(side="right")
+        tk.Button(controls, text="Preflight Check",
+                  command=self._run_preflight_ui,
+                  bg=COLORS["btn"], fg=COLORS["text"],
+                  relief="flat", padx=8, pady=6).pack(side="left", padx=(0, 8))
+        tk.Label(controls, textvariable=self.elapsed_var, bg=COLORS["bg"],
+                 fg=COLORS["text"], font=(FONT, 12, "bold")).pack(side="left", padx=(8, 0))
+        tk.Label(controls, textvariable=self.size_var, bg=COLORS["bg"],
+                 fg=COLORS["muted"], font=(FONT, 10)).pack(side="left", padx=8)
+        tk.Label(controls, textvariable=self.status_var, bg=COLORS["bg"],
+                 fg=COLORS["accent"], font=(FONT, 9, "bold")).pack(side="right")
 
         studio = tk.LabelFrame(
             body,
@@ -1307,6 +1651,87 @@ class ScreenRecorderApp:
                 self._pending_target_deadline = 0.0
         self._window_watch_job = self.root.after(WINDOW_WATCH_MS, self._window_watch_tick)
 
+    # ── Region selection ──────────────────────────────────────────────────────
+
+    def _select_region(self):
+        """Open full-screen drag-to-crop overlay."""
+        if self.session and self.session.running:
+            messagebox.showwarning(APP_NAME, "Stop recording before changing the region.")
+            return
+        # Minimise main window so user can see the whole screen
+        self.root.iconify()
+        self.root.after(250, self._open_region_selector)
+
+    def _open_region_selector(self):
+        def _on_select(x: int, y: int, w: int, h: int):
+            self._crop_region = (x, y, w, h)
+            self._region_var.set(f"Region: {w}×{h} at ({x},{y})")
+            self._btn_clear_region.config(state="normal")
+            self._log(f"[REGION] Selected: {w}×{h} at screen pos ({x},{y})\n")
+            self.root.deiconify()
+            self._update_disk_estimate()
+
+        def _on_cancel():
+            self.root.deiconify()
+            self._log("[REGION] Cancelled — using full window/screen\n")
+
+        RegionSelector(self.root, on_select=_on_select, on_cancel=_on_cancel)
+
+    def _clear_region(self):
+        self._crop_region = None
+        self._region_var.set("Full window / screen")
+        self._btn_clear_region.config(state="disabled")
+        self._log("[REGION] Cleared — will capture full window\n")
+        self._update_disk_estimate()
+
+    def _update_disk_estimate(self):
+        """Refresh the disk space label based on current settings."""
+        def _bg():
+            try:
+                out_dir = Path(self.output_var.get().strip() or str(RECORDINGS_DIR))
+                out_dir.mkdir(parents=True, exist_ok=True)
+                fmt = EXPORT_FORMATS.get(self.format_var.get(), {})
+                vcodec = str(fmt.get("vcodec", "libx264"))
+                sw, sh = _get_screen_size()
+                _, msg = _check_disk_space(out_dir, 30, sw, sh, vcodec)
+                self.root.after(0, lambda: self._disk_var.set(msg))
+            except Exception:
+                pass
+        threading.Thread(target=_bg, daemon=True).start()
+
+    # ── Preflight ─────────────────────────────────────────────────────────────
+
+    def _run_preflight_ui(self, on_proceed: Optional[Callable[[], None]] = None):
+        """Run full preflight check and show results dialog."""
+        title = self._clean_selected_title()
+        hwnd  = self._resolve_hwnd_for_title(title) if title else None
+        fmt_name = self.format_var.get()
+        fmt = EXPORT_FORMATS.get(fmt_name, EXPORT_FORMATS[list(EXPORT_FORMATS.keys())[0]])
+        out_dir = Path(self.output_var.get().strip() or str(RECORDINGS_DIR))
+        sw, sh = _get_screen_size()
+
+        def _bg():
+            go, errors, warnings = _preflight_check(
+                ffmpeg=self.ffmpeg or "",
+                fmt_name=fmt_name, fmt=fmt,
+                out_dir=out_dir,
+                fps=30, window_title=title or "",
+                hwnd=hwnd, screen_w=sw, screen_h=sh,
+            )
+            def _ui():
+                if go:
+                    self._preflight_var.set(
+                        f"Preflight OK  {len(warnings)} warning(s)")
+                else:
+                    self._preflight_var.set(
+                        f"Preflight FAILED — {len(errors)} error(s)")
+                _show_preflight_dialog(
+                    self.root, errors, warnings,
+                    on_proceed=on_proceed or (lambda: None)
+                )
+            self.root.after(0, _ui)
+        threading.Thread(target=_bg, daemon=True).start()
+
     def _repair_ffmpeg(self):
         """Show the FFmpeg repair dialog and re-check."""
         issues = []
@@ -1351,11 +1776,14 @@ class ScreenRecorderApp:
 
     def _start_recording(self):
         if not self.ffmpeg:
-            messagebox.showerror(APP_NAME, "FFmpeg not found.")
+            messagebox.showerror(APP_NAME,
+                "FFmpeg not found.\nClick 'Repair FFmpeg' to install it automatically.")
             return
         title = self._clean_selected_title()
         if not title or "no CITL windows open" in title.lower():
-            messagebox.showwarning(APP_NAME, "Select a window to record first.")
+            messagebox.showwarning(APP_NAME,
+                "Select a window to record first.\n"
+                "Launch a CITL app, then click 'Refresh Windows'.")
             return
         if self.session and self.session.running:
             return
@@ -1368,54 +1796,87 @@ class ScreenRecorderApp:
         crf = self.crf_var.get().strip() or "21"
         out_path = self._next_output_path()
         hwnd = self._resolve_hwnd_for_title(title)
-        if sys.platform == "win32":
+
+        if sys.platform == "win32" and not self._crop_region:
+            # Re-validate hwnd (may have changed)
             if not _is_valid_hwnd(hwnd):
                 self._refresh_windows(auto_select_new=False, log=False)
                 hwnd = self._resolve_hwnd_for_title(title)
             if not _is_valid_hwnd(hwnd):
-                messagebox.showwarning(
-                    APP_NAME,
+                messagebox.showwarning(APP_NAME,
                     "Target window handle not found.\n"
-                    "Refresh windows and select the target app again.",
-                )
+                    "Click 'Refresh Windows', re-select the target, or use "
+                    "'Select Region' to specify the capture area manually.")
                 return
 
-        self._release_topmost()
-        if _is_valid_hwnd(hwnd):
-            _focus_window(hwnd)
-            if self.pin_target_var.get() and _set_window_topmost(hwnd, True):
-                self._topmost_hwnd = hwnd
+        # Run preflight — show go/no-go dialog first, then start if approved
+        out_dir = out_path.parent
+        sw, sh = _get_screen_size()
 
-        def safe_log(msg: str):
-            self.root.after(0, lambda: self._log(msg))
+        def _do_start():
+            """Actually start the recording session."""
+            self._release_topmost()
+            if not self._crop_region and _is_valid_hwnd(hwnd):
+                _focus_window(hwnd)
+                if self.pin_target_var.get() and _set_window_topmost(hwnd, True):
+                    self._topmost_hwnd = hwnd
 
-        def safe_done(rc: int, path: str):
-            self.root.after(0, lambda: self._on_recording_done(rc, path))
+            def safe_log(msg: str):
+                self.root.after(0, lambda: self._log(msg))
 
-        self.session = RecordingSession(
-            ffmpeg_path=self.ffmpeg,
-            window_title=title,
-            window_hwnd=hwnd,
-            output_path=str(out_path),
-            fmt=fmt,
-            fps=fps,
-            audio_enabled=bool(self.audio_var.get()),
-            audio_device=(self.audio_dev_var.get() if self.audio_var.get() else None),
-            quality_crf=crf,
-            on_log=safe_log,
-            on_done=safe_done,
-        )
-        try:
-            self.session.start()
-        except Exception as exc:
-            messagebox.showerror(APP_NAME, f"Failed to start recording:\n{exc}")
-            self.session = None
-            return
+            def safe_done(rc: int, path: str):
+                self.root.after(0, lambda: self._on_recording_done(rc, path))
 
-        self.btn_start.config(state="disabled", bg=COLORS["btn"])
-        self.btn_stop.config(state="normal", bg="#6b1c1c", fg=COLORS["text"])
-        self.status_var.set(f"Recording: {out_path.name}")
-        self._tick_timer()
+            self.session = RecordingSession(
+                ffmpeg_path=self.ffmpeg,
+                window_title=title,
+                window_hwnd=hwnd,
+                output_path=str(out_path),
+                fmt=fmt,
+                fps=fps,
+                audio_enabled=bool(self.audio_var.get()),
+                audio_device=(self.audio_dev_var.get() if self.audio_var.get() else None),
+                quality_crf=crf,
+                crop_region=self._crop_region,
+                on_log=safe_log,
+                on_done=safe_done,
+            )
+            try:
+                self.session.start()
+            except Exception as exc:
+                region_hint = (" — if window capture fails, use 'Select Region' "
+                               "to drag a capture area instead.") if not self._crop_region else ""
+                messagebox.showerror(APP_NAME,
+                    f"Failed to start recording:\n{exc}{region_hint}")
+                self.session = None
+                return
+
+            self.btn_start.config(state="disabled", bg=COLORS["btn"])
+            self.btn_stop.config(state="normal", bg="#6b1c1c", fg=COLORS["text"])
+            region_label = (f"[{self._crop_region[2]}×{self._crop_region[3]}]"
+                            if self._crop_region else "")
+            self.status_var.set(f"Recording {region_label}: {out_path.name}")
+            self._tick_timer()
+
+        # Run preflight in background, then call _do_start if go
+        def _preflight_bg():
+            go, errors, warnings = _preflight_check(
+                ffmpeg=self.ffmpeg,
+                fmt_name=self.format_var.get(), fmt=fmt,
+                out_dir=out_dir, fps=fps,
+                window_title=title, hwnd=hwnd,
+                screen_w=sw, screen_h=sh,
+            )
+            if go:
+                self._preflight_var.set(
+                    f"Preflight OK  {len(warnings)} warning(s)")
+            else:
+                self._preflight_var.set(
+                    f"Preflight FAILED — {len(errors)} error(s)")
+            self.root.after(0, lambda: _show_preflight_dialog(
+                self.root, errors, warnings, on_proceed=_do_start))
+
+        threading.Thread(target=_preflight_bg, daemon=True).start()
 
     def _tick_timer(self):
         if self.session and self.session.running:
