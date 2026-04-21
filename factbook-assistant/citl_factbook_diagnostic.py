@@ -331,6 +331,8 @@ def _check_ollama_api() -> StepResult:
                 f"Try restarting Ollama:\n  pkill ollama && ollama serve"
             ),
             fix_cmds=["pkill ollama && ollama serve"],
+            fix_fn=lambda r, log: _fix_restart_ollama(log),
+            fix_label="Restart Ollama",
         )
     except urllib.error.URLError as e:
         return StepResult(
@@ -1177,60 +1179,292 @@ def _check_full_pipeline() -> StepResult:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# AUTO-FIX FUNCTIONS (called by fix_fn lambdas)
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTO-FIX FUNCTIONS
+# Each function:
+#   • Attempts the fix on BOTH Windows and Ubuntu/macOS
+#   • Streams live output to log()
+#   • Returns True on full success, False otherwise
+#   • Never silently swallows errors
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _fix_pip(packages: List[str], log: Callable[[str], None]) -> bool:
-    log(f"Running: {sys.executable} -m pip install {' '.join(packages)}")
-    ok, out = _run_cmd_capture(
-        [sys.executable, "-m", "pip", "install"] + packages, timeout=180)
-    for line in out.split("\n"):
-        log(line)
-    return ok
+def _best_python() -> str:
+    """Return the most capable Python executable available."""
+    # Prefer venv Python adjacent to this script
+    for venv_rel in [
+        HERE.parent / ".venv" / ("Scripts" if platform.system() == "Windows" else "bin") / "python",
+        HERE / ".venv"       / ("Scripts" if platform.system() == "Windows" else "bin") / "python",
+    ]:
+        if venv_rel.exists():
+            return str(venv_rel)
+    return sys.executable
 
 
-def _fix_start_ollama(log: Callable[[str], None]) -> bool:
-    log("Starting Ollama in background...")
+def _which(cmd: str) -> Optional[str]:
+    """Return full path to cmd or None if not found."""
+    import shutil
+    return shutil.which(cmd)
+
+
+def _check_network(log: Callable[[str], None]) -> bool:
+    """Return True if we can reach ollama.com (internet present)."""
     try:
-        if platform.system() == "Windows":
-            subprocess.Popen(["ollama", "serve"],
-                             creationflags=subprocess.CREATE_NEW_CONSOLE)
-        else:
-            subprocess.Popen(["ollama", "serve"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        log("ERROR: 'ollama' not found on PATH.")
-        log("Install from https://ollama.com/download")
-        log("  Windows: winget install Ollama.Ollama")
-        log("  Ubuntu:  curl -fsSL https://ollama.com/install.sh | sh")
+        socket.create_connection(("ollama.com", 443), timeout=6).close()
+        log("Network: internet reachable (ollama.com:443 OK)")
+        return True
+    except Exception as e:
+        log(f"Network: cannot reach ollama.com — {e}")
+        log("Check internet connection before attempting downloads.")
         return False
 
-    log("Waiting up to 15 seconds for Ollama to start...")
-    for i in range(15):
+
+def _wait_ollama_up(log: Callable[[str], None], timeout: int = 30) -> bool:
+    """Poll until Ollama TCP port opens or timeout expires. Returns True if up."""
+    host, port = _ollama_hostname(), _ollama_port()
+    log(f"Waiting up to {timeout}s for Ollama at {host}:{port}...")
+    for i in range(timeout):
         time.sleep(1)
         try:
-            s = socket.create_connection((_ollama_hostname(), _ollama_port()), timeout=1)
-            s.close()
-            log(f"Ollama started after {i+1} seconds.")
+            socket.create_connection((host, port), timeout=1).close()
+            log(f"Ollama responded after {i+1}s.")
             return True
         except Exception:
             pass
-    log("Ollama did not respond within 15 seconds.")
-    log("Try opening a new terminal and running: ollama serve")
+    log(f"Ollama did not respond within {timeout}s.")
     return False
 
 
-def _fix_ollama_pull(model: str, log: Callable[[str], None]) -> bool:
-    log(f"Pulling {model} (this may take several minutes)...")
-    ok, out = _run_cmd_capture(["ollama", "pull", model], timeout=900)
-    for line in out.split("\n"):
+# ── pip / package fixes ───────────────────────────────────────────────────────
+
+def _fix_pip(packages: List[str], log: Callable[[str], None]) -> bool:
+    """Install packages via pip, trying venv python first then sys.executable."""
+    py = _best_python()
+    cmd = [py, "-m", "pip", "install", "--upgrade"] + packages
+    log(f"Running: {' '.join(cmd)}")
+    ok, out = _run_cmd_capture(cmd, timeout=300)
+    for line in out.splitlines():
         log(line)
+    if not ok and py != sys.executable:
+        log(f"Retrying with: {sys.executable}")
+        ok, out = _run_cmd_capture(
+            [sys.executable, "-m", "pip", "install", "--upgrade"] + packages,
+            timeout=300)
+        for line in out.splitlines():
+            log(line)
+    if ok:
+        log(f"Installed: {', '.join(packages)}")
+    else:
+        log(f"pip install failed. Try manually: pip install {' '.join(packages)}")
+    return ok
+
+
+def _fix_install_requirements(log: Callable[[str], None]) -> bool:
+    """Install from requirements.txt if present adjacent to this script."""
+    req = HERE.parent / "requirements.txt"
+    if not req.exists():
+        req = HERE / "requirements.txt"
+    if not req.exists():
+        log("No requirements.txt found — installing core packages directly.")
+        return _fix_pip(["numpy", "requests", "sentence-transformers"], log)
+    py = _best_python()
+    log(f"Installing from {req}")
+    ok, out = _run_cmd_capture(
+        [py, "-m", "pip", "install", "-r", str(req)], timeout=600)
+    for line in out.splitlines():
+        log(line)
+    if ok:
+        log("Requirements installed successfully.")
+    return ok
+
+
+def _fix_install_tkinter(log: Callable[[str], None]) -> bool:
+    """Install python3-tk on Ubuntu/Debian if tkinter is missing."""
+    if platform.system() == "Windows":
+        log("On Windows, Tkinter ships with Python. Re-install Python from python.org")
+        log("Make sure 'tcl/tk and IDLE' is checked during installation.")
+        return False
+    # Ubuntu/Debian
+    log("Installing python3-tk via apt...")
+    ok, out = _run_cmd_capture(
+        ["sudo", "apt-get", "install", "-y", "python3-tk"], timeout=120)
+    for line in out.splitlines():
+        log(line)
+    if ok:
+        log("python3-tk installed. Restart this application.")
+    else:
+        log("apt install failed. Try: sudo apt-get install python3-tk")
+    return ok
+
+
+# ── Ollama fixes ──────────────────────────────────────────────────────────────
+
+def _fix_install_ollama(log: Callable[[str], None]) -> bool:
+    """Download and install Ollama on Windows or Ubuntu/macOS."""
+    log("Ollama not found. Attempting automatic installation...")
+    if not _check_network(log):
+        log("ABORT: No internet connection. Install Ollama manually from https://ollama.com/download")
+        return False
+
+    if platform.system() == "Windows":
+        # Try winget first (available on Win 10 1809+)
+        if _which("winget"):
+            log("Running: winget install Ollama.Ollama --silent")
+            ok, out = _run_cmd_capture(
+                ["winget", "install", "Ollama.Ollama", "--silent", "--accept-source-agreements"],
+                timeout=300)
+            for line in out.splitlines():
+                log(line)
+            if ok:
+                log("Ollama installed via winget.")
+                # Reload PATH
+                import os as _os
+                _os.environ["PATH"] = subprocess.check_output(
+                    ["powershell", "-Command",
+                     "[Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + "
+                     "[Environment]::GetEnvironmentVariable('PATH','User')"],
+                    text=True, timeout=10
+                ).strip()
+                return True
+        # Fallback: PowerShell download
+        log("winget not available. Downloading Ollama installer via PowerShell...")
+        installer = Path(os.environ.get("TEMP", "C:/Temp")) / "OllamaSetup.exe"
+        ok, out = _run_cmd_capture([
+            "powershell", "-Command",
+            f"Invoke-WebRequest -Uri 'https://ollama.com/download/OllamaSetup.exe'"
+            f" -OutFile '{installer}' -UseBasicParsing"
+        ], timeout=300)
+        for line in out.splitlines():
+            log(line)
+        if not ok or not installer.exists():
+            log(f"Download failed. Get Ollama manually: https://ollama.com/download")
+            return False
+        log(f"Running installer: {installer}")
+        ok, out = _run_cmd_capture([str(installer), "/S"], timeout=300)
+        for line in out.splitlines():
+            log(line)
+        if ok:
+            log("Ollama installed via installer. PATH may require a new terminal session.")
+        return ok
+
+    else:  # Linux / macOS
+        log("Running: curl -fsSL https://ollama.com/install.sh | sh")
+        ok, out = _run_cmd_capture(
+            ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
+            timeout=300)
+        for line in out.splitlines():
+            log(line)
+        if ok:
+            log("Ollama installed. Adding to PATH for this session...")
+            for p in ["/usr/local/bin", "/usr/bin", str(Path.home() / ".local/bin")]:
+                if Path(p, "ollama").exists():
+                    os.environ["PATH"] = p + ":" + os.environ.get("PATH", "")
+                    log(f"ollama found at {p}")
+                    break
+        else:
+            log("Automatic install failed. Manual install: https://ollama.com/download")
+        return ok
+
+
+def _fix_start_ollama(log: Callable[[str], None]) -> bool:
+    """Start Ollama. If not installed, installs it first. Works on Windows + Ubuntu."""
+    ollama_bin = _which("ollama")
+
+    # If not on PATH, check common install locations
+    if not ollama_bin:
+        for candidate in [
+            r"C:\Users\{}\AppData\Local\Programs\Ollama\ollama.exe".format(
+                os.environ.get("USERNAME", "user")),
+            "/usr/local/bin/ollama",
+            "/usr/bin/ollama",
+            str(Path.home() / ".local/bin/ollama"),
+        ]:
+            if Path(candidate).exists():
+                ollama_bin = candidate
+                os.environ["PATH"] = str(Path(candidate).parent) + (
+                    ";" if platform.system() == "Windows" else ":"
+                ) + os.environ.get("PATH", "")
+                log(f"Found ollama at: {candidate}")
+                break
+
+    if not ollama_bin:
+        log("Ollama not found on this system. Attempting installation...")
+        installed = _fix_install_ollama(log)
+        if not installed:
+            return False
+        ollama_bin = _which("ollama") or "ollama"
+
+    # Check if already running
+    try:
+        socket.create_connection((_ollama_hostname(), _ollama_port()), timeout=1).close()
+        log("Ollama is already running.")
+        return True
+    except Exception:
+        pass
+
+    log(f"Starting Ollama: {ollama_bin} serve")
+    try:
+        if platform.system() == "Windows":
+            subprocess.Popen(
+                [ollama_bin, "serve"],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                close_fds=True,
+            )
+        else:
+            subprocess.Popen(
+                [ollama_bin, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+    except Exception as e:
+        log(f"ERROR launching ollama serve: {e}")
+        log("Try starting manually: ollama serve")
+        return False
+
+    return _wait_ollama_up(log, timeout=30)
+
+
+def _fix_restart_ollama(log: Callable[[str], None]) -> bool:
+    """Kill any stuck Ollama process and restart it cleanly."""
+    log("Stopping existing Ollama process...")
+    if platform.system() == "Windows":
+        _run_cmd_capture(["taskkill", "/F", "/IM", "ollama.exe"], timeout=10)
+    else:
+        _run_cmd_capture(["pkill", "-f", "ollama serve"], timeout=10)
+    time.sleep(2)
+    return _fix_start_ollama(log)
+
+
+def _fix_ollama_pull(model: str, log: Callable[[str], None]) -> bool:
+    """Pull an Ollama model. Starts Ollama first if not running. Checks network."""
+    # Ensure Ollama is running
+    try:
+        socket.create_connection((_ollama_hostname(), _ollama_port()), timeout=2).close()
+    except Exception:
+        log("Ollama not running — starting it first...")
+        if not _fix_start_ollama(log):
+            log(f"Cannot pull {model}: Ollama failed to start.")
+            return False
+
+    if not _check_network(log):
+        log(f"Cannot pull {model}: no internet connection.")
+        return False
+
+    log(f"Pulling {model} (may take several minutes on first run)...")
+    ollama_bin = _which("ollama") or "ollama"
+    ok, out = _run_cmd_capture([ollama_bin, "pull", model], timeout=900)
+    for line in out.splitlines():
+        if line.strip():
+            log(line)
     if ok:
         log(f"Successfully pulled {model}")
     else:
-        log(f"Failed to pull {model}. Check internet connection.")
+        log(f"Failed to pull {model}.")
+        log("Check: ollama.com is reachable, disk has space, Ollama service is healthy")
     return ok
 
+
+# ── Index / corpus fixes ──────────────────────────────────────────────────────
 
 def _fix_mkdir(path: Path, log: Callable[[str], None]) -> bool:
     try:
@@ -1238,17 +1472,23 @@ def _fix_mkdir(path: Path, log: Callable[[str], None]) -> bool:
         log(f"Created: {path}")
         return True
     except Exception as e:
-        log(f"ERROR: {e}")
+        log(f"ERROR creating {path}: {e}")
         return False
 
 
 def _fix_rebuild_index(log: Callable[[str], None], force: bool = True) -> bool:
-    log("Rebuilding keyword index...")
+    """Rebuild the JSONL keyword index from source documents."""
+    log("Rebuilding keyword index from source documents...")
+    if not LIB_RAW.is_dir() or not any(LIB_RAW.iterdir()):
+        log(f"ERROR: library_raw/ is empty or missing: {LIB_RAW}")
+        log("Add source documents (.txt, .pdf, .docx) to:")
+        log(f"  {LIB_RAW}")
+        return False
     try:
-        from citl_auto_index import auto_index_library, LIB_RAW as _LR
+        from citl_auto_index import auto_index_library
         idx_dir = _writable_idx_dir()
         log(f"Writing index to: {idx_dir}")
-        results = auto_index_library(lib_dir=_LR, idx_dir=idx_dir, force=force)
+        results = auto_index_library(lib_dir=LIB_RAW, idx_dir=idx_dir, force=force)
         total = sum(results.values()) if results else 0
         if total > 0:
             log(f"Done: {total:,} chunks indexed across {len(results)} document(s)")
@@ -1256,37 +1496,198 @@ def _fix_rebuild_index(log: Callable[[str], None], force: bool = True) -> bool:
                 log(f"  {name}: {count:,} chunks")
             return True
         else:
-            log("WARNING: Index rebuilt but 0 chunks produced.")
-            log(f"library_raw/ path: {LIB_RAW}")
-            log(f"Documents found: {list(LIB_RAW.glob('*.*')) if LIB_RAW.is_dir() else 'directory missing'}")
+            log("WARNING: 0 chunks produced — check source documents are readable text")
+            log(f"Documents in library_raw/: {[f.name for f in LIB_RAW.glob('*.*')]}")
             return False
-    except Exception as e:
-        log(f"ERROR: {traceback.format_exc()}")
+    except ImportError as e:
+        log(f"Import error: {e}")
+        log("Trying subprocess fallback...")
+        script = HERE / "citl_auto_index.py"
+        if not script.exists():
+            log(f"citl_auto_index.py not found at {script}")
+            return False
+        py = _best_python()
+        ok, out = _run_cmd_capture(
+            [py, str(script), "--force"] if force else [py, str(script)],
+            timeout=300)
+        for line in out.splitlines():
+            log(line)
+        return ok
+    except Exception:
+        log(f"ERROR:\n{traceback.format_exc()}")
         return False
+
+
+def _fix_repair_corrupt_index(log: Callable[[str], None]) -> bool:
+    """Delete corrupted or empty JSONL files then rebuild."""
+    idx_dir = _writable_idx_dir()
+    log(f"Scanning index directory for corrupt files: {idx_dir}")
+    removed = 0
+    if idx_dir.is_dir():
+        for f in idx_dir.glob("*.jsonl"):
+            try:
+                lines = [l for l in f.read_text(encoding="utf-8", errors="ignore").splitlines()
+                         if l.strip() and not l.strip().startswith("//")]
+                if len(lines) == 0:
+                    log(f"  Removing empty index: {f.name}")
+                    f.unlink()
+                    removed += 1
+                else:
+                    # Validate each line is valid JSON
+                    bad = 0
+                    for ln in lines:
+                        try:
+                            json.loads(ln)
+                        except Exception:
+                            bad += 1
+                    if bad > len(lines) * 0.1:   # >10% corrupt
+                        log(f"  Removing corrupt index ({bad}/{len(lines)} bad lines): {f.name}")
+                        f.unlink()
+                        removed += 1
+            except Exception as e:
+                log(f"  Unreadable — removing: {f.name} ({e})")
+                try:
+                    f.unlink()
+                    removed += 1
+                except Exception:
+                    pass
+    log(f"Removed {removed} corrupt/empty index file(s). Rebuilding...")
+    return _fix_rebuild_index(log, force=True)
 
 
 def _fix_build_embeddings(log: Callable[[str], None]) -> bool:
-    script = HERE / "build_factbook_index.py"
-    if not script.exists():
-        log(f"ERROR: build_factbook_index.py not found at {script}")
+    """Build the vector embedding index from source documents."""
+    # Ollama must be running for embeddings
+    try:
+        socket.create_connection((_ollama_hostname(), _ollama_port()), timeout=2).close()
+    except Exception:
+        log("Ollama not running — starting it first...")
+        if not _fix_start_ollama(log):
+            log("Cannot build embeddings without Ollama running.")
+            return False
+
+    for script_name in ["build_factbook_index.py", "build_corpus_index.py"]:
+        script = HERE / script_name
+        if script.exists():
+            break
+    else:
+        log("ERROR: Neither build_factbook_index.py nor build_corpus_index.py found.")
+        log(f"Expected location: {HERE}")
         return False
-    log(f"Running: {sys.executable} {script}")
-    log("This may take several minutes depending on corpus size and hardware...")
-    ok, out = _run_cmd_capture([sys.executable, str(script)], timeout=900)
-    for line in out.split("\n"):
-        log(line)
+
+    py = _best_python()
+    log(f"Running: {py} {script}")
+    log("This may take 5-20 minutes depending on corpus size and hardware...")
+    ok, out = _run_cmd_capture([py, str(script)], timeout=1800)
+    for line in out.splitlines():
+        if line.strip():
+            log(line)
+    if ok:
+        log("Embeddings built successfully.")
+    else:
+        log("Embedding build failed. Check Ollama is running and the nomic-embed-text model is pulled.")
     return ok
 
 
 def _fix_delete_rebuild_embeddings(log: Callable[[str], None]) -> bool:
-    log(f"Deleting {EMB_JSON.name}...")
+    """Delete stale/corrupt embedding JSON and rebuild from scratch."""
+    log(f"Deleting embedding file: {EMB_JSON.name}")
     try:
         EMB_JSON.unlink(missing_ok=True)
-        log("Deleted.")
+        log("Deleted stale embeddings.")
     except Exception as e:
-        log(f"ERROR deleting: {e}")
+        log(f"ERROR deleting {EMB_JSON}: {e}")
         return False
     return _fix_build_embeddings(log)
+
+
+def _fix_full_heal(log: Callable[[str], None]) -> bool:
+    """Comprehensive sequential heal: packages → Ollama → models → index → embeddings.
+    Runs only what is actually needed based on current state."""
+    log("=" * 56)
+    log("FULL HEAL SEQUENCE — running all necessary fixes")
+    log("=" * 56)
+    steps_run = 0
+    steps_ok  = 0
+
+    # 1. Packages
+    core = []
+    for pkg, imp in [("numpy","numpy"),("requests","requests")]:
+        try:
+            importlib.import_module(imp)
+        except ImportError:
+            core.append(pkg)
+    if core:
+        log(f"\n[1/5] Installing core packages: {core}")
+        steps_run += 1
+        if _fix_pip(core, log):
+            steps_ok += 1
+
+    # 2. Ollama
+    try:
+        socket.create_connection((_ollama_hostname(), _ollama_port()), timeout=2).close()
+        log("\n[2/5] Ollama: already running — OK")
+        steps_ok += 1
+    except Exception:
+        log("\n[2/5] Starting Ollama...")
+        steps_run += 1
+        if _fix_start_ollama(log):
+            steps_ok += 1
+        else:
+            log("Ollama could not be started. Remaining steps may fail.")
+
+    # 3. LLM model
+    try:
+        tags = _http_get(f"{_ollama_host()}/api/tags", timeout=5)
+        installed = [m.get("name","") for m in tags.get("models",[])]
+        has_llm = any("mistral" in m or "llama" in m or "phi" in m
+                      or "gemma" in m or "qwen" in m for m in installed)
+        if not has_llm:
+            log("\n[3/5] No LLM model found — pulling mistral:7b-instruct...")
+            steps_run += 1
+            if _fix_ollama_pull("mistral:7b-instruct", log):
+                steps_ok += 1
+        else:
+            log(f"\n[3/5] LLM model already installed — OK")
+            steps_ok += 1
+    except Exception as e:
+        log(f"\n[3/5] Cannot check LLM models: {e}")
+
+    # 4. Embed model
+    try:
+        tags = _http_get(f"{_ollama_host()}/api/tags", timeout=5)
+        installed = [m.get("name","") for m in tags.get("models",[])]
+        has_embed = any("nomic" in m or "embed" in m or "mxbai" in m
+                        for m in installed)
+        if not has_embed:
+            log("\n[4/5] No embedding model found — pulling nomic-embed-text...")
+            steps_run += 1
+            if _fix_ollama_pull("nomic-embed-text", log):
+                steps_ok += 1
+        else:
+            log(f"\n[4/5] Embed model already installed — OK")
+            steps_ok += 1
+    except Exception as e:
+        log(f"\n[4/5] Cannot check embed models: {e}")
+
+    # 5. Index
+    total_chunks, _ = _count_chunks(_writable_idx_dir())
+    if total_chunks < 100:
+        log(f"\n[5/5] Index has only {total_chunks} chunks — rebuilding...")
+        steps_run += 1
+        if _fix_rebuild_index(log, force=True):
+            steps_ok += 1
+    else:
+        log(f"\n[5/5] Index OK ({total_chunks:,} chunks)")
+        steps_ok += 1
+
+    log(f"\n{'='*56}")
+    log(f"Full Heal complete: {steps_ok}/{max(steps_run,1)} steps succeeded.")
+    if steps_ok == steps_run:
+        log("All fixes applied. Re-run diagnostic to confirm.")
+    else:
+        log("Some steps failed — check the log above for details.")
+    return steps_ok > 0
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1659,12 +2060,21 @@ def run_gui():
 
             if auto_fix_all:
                 fixable = [rr for rr in results if not rr.passed and rr.fix_fn]
-                for rr in fixable:
-                    root.after(0, lambda n=rr.name: _log(f"\nAuto-fixing: {n}", "cmd"))
-                    try:
-                        rr.fix_fn(rr, _log)
-                    except Exception as e:
-                        root.after(0, lambda err=e: _log(f"ERROR: {err}", "err"))
+                if fixable:
+                    root.after(0, lambda: _log(
+                        f"\nAuto-fixing {len(fixable)} issue(s)...", "cmd"))
+                    for rr in fixable:
+                        root.after(0, lambda n=rr.name: _log(f"\n-- Fixing: {n}", "cmd"))
+                        try:
+                            rr.fix_fn(rr, _log)
+                        except Exception as e:
+                            root.after(0, lambda err=e: _log(f"ERROR: {err}", "err"))
+                    # Re-run diagnostic automatically after all fixes
+                    root.after(0, lambda: _log(
+                        "\nAll fixes applied — re-running diagnostic to verify...", "ok"))
+                    time.sleep(1)
+                    root.after(500, lambda: _run_diagnostic_bg(False))
+                    return
 
             def _done():
                 failed = [rr for rr in results if rr.failed]
@@ -1691,8 +2101,23 @@ def run_gui():
 
     _btn("Run Diagnostic", _T["accent"],
          lambda: _run_diagnostic_bg(False)).pack(side="left", padx=6)
-    _btn("Auto-Fix All",   _T["warn"],
+    _btn("Auto-Fix All + Re-Test", _T["warn"],
          lambda: _run_diagnostic_bg(True)).pack(side="left", padx=2)
+
+    def _run_full_heal():
+        _log("\n" + "="*56, "cmd")
+        _log("FULL SYSTEM HEAL — packages, Ollama, models, index", "cmd")
+        _log("="*56, "cmd")
+        status_var.set("  Running Full System Heal...")
+        def _bg():
+            ok = _fix_full_heal(_log)
+            root.after(0, lambda: _log(
+                "\nFull Heal done — re-running diagnostic...", "ok" if ok else "warn"))
+            time.sleep(1)
+            root.after(500, lambda: _run_diagnostic_bg(False))
+        threading.Thread(target=_bg, daemon=True).start()
+
+    _btn("Full System Heal", "#FF6B6B", _run_full_heal).pack(side="left", padx=2)
     tk.Button(toolbar, text="Clear Log",
               bg=_T["btn"], fg=_T["btn_fg"], relief="flat",
               padx=8, pady=4, cursor="hand2", font=("Consolas", 9),
