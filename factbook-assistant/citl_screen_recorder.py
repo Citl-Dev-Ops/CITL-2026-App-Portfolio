@@ -6,10 +6,9 @@ Window-focused recorder for CITL applications using FFmpeg.
 """
 from __future__ import annotations
 
-import ctypes
-import ctypes.wintypes as wintypes
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -17,16 +16,27 @@ import sys
 import threading
 import time
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
+
+# ── Windows-only Win32 imports ────────────────────────────────────────────────
+if sys.platform == "win32":
+    import ctypes
+    import ctypes.wintypes as wintypes
+    _WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+else:
+    ctypes = None      # type: ignore[assignment]
+    wintypes = None    # type: ignore[assignment]
+    _WNDENUMPROC = None
 
 try:
     import tkinter as tk
     from tkinter import filedialog, messagebox, scrolledtext, ttk
 except Exception:
     print("tkinter is required for CITL Screen Recorder.")
+    print("Ubuntu fix: sudo apt install python3-tk")
     sys.exit(1)
 
 
@@ -205,8 +215,6 @@ EXPORT_FORMATS: Dict[str, Dict[str, object]] = {
 }
 FPS_OPTIONS = ["10", "15", "20", "24", "30", "60"]
 
-_WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-
 
 def _enum_visible_windows() -> List[Tuple[int, str]]:
     """Return list of visible top-level windows as (hwnd, title)."""
@@ -283,19 +291,144 @@ def _set_window_topmost(hwnd: Optional[int], enabled: bool) -> bool:
 
 
 def _find_ffmpeg() -> Optional[str]:
+    """Locate FFmpeg on Windows or Ubuntu. Returns full path or None."""
     ff = shutil.which("ffmpeg")
     if ff:
         return ff
-    candidates = [
-        REPO / "bin" / "ffmpeg.exe",
-        REPO / "bin" / "windows" / "ffmpeg.exe",
-        Path("C:/ffmpeg/bin/ffmpeg.exe"),
-        Path(os.environ.get("PROGRAMFILES", "C:/Program Files")) / "FFmpeg" / "bin" / "ffmpeg.exe",
-    ]
+    if sys.platform == "win32":
+        candidates = [
+            REPO / "bin" / "ffmpeg.exe",
+            REPO / "bin" / "windows" / "ffmpeg.exe",
+            Path("C:/ffmpeg/bin/ffmpeg.exe"),
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinGet" /
+                "Packages" / "Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe" /
+                "ffmpeg-7.1-full_build" / "bin" / "ffmpeg.exe",
+            Path(os.environ.get("PROGRAMFILES", "C:/Program Files")) / "FFmpeg" / "bin" / "ffmpeg.exe",
+            Path(os.environ.get("PROGRAMFILES(X86)", "")) / "FFmpeg" / "bin" / "ffmpeg.exe",
+        ]
+    else:
+        candidates = [
+            Path("/usr/bin/ffmpeg"),
+            Path("/usr/local/bin/ffmpeg"),
+            Path.home() / ".local/bin/ffmpeg",
+            REPO / "bin" / "ffmpeg",
+            REPO / "bin" / "linux" / "ffmpeg",
+        ]
     for p in candidates:
-        if p.exists():
-            return str(p)
+        try:
+            if p and p.exists():
+                return str(p)
+        except Exception:
+            pass
     return None
+
+
+def _run_silent(cmd: List[str], timeout: int = 10) -> Tuple[bool, str]:
+    """Run command, return (success, output). Never raises."""
+    try:
+        r = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=timeout, encoding="utf-8", errors="replace",
+            creationflags=0x08000000 if sys.platform == "win32" else 0,
+        )
+        return r.returncode == 0, (r.stdout + r.stderr).strip()
+    except FileNotFoundError:
+        return False, f"Command not found: {cmd[0]}"
+    except subprocess.TimeoutExpired:
+        return False, "Timed out"
+    except Exception as e:
+        return False, str(e)
+
+
+def _install_ffmpeg(log: Callable[[str], None]) -> Optional[str]:
+    """Install FFmpeg on Windows (winget/choco/direct) or Ubuntu (apt).
+    Returns new ffmpeg path on success, None on failure."""
+    if sys.platform == "win32":
+        # Try winget
+        if shutil.which("winget"):
+            log("Installing FFmpeg via winget (Gyan.FFmpeg)...")
+            ok, out = _run_silent(
+                ["winget", "install", "Gyan.FFmpeg",
+                 "--silent", "--accept-source-agreements"], timeout=300)
+            for line in out.splitlines():
+                log(line)
+            # Reload PATH after install
+            try:
+                new_path = subprocess.check_output(
+                    ["powershell", "-Command",
+                     "[Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + "
+                     "[Environment]::GetEnvironmentVariable('PATH','User')"],
+                    text=True, timeout=10
+                ).strip()
+                os.environ["PATH"] = new_path
+            except Exception:
+                pass
+            found = _find_ffmpeg()
+            if found:
+                log(f"FFmpeg installed: {found}")
+                return found
+
+        # Try chocolatey
+        if shutil.which("choco"):
+            log("Installing FFmpeg via Chocolatey...")
+            ok, out = _run_silent(["choco", "install", "ffmpeg", "-y"], timeout=300)
+            for line in out.splitlines():
+                log(line)
+            found = _find_ffmpeg()
+            if found:
+                log(f"FFmpeg installed: {found}")
+                return found
+
+        # Direct download to C:\ffmpeg
+        log("Attempting direct FFmpeg download to C:\\ffmpeg\\bin\\...")
+        dl_script = (
+            "$url='https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';"
+            "$out='$env:TEMP\\ffmpeg.zip';"
+            "Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing;"
+            "$dest='C:\\ffmpeg';"
+            "Expand-Archive -Path $out -DestinationPath $dest -Force;"
+            "$binDir=(Get-ChildItem -Path $dest -Recurse -Filter 'ffmpeg.exe' | "
+            "Select-Object -First 1).DirectoryName;"
+            "[Environment]::SetEnvironmentVariable('PATH',$env:PATH+';'+$binDir,'Machine');"
+            "Write-Host ('Installed to: '+$binDir)"
+        )
+        ok, out = _run_silent(["powershell", "-Command", dl_script], timeout=600)
+        for line in out.splitlines():
+            log(line)
+        # Also add C:\ffmpeg\... dynamically
+        for sub in Path("C:/ffmpeg").rglob("ffmpeg.exe"):
+            os.environ["PATH"] = str(sub.parent) + ";" + os.environ.get("PATH", "")
+            break
+        found = _find_ffmpeg()
+        if found:
+            log(f"FFmpeg installed: {found}")
+            return found
+        log("FFmpeg automatic install failed. Download manually from https://ffmpeg.org/download.html")
+        return None
+
+    else:  # Ubuntu / Linux
+        # Try apt
+        if shutil.which("apt-get"):
+            log("Installing FFmpeg via apt-get...")
+            ok, out = _run_silent(
+                ["sudo", "apt-get", "install", "-y", "ffmpeg"], timeout=300)
+            for line in out.splitlines():
+                log(line)
+            found = _find_ffmpeg()
+            if found:
+                log(f"FFmpeg installed: {found}")
+                return found
+        # Try snap
+        if shutil.which("snap"):
+            log("Trying snap install ffmpeg...")
+            ok, out = _run_silent(["sudo", "snap", "install", "ffmpeg"], timeout=300)
+            for line in out.splitlines():
+                log(line)
+            found = _find_ffmpeg()
+            if found:
+                return found
+        log("FFmpeg install failed. Run: sudo apt install ffmpeg")
+        return None
 
 
 def _ffmpeg_version(ffmpeg_path: str) -> str:
@@ -314,33 +447,192 @@ def _ffmpeg_version(ffmpeg_path: str) -> str:
 
 
 def _list_audio_devices(ffmpeg_path: str) -> List[str]:
-    if sys.platform != "win32":
-        return []
-    try:
-        out = subprocess.check_output(
-            [ffmpeg_path, "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
-            stderr=subprocess.STDOUT,
-            timeout=8,
-            creationflags=0x08000000,
-        )
-        text = out.decode("utf-8", errors="replace")
-    except Exception:
-        return []
+    """Return audio device names for the current platform."""
+    if sys.platform == "win32":
+        # DirectShow devices
+        try:
+            out = subprocess.check_output(
+                [ffmpeg_path, "-hide_banner", "-list_devices", "true",
+                 "-f", "dshow", "-i", "dummy"],
+                stderr=subprocess.STDOUT, timeout=8,
+                creationflags=0x08000000,
+            )
+            text = out.decode("utf-8", errors="replace")
+        except Exception:
+            return []
+        devices: List[str] = []
+        in_audio = False
+        for line in text.splitlines():
+            if "DirectShow audio devices" in line:
+                in_audio = True
+                continue
+            if in_audio and "DirectShow video devices" in line:
+                break
+            if not in_audio:
+                continue
+            m = re.search(r'"([^"]+)"', line)
+            if m:
+                devices.append(m.group(1))
+        return devices
 
-    devices: List[str] = []
-    in_audio = False
-    for line in text.splitlines():
-        if "DirectShow audio devices" in line:
-            in_audio = True
-            continue
-        if in_audio and "DirectShow video devices" in line:
-            break
-        if not in_audio:
-            continue
-        m = re.search(r'"([^"]+)"', line)
-        if m:
-            devices.append(m.group(1))
-    return devices
+    else:
+        # PulseAudio (most Ubuntu installs)
+        devices: List[str] = []
+        pa_ok, pa_out = _run_silent(["pactl", "list", "short", "sources"], timeout=5)
+        if pa_ok and pa_out.strip():
+            for line in pa_out.splitlines():
+                parts = line.split()
+                if len(parts) >= 2:
+                    src = parts[1]
+                    if not src.endswith(".monitor") or not devices:
+                        devices.append(src)
+            if devices:
+                return devices
+
+        # ALSA fallback
+        alsa_ok, alsa_out = _run_silent(
+            ["arecord", "-l"], timeout=5)
+        if alsa_ok:
+            for line in alsa_out.splitlines():
+                m = re.search(r"card (\d+):.*device (\d+):", line)
+                if m:
+                    devices.append(f"hw:{m.group(1)},{m.group(2)}")
+            if devices:
+                return devices
+
+        # Default fallback — always works with pulse
+        return ["default", "pulse"]
+
+
+def _get_screen_size() -> Tuple[int, int]:
+    """Return (width, height) of the primary screen."""
+    try:
+        if sys.platform == "win32" and ctypes:
+            user32 = ctypes.windll.user32
+            return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+        else:
+            # xrandr / xdpyinfo fallback
+            ok, out = _run_silent(["xdpyinfo"], timeout=5)
+            if ok:
+                m = re.search(r"dimensions:\s+(\d+)x(\d+)", out)
+                if m:
+                    return int(m.group(1)), int(m.group(2))
+            ok2, out2 = _run_silent(["xrandr", "--query"], timeout=5)
+            if ok2:
+                m2 = re.search(r"current (\d+) x (\d+)", out2)
+                if m2:
+                    return int(m2.group(1)), int(m2.group(2))
+    except Exception:
+        pass
+    return 1920, 1080   # Safe default
+
+
+def _open_path(p: Path) -> None:
+    """Open a file or folder cross-platform."""
+    p = Path(p)
+    if sys.platform == "win32":
+        os.startfile(str(p))
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(p)])
+    else:
+        subprocess.Popen(["xdg-open", str(p)])
+
+
+def _diagnose_ffmpeg() -> List[str]:
+    """Return list of problem strings for the current environment."""
+    issues: List[str] = []
+    ff = _find_ffmpeg()
+    if not ff:
+        issues.append("FFmpeg not found on this system.")
+        return issues
+    # Check gdigrab / x11grab availability
+    ok, out = _run_silent([ff, "-hide_banner", "-devices"], timeout=5)
+    if sys.platform == "win32" and "gdigrab" not in out:
+        issues.append("FFmpeg is installed but gdigrab is not available. "
+                      "Re-install a full FFmpeg build.")
+    if sys.platform != "win32" and "x11grab" not in out:
+        issues.append("FFmpeg is installed but x11grab is not available. "
+                      "Install: sudo apt install ffmpeg")
+    # Check libx264 encoder
+    ok2, enc_out = _run_silent([ff, "-hide_banner", "-encoders"], timeout=5)
+    if "libx264" not in enc_out:
+        issues.append("libx264 encoder not found in this FFmpeg build. "
+                      "Install a full build: sudo apt install ffmpeg  "
+                      "or get the full Windows build from gyan.dev")
+    return issues
+
+
+def _startup_repair_dialog(root: tk.Tk, issues: List[str],
+                           on_fixed: Callable[[str], None]) -> None:
+    """Show a modal repair dialog if FFmpeg or capture deps are missing."""
+    win = tk.Toplevel(root)
+    win.title("CITL Screen Recorder — Repair Required")
+    win.configure(bg=COLORS["bg"])
+    win.geometry("620x400")
+    win.grab_set()
+
+    tk.Label(win, text="  Setup Problems Found",
+             font=(FONT, 13, "bold"), bg=COLORS["panel"],
+             fg=COLORS["danger"]).pack(fill="x", pady=(0, 8))
+
+    log_w = scrolledtext.ScrolledText(
+        win, height=8, bg=COLORS["notebk"], fg=COLORS["text"],
+        font=("Courier New", 9), relief="flat")
+    log_w.pack(fill="both", expand=True, padx=12, pady=4)
+
+    for iss in issues:
+        log_w.insert("end", f"  PROBLEM: {iss}\n")
+    log_w.configure(state="disabled")
+
+    status = tk.StringVar(value="Click 'Fix Now' to auto-repair.")
+    tk.Label(win, textvariable=status, bg=COLORS["bg"],
+             fg=COLORS["warn"], font=(FONT, 9)).pack(fill="x", padx=12)
+
+    def _append(line: str):
+        def _do():
+            log_w.configure(state="normal")
+            log_w.insert("end", line + "\n")
+            log_w.configure(state="disabled")
+            log_w.see("end")
+        win.after(0, _do)
+
+    def _fix():
+        fix_btn.config(state="disabled")
+        status.set("Fixing… this may take a few minutes.")
+        def _bg():
+            found = _install_ffmpeg(_append)
+            def _done():
+                if found:
+                    status.set(f"Fixed! FFmpeg: {found}")
+                    on_fixed(found)
+                    win.after(1500, win.destroy)
+                else:
+                    status.set("Auto-fix failed — see log above. Install FFmpeg manually.")
+                    fix_btn.config(state="normal")
+            win.after(0, _done)
+        threading.Thread(target=_bg, daemon=True).start()
+
+    btn_row = tk.Frame(win, bg=COLORS["bg"])
+    btn_row.pack(fill="x", padx=12, pady=8)
+    fix_btn = tk.Button(btn_row, text="Fix Now (Auto-Install FFmpeg)",
+                        bg=COLORS["accent"], fg=COLORS["text"],
+                        font=(FONT, 10, "bold"), relief="flat",
+                        padx=10, pady=6, command=_fix)
+    fix_btn.pack(side="left")
+    tk.Button(btn_row, text="Continue Anyway",
+              bg=COLORS["btn"], fg=COLORS["muted"],
+              relief="flat", padx=10, pady=6,
+              command=win.destroy).pack(side="left", padx=8)
+
+    def _manual():
+        url = ("https://ffmpeg.org/download.html" if sys.platform == "win32"
+               else "https://ffmpeg.org/download.html#build-linux")
+        import webbrowser
+        webbrowser.open(url)
+    tk.Button(btn_row, text="Open ffmpeg.org",
+              bg=COLORS["btn"], fg=COLORS["muted"],
+              relief="flat", padx=8, pady=6,
+              command=_manual).pack(side="left")
 
 
 @dataclass
@@ -362,14 +654,43 @@ class RecordingSession:
     start_time: float = 0.0
 
     def _cmd(self) -> List[str]:
-        cmd: List[str] = [
-            self.ffmpeg_path,
-            "-hide_banner",
-            "-f", "gdigrab",
-            "-framerate", str(self.fps),
-            "-i", (f"hwnd={self.window_hwnd}" if self.window_hwnd else f"title={self.window_title}"),
-            "-vcodec", str(self.fmt["vcodec"]),
-        ]
+        cmd: List[str] = [self.ffmpeg_path, "-hide_banner"]
+
+        if sys.platform == "win32":
+            # Windows: gdigrab by HWND or window title
+            cmd.extend([
+                "-f", "gdigrab",
+                "-framerate", str(self.fps),
+                "-i", (f"hwnd={self.window_hwnd}"
+                       if self.window_hwnd else f"title={self.window_title}"),
+            ])
+        else:
+            # Ubuntu / Linux: x11grab full desktop (window-specific needs xwininfo)
+            display = os.environ.get("DISPLAY", ":0")
+            w, h = _get_screen_size()
+            # Try to get window geometry for targeted capture
+            wgeo = self._get_window_geometry_linux()
+            if wgeo:
+                x, y, ww, wh = wgeo
+                # Align dimensions to even numbers (required by most codecs)
+                ww = ww - (ww % 2)
+                wh = wh - (wh % 2)
+                cmd.extend([
+                    "-f", "x11grab",
+                    "-framerate", str(self.fps),
+                    "-video_size", f"{ww}x{wh}",
+                    "-i", f"{display}+{x},{y}",
+                ])
+            else:
+                # Full-screen fallback
+                cmd.extend([
+                    "-f", "x11grab",
+                    "-framerate", str(self.fps),
+                    "-video_size", f"{w}x{h}",
+                    "-i", f"{display}",
+                ])
+
+        cmd.extend(["-vcodec", str(self.fmt["vcodec"])])
         vflags = list(self.fmt.get("vflags", []))
         if "-crf" in vflags:
             idx = vflags.index("-crf")
@@ -380,19 +701,59 @@ class RecordingSession:
             cmd.extend(["-pix_fmt", "yuv420p"])
 
         supports_audio = bool(self.fmt.get("audio"))
-        if supports_audio and self.audio_enabled and self.audio_device and sys.platform == "win32":
-            cmd.extend(["-f", "dshow", "-i", f"audio={self.audio_device}"])
+        if supports_audio and self.audio_enabled and self.audio_device:
+            if sys.platform == "win32":
+                cmd.extend(["-f", "dshow", "-i", f"audio={self.audio_device}"])
+            else:
+                # Ubuntu: prefer pulse then alsa
+                dev = self.audio_device or "default"
+                if dev in ("default", "pulse") or dev.startswith("alsa_"):
+                    cmd.extend(["-f", "pulse", "-i", dev])
+                elif dev.startswith("hw:"):
+                    cmd.extend(["-f", "alsa", "-i", dev])
+                else:
+                    cmd.extend(["-f", "pulse", "-i", dev])
             acodec = str(self.fmt.get("acodec") or "")
             if acodec:
                 cmd.extend(["-acodec", acodec])
             cmd.extend(list(self.fmt.get("aflags", [])))
-        elif supports_audio:
-            cmd.append("-an")
         else:
             cmd.append("-an")
 
         cmd.extend(["-y", self.output_path])
         return cmd
+
+    def _get_window_geometry_linux(self) -> Optional[Tuple[int, int, int, int]]:
+        """Return (x, y, w, h) of the target window on Linux using xdotool."""
+        if sys.platform == "win32" or not self.window_title:
+            return None
+        try:
+            # Find window by name
+            ok, wid = _run_silent(
+                ["xdotool", "search", "--name", self.window_title], timeout=3)
+            if not ok or not wid.strip():
+                # Try partial match
+                ok, wid = _run_silent(
+                    ["xdotool", "search", "--name",
+                     self.window_title.split()[0]], timeout=3)
+            if ok and wid.strip():
+                wid_clean = wid.strip().splitlines()[0]
+                ok2, geo = _run_silent(
+                    ["xdotool", "getwindowgeometry", "--shell", wid_clean], timeout=3)
+                if ok2 and geo:
+                    vals: Dict[str, int] = {}
+                    for line in geo.splitlines():
+                        if "=" in line:
+                            k, _, v = line.partition("=")
+                            try:
+                                vals[k.strip()] = int(v.strip())
+                            except ValueError:
+                                pass
+                    if all(k in vals for k in ("X", "Y", "WIDTH", "HEIGHT")):
+                        return vals["X"], vals["Y"], vals["WIDTH"], vals["HEIGHT"]
+        except Exception:
+            pass
+        return None
 
     def _emit(self, text: str):
         if self.on_log:
@@ -450,6 +811,66 @@ class RecordingSession:
         self.running = False
 
 
+_FFMPEG_ERROR_PATTERNS: List[Tuple[str, str]] = [
+    # (match fragment, human description)
+    ("Could not find a valid device",       "capture device not found"),
+    ("device open failed",                  "capture device failed to open"),
+    ("No such file or directory",           "output path not writable"),
+    ("Permission denied",                   "permission denied — check output folder"),
+    ("Invalid argument",                    "invalid FFmpeg argument"),
+    ("Encoder libx264 not found",           "libx264 encoder missing"),
+    ("Encoder libvpx-vp9 not found",        "libvpx-vp9 encoder missing"),
+    ("gdigrab",                             "gdigrab (Windows screen capture) failed"),
+    ("x11grab",                             "x11grab (Linux screen capture) failed — is DISPLAY set?"),
+    ("Connection refused",                  "screen capture connection refused"),
+    ("Unable to find a suitable output",    "incompatible output format"),
+    ("moov atom not found",                 "output file corrupt — disk may be full"),
+    ("No space left",                       "disk full — free up space and retry"),
+    ("Error initializing output stream",    "could not open output stream"),
+    ("hwnd=",                               "window handle invalid — re-select target window"),
+    ("title=",                              "window title not found — re-select target window"),
+    ("pulse",                               "PulseAudio error — try different audio device or disable audio"),
+    ("alsa",                                "ALSA audio error — try different audio device or disable audio"),
+    ("dshow",                               "DirectShow audio error — try different audio device or disable audio"),
+]
+
+
+def _parse_ffmpeg_error(log_text: str) -> str:
+    """Scan FFmpeg log output and return a human-readable cause."""
+    for fragment, description in _FFMPEG_ERROR_PATTERNS:
+        if fragment.lower() in log_text.lower():
+            return description
+    # Last-resort: extract last "Error" line
+    for line in reversed(log_text.splitlines()):
+        if "error" in line.lower() and len(line.strip()) > 10:
+            return line.strip()[:120]
+    return "unknown error — see log below"
+
+
+def _ffmpeg_fix_hint(cause: str) -> str:
+    """Return a one-line actionable hint for a given error cause."""
+    hints = {
+        "capture device not found":     "Refresh Windows list and re-select target, or check DISPLAY env var on Ubuntu",
+        "capture device failed":        "Try 'Show all windows', re-select target, or reboot and retry",
+        "output path not writable":     "Change Output folder to a writable directory (e.g. Desktop/Recordings)",
+        "permission denied":            "Run as administrator (Windows) or check folder permissions (Ubuntu: chmod 755)",
+        "libx264 encoder missing":      "Re-install FFmpeg full build: winget install Gyan.FFmpeg  or  sudo apt install ffmpeg",
+        "libvpx-vp9 encoder missing":   "Switch format to MP4-H264 or re-install full FFmpeg",
+        "disk full":                    "Free up disk space or change Output folder to a drive with more space",
+        "window handle invalid":        "Click 'Refresh Windows' then re-select the target window",
+        "window title not found":       "Click 'Refresh Windows' then re-select the target window",
+        "PulseAudio error":             "Disable audio capture, or run: pulseaudio --start",
+        "ALSA audio error":             "Disable audio capture or switch to 'pulse' audio device",
+        "DirectShow audio error":       "Disable audio capture or click 'Detect Audio Devices' and choose a different device",
+        "gdigrab":                      "Re-select target window; if problem persists re-install FFmpeg full build",
+        "x11grab":                      "Ensure DISPLAY=:0 is set and you are running in a graphical session",
+    }
+    for key, hint in hints.items():
+        if key in cause:
+            return hint
+    return "See FFMPEG output in the log below for details"
+
+
 class ScreenRecorderApp:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -498,6 +919,7 @@ class ScreenRecorderApp:
         self._refresh_recent_recordings()
         self._start_window_watch()
         self.root.after(400, self._update_ffmpeg_label)
+        self.root.after(600, self._run_startup_diagnostic)
 
     def _build_ui(self):
         top = tk.Frame(self.root, bg=COLORS["panel"], padx=12, pady=8)
@@ -547,7 +969,13 @@ class ScreenRecorderApp:
         ).pack(anchor="w", padx=8, pady=(0, 4))
         self.window_combo = ttk.Combobox(wbox, textvariable=self.window_var, state="readonly")
         self.window_combo.pack(fill="x", padx=8, pady=(0, 6))
-        tk.Button(wbox, text="Refresh Windows", command=self._refresh_windows, bg=COLORS["btn"], fg=COLORS["text"], relief="flat").pack(anchor="w", padx=8, pady=(0, 8))
+        btn_row_w = tk.Frame(wbox, bg=COLORS["card"])
+        btn_row_w.pack(anchor="w", padx=8, pady=(0, 8))
+        tk.Button(btn_row_w, text="Refresh Windows", command=self._refresh_windows,
+                  bg=COLORS["btn"], fg=COLORS["text"], relief="flat").pack(side="left")
+        tk.Button(btn_row_w, text="Repair FFmpeg",
+                  command=self._repair_ffmpeg,
+                  bg=COLORS["btn_acc"], fg=COLORS["text"], relief="flat").pack(side="left", padx=6)
 
         cfg = tk.LabelFrame(body, text="Recording Options", font=(FONT, 9, "bold"), bg=COLORS["card"], fg=COLORS["text"], bd=1, relief="solid")
         cfg.pack(fill="x", pady=(0, 8))
@@ -679,11 +1107,30 @@ class ScreenRecorderApp:
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    def _run_startup_diagnostic(self):
+        """Check FFmpeg and capture support. Show repair dialog if broken."""
+        def _bg():
+            issues = []
+            if not self.ffmpeg:
+                issues.append("FFmpeg not found. Recording is not possible without it.")
+            else:
+                issues.extend(_diagnose_ffmpeg())
+            if issues:
+                self.root.after(0, lambda: _startup_repair_dialog(
+                    self.root, issues,
+                    on_fixed=lambda path: (
+                        setattr(self, "ffmpeg", path),
+                        self._update_ffmpeg_label(),
+                        self._log(f"[FIX] FFmpeg installed: {path}\n"),
+                    )
+                ))
+        threading.Thread(target=_bg, daemon=True).start()
+
     def _update_ffmpeg_label(self):
         if self.ffmpeg:
             self.ffmpeg_var.set(f"{self.ffmpeg} [{_ffmpeg_version(self.ffmpeg)}]")
         else:
-            self.ffmpeg_var.set("NOT FOUND - install FFmpeg for recording")
+            self.ffmpeg_var.set("NOT FOUND — click Repair FFmpeg in the log area")
 
     def _log(self, text: str):
         self.log.insert("end", text)
@@ -860,6 +1307,28 @@ class ScreenRecorderApp:
                 self._pending_target_deadline = 0.0
         self._window_watch_job = self.root.after(WINDOW_WATCH_MS, self._window_watch_tick)
 
+    def _repair_ffmpeg(self):
+        """Show the FFmpeg repair dialog and re-check."""
+        issues = []
+        if not self.ffmpeg:
+            issues.append("FFmpeg not found on this machine.")
+        else:
+            issues.extend(_diagnose_ffmpeg())
+            if not issues:
+                messagebox.showinfo(APP_NAME,
+                    f"FFmpeg OK: {self.ffmpeg}\nVersion: {_ffmpeg_version(self.ffmpeg)}")
+                return
+        if not issues:
+            issues = ["FFmpeg may have a problem. Click Fix Now to reinstall."]
+        _startup_repair_dialog(
+            self.root, issues,
+            on_fixed=lambda path: (
+                setattr(self, "ffmpeg", path),
+                self._update_ffmpeg_label(),
+                self._log(f"[FIX] FFmpeg repaired: {path}\n"),
+            )
+        )
+
     def _refresh_audio_devices(self):
         if not self.ffmpeg:
             messagebox.showwarning(APP_NAME, "FFmpeg not found.")
@@ -982,8 +1451,12 @@ class ScreenRecorderApp:
             if self.auto_open_editor_var.get() and self._last_saved_video and self._last_saved_video.exists():
                 self.root.after(300, lambda p=self._last_saved_video: self._open_post_editor(input_override=p))
         else:
-            self.status_var.set(f"Recording ended (code {rc})")
-            self._log(f"[WARN] FFmpeg exit code {rc}\n")
+            # Parse known FFmpeg failure patterns from the log widget
+            log_text = self.log.get("1.0", "end")
+            cause = _parse_ffmpeg_error(log_text)
+            self.status_var.set(f"Recording failed (code {rc}): {cause}")
+            self._log(f"[ERROR] FFmpeg exit code {rc}: {cause}\n")
+            self._log("[HINT]  " + _ffmpeg_fix_hint(cause) + "\n")
         self.session = None
         self.elapsed_var.set("00:00:00")
         self._release_topmost()
@@ -1053,7 +1526,7 @@ class ScreenRecorderApp:
     def _open_output(self):
         p = Path(self.output_var.get().strip())
         if p.exists():
-            os.startfile(str(p))
+            _open_path(p)
         else:
             messagebox.showinfo(APP_NAME, f"Folder not found:\n{p}")
 
@@ -1110,14 +1583,14 @@ class ScreenRecorderApp:
             messagebox.showinfo(APP_NAME, "Select a recording first.")
             return
         try:
-            os.startfile(str(p))
+            _open_path(p)
         except Exception as exc:
             messagebox.showerror(APP_NAME, f"Could not open recording:\n{exc}")
 
     def _open_screenshots_folder(self):
         try:
             SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-            os.startfile(str(SCREENSHOTS_DIR))
+            _open_path(SCREENSHOTS_DIR)
         except Exception as exc:
             messagebox.showerror(APP_NAME, f"Could not open screenshots folder:\n{exc}")
 
