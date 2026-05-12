@@ -1,0 +1,1934 @@
+{
+  "patches": [
+    {
+      "patch_id": "PATCH-0001",
+      "patch_num": 1,
+      "nickname": "Matcha Latte",
+      "color_fg": "#00C8A8",
+      "color_bg": "#E6FFF9",
+      "date": "2026-04-30",
+      "time": "00:53:25 UTC",
+      "recorded_at": "2026-04-30T00:53:25.545911+00:00",
+      "recorded_at_local": "2026-04-29T17:53:25.552917-07:00",
+      "source_repo": "C:\\Users\\Doc_M\\CITL",
+      "source_host": "DESKTOP-H3821SL",
+      "source_platform": "Windows",
+      "source_user": "Doc_M",
+      "source_machine_id": "b1e1659b00ab",
+      "source_machine_nickname": "Black Sesame Latte",
+      "source_machine_color_fg": "#424242",
+      "source_machine_color_bg": "#E0E0E0",
+      "source_device_num": 1,
+      "source_device_label": "PC-01",
+      "source_device_nickname": "Taro Bubble Tea",
+      "source_device_color_fg": "#9B59B6",
+      "source_device_color_bg": "#F0E6FF",
+      "patch_type": "sync",
+      "manual_tag": false,
+      "cadence_hours": 48,
+      "collector": false,
+      "collector_app": null,
+      "patch_label": "PATCH-0001 Matcha Latte",
+      "patch_description": "61 changed file(s) across CITL App Sync.cmd, CITL Field Apps.cmd, CITL Presentation Suite.cmd, CITL Sync Hub.cmd, CITL Workstation Apps.cmd, CITL-UTILITIES-EASY-RUN-v2, COPY_THIS_USB_TO_NEXT_WINDOWS.cmd, DIAGNOSE_FACTBOOK.cmd, INSTALL_CITL_APPS_PORTABLE.cmd, LAUNCH_FACTBOOK.cmd, PORTABLE_APPS, REPAIR_CITL_APPS.cmd, RUN_CITL_FLEX.sh, RUN_FACTBOOK.sh, RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh, RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd, RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd, START_CITL_UBUNTU.sh, SYNC_EXES_TO_USB_WINDOWS.cmd, _work_academic_advisor, bootstrap, citl_app_sync.py, citl_device_registry.json, citl_fixer.py, citl_flex_troubleshooter, citl_patches.json, diagnose_factbook.sh, documents, factbook-assistant, gpu, launch_factbook.sh, launch_flex.sh, powerflow_builder, scripts",
+      "apps": [
+        "CITL App Sync.cmd",
+        "CITL Field Apps.cmd",
+        "CITL Presentation Suite.cmd",
+        "CITL Sync Hub.cmd",
+        "CITL Workstation Apps.cmd",
+        "CITL-UTILITIES-EASY-RUN-v2",
+        "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd",
+        "DIAGNOSE_FACTBOOK.cmd",
+        "INSTALL_CITL_APPS_PORTABLE.cmd",
+        "LAUNCH_FACTBOOK.cmd",
+        "PORTABLE_APPS",
+        "REPAIR_CITL_APPS.cmd",
+        "RUN_CITL_FLEX.sh",
+        "RUN_FACTBOOK.sh",
+        "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+        "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+        "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd",
+        "START_CITL_UBUNTU.sh",
+        "SYNC_EXES_TO_USB_WINDOWS.cmd",
+        "_work_academic_advisor",
+        "bootstrap",
+        "citl_app_sync.py",
+        "citl_device_registry.json",
+        "citl_fixer.py",
+        "citl_flex_troubleshooter",
+        "citl_patches.json",
+        "diagnose_factbook.sh",
+        "documents",
+        "factbook-assistant",
+        "gpu",
+        "launch_factbook.sh",
+        "launch_flex.sh",
+        "powerflow_builder",
+        "scripts"
+      ],
+      "total_files": 61,
+      "by_kind": {
+        "modified": 28,
+        "new": 33
+      },
+      "files": [
+        {
+          "path": "CITL App Sync.cmd",
+          "kind": "modified",
+          "src_hash": "5bb81ac13dddfb94",
+          "usb_hash": "8cf41aaccd7105b7",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Field Apps.cmd",
+          "kind": "modified",
+          "src_hash": "4730d0facf999974",
+          "usb_hash": "de4a86a888e423e8",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Presentation Suite.cmd",
+          "kind": "modified",
+          "src_hash": "788361fa4dec453d",
+          "usb_hash": "4d771c090fcf9ddd",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Sync Hub.cmd",
+          "kind": "modified",
+          "src_hash": "bffb73683a2c893a",
+          "usb_hash": "b7d033edc5b91c9f",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Workstation Apps.cmd",
+          "kind": "modified",
+          "src_hash": "cc837af28866e478",
+          "usb_hash": "ca1e4e6aa21d7285",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "citl_app_sync.py",
+          "kind": "new",
+          "src_hash": "4a7e33a1cf078fcd",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_device_registry.json",
+          "kind": "new",
+          "src_hash": "b674a853e767eb95",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "6d21d373de883e51",
+          "usb_hash": "4e9554e85068d8fb",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_patches.json",
+          "kind": "new",
+          "src_hash": "32d8413601349f45",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd",
+          "kind": "modified",
+          "src_hash": "2ad4552629e2e849",
+          "usb_hash": "bc2af4c189c36ac0",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "DIAGNOSE_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "9d2907d2599ad604",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:44:10-07:00",
+          "commit_msg": "Add 18-stage live pipeline diagnostic with exact-error reporting and fix buttons"
+        },
+        {
+          "path": "diagnose_factbook.sh",
+          "kind": "new",
+          "src_hash": "7a0b290def6788be",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:44:10-07:00",
+          "commit_msg": "Add 18-stage live pipeline diagnostic with exact-error reporting and fix buttons"
+        },
+        {
+          "path": "INSTALL_CITL_APPS_PORTABLE.cmd",
+          "kind": "modified",
+          "src_hash": "01d1c7e9cd7d3bf3",
+          "usb_hash": "114fd2226f451caa",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "LAUNCH_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "0d3d12a899d0fd95",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "launch_factbook.sh",
+          "kind": "new",
+          "src_hash": "d5b6a974c0859784",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "launch_flex.sh",
+          "kind": "new",
+          "src_hash": "6e8740bec7e3a1d1",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "REPAIR_CITL_APPS.cmd",
+          "kind": "modified",
+          "src_hash": "215dce31e24dd422",
+          "usb_hash": "453bb6c563ac6fab",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_CITL_FLEX.sh",
+          "kind": "new",
+          "src_hash": "b450ecd02a762dad",
+          "usb_hash": "",
+          "commit_date": "2026-04-16T02:17:16-07:00",
+          "commit_msg": "Add CITL FLEX Troubleshooter v1.0 \u2014 standalone IT ops app with teal_ops theme"
+        },
+        {
+          "path": "RUN_FACTBOOK.sh",
+          "kind": "modified",
+          "src_hash": "16a00abd950f67e9",
+          "usb_hash": "96f5b2f8378b0ad2",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+          "kind": "new",
+          "src_hash": "066b6e1055add5e0",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+          "kind": "new",
+          "src_hash": "e1c620888adad7c2",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd",
+          "kind": "new",
+          "src_hash": "50be73d637341217",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "START_CITL_UBUNTU.sh",
+          "kind": "modified",
+          "src_hash": "72882cb7c92d8084",
+          "usb_hash": "ef75e8378737134d",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "SYNC_EXES_TO_USB_WINDOWS.cmd",
+          "kind": "modified",
+          "src_hash": "b8a3c51195628095",
+          "usb_hash": "08e2fd9fae2ee207",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "bootstrap/citl_bootstrap_state.json",
+          "kind": "modified",
+          "src_hash": "1cfc023faa4f7530",
+          "usb_hash": "ef13a1f43716a186",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "bootstrap/citl_patch_cadence_state.json",
+          "kind": "new",
+          "src_hash": "931f0cb2cbd67c73",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "CITL-UTILITIES-EASY-RUN-v2/apps/citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "4e9554e85068d8fb",
+          "usb_hash": "6b4e4e05c53172ca",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_flex_troubleshooter/citl_repair_all.py",
+          "kind": "new",
+          "src_hash": "c606d0569ed779d6",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "documents/ticketing_system/exports/example_compiled.json",
+          "kind": "new",
+          "src_hash": "d0812e39a051a664",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/citl_app_sync.py",
+          "kind": "modified",
+          "src_hash": "c82cb0bccff3de59",
+          "usb_hash": "0e5120851f1b1f3e",
+          "commit_date": "2026-04-20T05:36:28-07:00",
+          "commit_msg": "Add Find & Repair UI to CITL Sync, separate USB diagnostic/repair launchers"
+        },
+        {
+          "path": "factbook-assistant/citl_repair_all.py",
+          "kind": "new",
+          "src_hash": "e732e56691f28f7b",
+          "usb_hash": "",
+          "commit_date": "2026-04-20T06:50:53-07:00",
+          "commit_msg": "Fix citl_repair_all: same-drive search only, device memory, precise marker match"
+        },
+        {
+          "path": "factbook-assistant/citl_sync_hub.py",
+          "kind": "modified",
+          "src_hash": "5fc86e72bd1b793f",
+          "usb_hash": "53712ccbc6a7cd46",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "factbook-assistant/DIAGNOSE_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "9d2907d2599ad604",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/diagnose_factbook.sh",
+          "kind": "new",
+          "src_hash": "7a0b290def6788be",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/LAUNCH_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "0d3d12a899d0fd95",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/launch_factbook.sh",
+          "kind": "new",
+          "src_hash": "d5b6a974c0859784",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "gpu/burnin/burnin.sh",
+          "kind": "modified",
+          "src_hash": "cc018576a2cf02f9",
+          "usb_hash": "bc9c4fa6f1d473cf",
+          "commit_date": "2025-12-04T01:35:35-08:00",
+          "commit_msg": "Initial clean commit without venv / DLLs / embeddings"
+        },
+        {
+          "path": "gpu/burnin/install_citl_gpu_burn.sh",
+          "kind": "modified",
+          "src_hash": "61f2b0f880ec135e",
+          "usb_hash": "3e3c128a4ce6d842",
+          "commit_date": "2025-12-04T01:35:35-08:00",
+          "commit_msg": "Initial clean commit without venv / DLLs / embeddings"
+        },
+        {
+          "path": "PORTABLE_APPS/CITL/citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "4e9554e85068d8fb",
+          "usb_hash": "6b4e4e05c53172ca",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/build_ticketing_automation_bin.sh",
+          "kind": "new",
+          "src_hash": "8b28a073811c7772",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/build_ticketing_automation_exe.ps1",
+          "kind": "new",
+          "src_hash": "cdafd01a836372f0",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/BUILD_TICKETING_BINARIES.md",
+          "kind": "new",
+          "src_hash": "91f37a665f7d570b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/citl_work_ticketing_gui.py",
+          "kind": "new",
+          "src_hash": "3573fcd5e7f22806",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/flowfx_compiler.py",
+          "kind": "new",
+          "src_hash": "dc89be30c401059c",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/flowfx_validator_pack.py",
+          "kind": "new",
+          "src_hash": "1f20dcab0448d37b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/ops_assistant.py",
+          "kind": "new",
+          "src_hash": "363bab9a657bb2f5",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/README_TICKETING_SYSTEM.md",
+          "kind": "new",
+          "src_hash": "408fe819cb430699",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/RESEARCH_STOPGAP_OPTIONS_2026.md",
+          "kind": "new",
+          "src_hash": "166c254adcaaf9b6",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/__init__.py",
+          "kind": "new",
+          "src_hash": "e3b0c44298fc1c14",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/pyi_hooks/pre_find_module_path/hook-tkinter.py",
+          "kind": "new",
+          "src_hash": "fb45d2a363664980",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "scripts/bootstrap_ubuntu.sh",
+          "kind": "modified",
+          "src_hash": "881d52dfe7bbdfda",
+          "usb_hash": "a1568cecfc95ddb1",
+          "commit_date": "2026-02-25T13:00:11-08:00",
+          "commit_msg": "CITL: durable installers (Win+Ubuntu+USB), tabbed GUI (themes/modelfile/translat"
+        },
+        {
+          "path": "scripts/run_ubuntu.sh",
+          "kind": "modified",
+          "src_hash": "756872407a9d16ae",
+          "usb_hash": "4cd24dd505cc09f2",
+          "commit_date": "2026-02-11T18:01:25-08:00",
+          "commit_msg": "Stop tracking venv/backups; add WSL Ubuntu demo launcher; normalize line endings"
+        },
+        {
+          "path": "scripts/sync_flex_to_exfat.py",
+          "kind": "new",
+          "src_hash": "160ce280d88242e3",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "scripts/linux/run.sh",
+          "kind": "modified",
+          "src_hash": "8b1c3f3f24eeea2c",
+          "usb_hash": "844b6feeb35f8480",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "scripts/linux/update.sh",
+          "kind": "modified",
+          "src_hash": "0c8b14096a6fc66b",
+          "usb_hash": "b37325a5083de345",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "scripts/windows/build_all_citl_exes.ps1",
+          "kind": "modified",
+          "src_hash": "fc0d977b83783aef",
+          "usb_hash": "546418a838450692",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/install_citl_apps_portable.ps1",
+          "kind": "modified",
+          "src_hash": "ca574e64657e1aa6",
+          "usb_hash": "047ffd2a53bb4b7d",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/run_staff_toolkit.ps1",
+          "kind": "modified",
+          "src_hash": "aef0be82ab3ef1f6",
+          "usb_hash": "124733a273c5d8c5",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/run_work_preparedness_launcher.ps1",
+          "kind": "modified",
+          "src_hash": "aef0be82ab3ef1f6",
+          "usb_hash": "124733a273c5d8c5",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/sync_usb_apps.ps1",
+          "kind": "modified",
+          "src_hash": "9efae1a695f42f7b",
+          "usb_hash": "2383510e4e2a4c9b",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "_work_academic_advisor/app.py",
+          "kind": "new",
+          "src_hash": "9e1fe62e74100a9b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        }
+      ],
+      "applied": false,
+      "dry_run": false
+    },
+    {
+      "patch_id": "M-PATCH-0002",
+      "patch_num": 2,
+      "nickname": "Chai Spice",
+      "color_fg": "#E67E22",
+      "color_bg": "#FFF3E0",
+      "date": "2026-04-30",
+      "time": "00:53:45 UTC",
+      "recorded_at": "2026-04-30T00:53:45.026335+00:00",
+      "recorded_at_local": "2026-04-29T17:53:45.033440-07:00",
+      "source_repo": "C:\\Users\\Doc_M\\CITL",
+      "source_host": "DESKTOP-H3821SL",
+      "source_platform": "Windows",
+      "source_user": "Doc_M",
+      "source_machine_id": "b1e1659b00ab",
+      "source_machine_nickname": "Black Sesame Latte",
+      "source_machine_color_fg": "#424242",
+      "source_machine_color_bg": "#E0E0E0",
+      "source_device_num": 1,
+      "source_device_label": "PC-01",
+      "source_device_nickname": "Taro Bubble Tea",
+      "source_device_color_fg": "#9B59B6",
+      "source_device_color_bg": "#F0E6FF",
+      "patch_type": "sync",
+      "manual_tag": true,
+      "cadence_hours": 48,
+      "collector": false,
+      "collector_app": null,
+      "patch_label": "M-PATCH-0002 Chai Spice",
+      "patch_description": "61 changed file(s) across CITL App Sync.cmd, CITL Field Apps.cmd, CITL Presentation Suite.cmd, CITL Sync Hub.cmd, CITL Workstation Apps.cmd, CITL-UTILITIES-EASY-RUN-v2, COPY_THIS_USB_TO_NEXT_WINDOWS.cmd, DIAGNOSE_FACTBOOK.cmd, INSTALL_CITL_APPS_PORTABLE.cmd, LAUNCH_FACTBOOK.cmd, PORTABLE_APPS, REPAIR_CITL_APPS.cmd, RUN_CITL_FLEX.sh, RUN_FACTBOOK.sh, RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh, RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd, RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd, START_CITL_UBUNTU.sh, SYNC_EXES_TO_USB_WINDOWS.cmd, _work_academic_advisor, bootstrap, citl_app_sync.py, citl_device_registry.json, citl_fixer.py, citl_flex_troubleshooter, citl_patches.json, diagnose_factbook.sh, documents, factbook-assistant, gpu, launch_factbook.sh, launch_flex.sh, powerflow_builder, scripts",
+      "apps": [
+        "CITL App Sync.cmd",
+        "CITL Field Apps.cmd",
+        "CITL Presentation Suite.cmd",
+        "CITL Sync Hub.cmd",
+        "CITL Workstation Apps.cmd",
+        "CITL-UTILITIES-EASY-RUN-v2",
+        "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd",
+        "DIAGNOSE_FACTBOOK.cmd",
+        "INSTALL_CITL_APPS_PORTABLE.cmd",
+        "LAUNCH_FACTBOOK.cmd",
+        "PORTABLE_APPS",
+        "REPAIR_CITL_APPS.cmd",
+        "RUN_CITL_FLEX.sh",
+        "RUN_FACTBOOK.sh",
+        "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+        "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+        "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd",
+        "START_CITL_UBUNTU.sh",
+        "SYNC_EXES_TO_USB_WINDOWS.cmd",
+        "_work_academic_advisor",
+        "bootstrap",
+        "citl_app_sync.py",
+        "citl_device_registry.json",
+        "citl_fixer.py",
+        "citl_flex_troubleshooter",
+        "citl_patches.json",
+        "diagnose_factbook.sh",
+        "documents",
+        "factbook-assistant",
+        "gpu",
+        "launch_factbook.sh",
+        "launch_flex.sh",
+        "powerflow_builder",
+        "scripts"
+      ],
+      "total_files": 61,
+      "by_kind": {
+        "modified": 28,
+        "new": 33
+      },
+      "files": [
+        {
+          "path": "CITL App Sync.cmd",
+          "kind": "modified",
+          "src_hash": "5bb81ac13dddfb94",
+          "usb_hash": "8cf41aaccd7105b7",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Field Apps.cmd",
+          "kind": "modified",
+          "src_hash": "4730d0facf999974",
+          "usb_hash": "de4a86a888e423e8",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Presentation Suite.cmd",
+          "kind": "modified",
+          "src_hash": "788361fa4dec453d",
+          "usb_hash": "4d771c090fcf9ddd",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Sync Hub.cmd",
+          "kind": "modified",
+          "src_hash": "bffb73683a2c893a",
+          "usb_hash": "b7d033edc5b91c9f",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Workstation Apps.cmd",
+          "kind": "modified",
+          "src_hash": "cc837af28866e478",
+          "usb_hash": "ca1e4e6aa21d7285",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "citl_app_sync.py",
+          "kind": "new",
+          "src_hash": "4a7e33a1cf078fcd",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_device_registry.json",
+          "kind": "new",
+          "src_hash": "b674a853e767eb95",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "6d21d373de883e51",
+          "usb_hash": "4e9554e85068d8fb",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_patches.json",
+          "kind": "new",
+          "src_hash": "05fc5ae3feaaf449",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd",
+          "kind": "modified",
+          "src_hash": "2ad4552629e2e849",
+          "usb_hash": "bc2af4c189c36ac0",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "DIAGNOSE_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "9d2907d2599ad604",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:44:10-07:00",
+          "commit_msg": "Add 18-stage live pipeline diagnostic with exact-error reporting and fix buttons"
+        },
+        {
+          "path": "diagnose_factbook.sh",
+          "kind": "new",
+          "src_hash": "7a0b290def6788be",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:44:10-07:00",
+          "commit_msg": "Add 18-stage live pipeline diagnostic with exact-error reporting and fix buttons"
+        },
+        {
+          "path": "INSTALL_CITL_APPS_PORTABLE.cmd",
+          "kind": "modified",
+          "src_hash": "01d1c7e9cd7d3bf3",
+          "usb_hash": "114fd2226f451caa",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "LAUNCH_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "0d3d12a899d0fd95",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "launch_factbook.sh",
+          "kind": "new",
+          "src_hash": "d5b6a974c0859784",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "launch_flex.sh",
+          "kind": "new",
+          "src_hash": "6e8740bec7e3a1d1",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "REPAIR_CITL_APPS.cmd",
+          "kind": "modified",
+          "src_hash": "215dce31e24dd422",
+          "usb_hash": "453bb6c563ac6fab",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_CITL_FLEX.sh",
+          "kind": "new",
+          "src_hash": "b450ecd02a762dad",
+          "usb_hash": "",
+          "commit_date": "2026-04-16T02:17:16-07:00",
+          "commit_msg": "Add CITL FLEX Troubleshooter v1.0 \u2014 standalone IT ops app with teal_ops theme"
+        },
+        {
+          "path": "RUN_FACTBOOK.sh",
+          "kind": "modified",
+          "src_hash": "16a00abd950f67e9",
+          "usb_hash": "96f5b2f8378b0ad2",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+          "kind": "new",
+          "src_hash": "066b6e1055add5e0",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+          "kind": "new",
+          "src_hash": "e1c620888adad7c2",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd",
+          "kind": "new",
+          "src_hash": "50be73d637341217",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "START_CITL_UBUNTU.sh",
+          "kind": "modified",
+          "src_hash": "72882cb7c92d8084",
+          "usb_hash": "ef75e8378737134d",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "SYNC_EXES_TO_USB_WINDOWS.cmd",
+          "kind": "modified",
+          "src_hash": "b8a3c51195628095",
+          "usb_hash": "08e2fd9fae2ee207",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "bootstrap/citl_bootstrap_state.json",
+          "kind": "modified",
+          "src_hash": "1cfc023faa4f7530",
+          "usb_hash": "ef13a1f43716a186",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "bootstrap/citl_patch_cadence_state.json",
+          "kind": "new",
+          "src_hash": "931f0cb2cbd67c73",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "CITL-UTILITIES-EASY-RUN-v2/apps/citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "4e9554e85068d8fb",
+          "usb_hash": "6b4e4e05c53172ca",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_flex_troubleshooter/citl_repair_all.py",
+          "kind": "new",
+          "src_hash": "c606d0569ed779d6",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "documents/ticketing_system/exports/example_compiled.json",
+          "kind": "new",
+          "src_hash": "d0812e39a051a664",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/citl_app_sync.py",
+          "kind": "modified",
+          "src_hash": "c82cb0bccff3de59",
+          "usb_hash": "0e5120851f1b1f3e",
+          "commit_date": "2026-04-20T05:36:28-07:00",
+          "commit_msg": "Add Find & Repair UI to CITL Sync, separate USB diagnostic/repair launchers"
+        },
+        {
+          "path": "factbook-assistant/citl_repair_all.py",
+          "kind": "new",
+          "src_hash": "e732e56691f28f7b",
+          "usb_hash": "",
+          "commit_date": "2026-04-20T06:50:53-07:00",
+          "commit_msg": "Fix citl_repair_all: same-drive search only, device memory, precise marker match"
+        },
+        {
+          "path": "factbook-assistant/citl_sync_hub.py",
+          "kind": "modified",
+          "src_hash": "5fc86e72bd1b793f",
+          "usb_hash": "53712ccbc6a7cd46",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "factbook-assistant/DIAGNOSE_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "9d2907d2599ad604",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/diagnose_factbook.sh",
+          "kind": "new",
+          "src_hash": "7a0b290def6788be",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/LAUNCH_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "0d3d12a899d0fd95",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/launch_factbook.sh",
+          "kind": "new",
+          "src_hash": "d5b6a974c0859784",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "gpu/burnin/burnin.sh",
+          "kind": "modified",
+          "src_hash": "cc018576a2cf02f9",
+          "usb_hash": "bc9c4fa6f1d473cf",
+          "commit_date": "2025-12-04T01:35:35-08:00",
+          "commit_msg": "Initial clean commit without venv / DLLs / embeddings"
+        },
+        {
+          "path": "gpu/burnin/install_citl_gpu_burn.sh",
+          "kind": "modified",
+          "src_hash": "61f2b0f880ec135e",
+          "usb_hash": "3e3c128a4ce6d842",
+          "commit_date": "2025-12-04T01:35:35-08:00",
+          "commit_msg": "Initial clean commit without venv / DLLs / embeddings"
+        },
+        {
+          "path": "PORTABLE_APPS/CITL/citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "4e9554e85068d8fb",
+          "usb_hash": "6b4e4e05c53172ca",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/build_ticketing_automation_bin.sh",
+          "kind": "new",
+          "src_hash": "8b28a073811c7772",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/build_ticketing_automation_exe.ps1",
+          "kind": "new",
+          "src_hash": "cdafd01a836372f0",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/BUILD_TICKETING_BINARIES.md",
+          "kind": "new",
+          "src_hash": "91f37a665f7d570b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/citl_work_ticketing_gui.py",
+          "kind": "new",
+          "src_hash": "3573fcd5e7f22806",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/flowfx_compiler.py",
+          "kind": "new",
+          "src_hash": "dc89be30c401059c",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/flowfx_validator_pack.py",
+          "kind": "new",
+          "src_hash": "1f20dcab0448d37b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/ops_assistant.py",
+          "kind": "new",
+          "src_hash": "363bab9a657bb2f5",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/README_TICKETING_SYSTEM.md",
+          "kind": "new",
+          "src_hash": "408fe819cb430699",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/RESEARCH_STOPGAP_OPTIONS_2026.md",
+          "kind": "new",
+          "src_hash": "166c254adcaaf9b6",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/__init__.py",
+          "kind": "new",
+          "src_hash": "e3b0c44298fc1c14",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/pyi_hooks/pre_find_module_path/hook-tkinter.py",
+          "kind": "new",
+          "src_hash": "fb45d2a363664980",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "scripts/bootstrap_ubuntu.sh",
+          "kind": "modified",
+          "src_hash": "881d52dfe7bbdfda",
+          "usb_hash": "a1568cecfc95ddb1",
+          "commit_date": "2026-02-25T13:00:11-08:00",
+          "commit_msg": "CITL: durable installers (Win+Ubuntu+USB), tabbed GUI (themes/modelfile/translat"
+        },
+        {
+          "path": "scripts/run_ubuntu.sh",
+          "kind": "modified",
+          "src_hash": "756872407a9d16ae",
+          "usb_hash": "4cd24dd505cc09f2",
+          "commit_date": "2026-02-11T18:01:25-08:00",
+          "commit_msg": "Stop tracking venv/backups; add WSL Ubuntu demo launcher; normalize line endings"
+        },
+        {
+          "path": "scripts/sync_flex_to_exfat.py",
+          "kind": "new",
+          "src_hash": "160ce280d88242e3",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "scripts/linux/run.sh",
+          "kind": "modified",
+          "src_hash": "8b1c3f3f24eeea2c",
+          "usb_hash": "844b6feeb35f8480",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "scripts/linux/update.sh",
+          "kind": "modified",
+          "src_hash": "0c8b14096a6fc66b",
+          "usb_hash": "b37325a5083de345",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "scripts/windows/build_all_citl_exes.ps1",
+          "kind": "modified",
+          "src_hash": "fc0d977b83783aef",
+          "usb_hash": "546418a838450692",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/install_citl_apps_portable.ps1",
+          "kind": "modified",
+          "src_hash": "ca574e64657e1aa6",
+          "usb_hash": "047ffd2a53bb4b7d",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/run_staff_toolkit.ps1",
+          "kind": "modified",
+          "src_hash": "aef0be82ab3ef1f6",
+          "usb_hash": "124733a273c5d8c5",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/run_work_preparedness_launcher.ps1",
+          "kind": "modified",
+          "src_hash": "aef0be82ab3ef1f6",
+          "usb_hash": "124733a273c5d8c5",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/sync_usb_apps.ps1",
+          "kind": "modified",
+          "src_hash": "9efae1a695f42f7b",
+          "usb_hash": "2383510e4e2a4c9b",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "_work_academic_advisor/app.py",
+          "kind": "new",
+          "src_hash": "9e1fe62e74100a9b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        }
+      ],
+      "applied": false,
+      "dry_run": false
+    },
+    {
+      "patch_id": "M-PATCH-0003",
+      "patch_num": 3,
+      "nickname": "Oat Milk Cortado",
+      "color_fg": "#D4A96A",
+      "color_bg": "#FFF8EE",
+      "date": "2026-04-30",
+      "time": "00:54:04 UTC",
+      "recorded_at": "2026-04-30T00:54:04.509984+00:00",
+      "recorded_at_local": "2026-04-29T17:54:04.516981-07:00",
+      "source_repo": "C:\\Users\\Doc_M\\CITL",
+      "source_host": "DESKTOP-H3821SL",
+      "source_platform": "Windows",
+      "source_user": "Doc_M",
+      "source_machine_id": "b1e1659b00ab",
+      "source_machine_nickname": "Black Sesame Latte",
+      "source_machine_color_fg": "#424242",
+      "source_machine_color_bg": "#E0E0E0",
+      "source_device_num": 1,
+      "source_device_label": "PC-01",
+      "source_device_nickname": "Taro Bubble Tea",
+      "source_device_color_fg": "#9B59B6",
+      "source_device_color_bg": "#F0E6FF",
+      "patch_type": "sync",
+      "manual_tag": true,
+      "cadence_hours": 48,
+      "collector": false,
+      "collector_app": null,
+      "patch_label": "M-PATCH-0003 Oat Milk Cortado",
+      "patch_description": "61 changed file(s) across CITL App Sync.cmd, CITL Field Apps.cmd, CITL Presentation Suite.cmd, CITL Sync Hub.cmd, CITL Workstation Apps.cmd, CITL-UTILITIES-EASY-RUN-v2, COPY_THIS_USB_TO_NEXT_WINDOWS.cmd, DIAGNOSE_FACTBOOK.cmd, INSTALL_CITL_APPS_PORTABLE.cmd, LAUNCH_FACTBOOK.cmd, PORTABLE_APPS, REPAIR_CITL_APPS.cmd, RUN_CITL_FLEX.sh, RUN_FACTBOOK.sh, RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh, RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd, RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd, START_CITL_UBUNTU.sh, SYNC_EXES_TO_USB_WINDOWS.cmd, _work_academic_advisor, bootstrap, citl_app_sync.py, citl_device_registry.json, citl_fixer.py, citl_flex_troubleshooter, citl_patches.json, diagnose_factbook.sh, documents, factbook-assistant, gpu, launch_factbook.sh, launch_flex.sh, powerflow_builder, scripts",
+      "apps": [
+        "CITL App Sync.cmd",
+        "CITL Field Apps.cmd",
+        "CITL Presentation Suite.cmd",
+        "CITL Sync Hub.cmd",
+        "CITL Workstation Apps.cmd",
+        "CITL-UTILITIES-EASY-RUN-v2",
+        "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd",
+        "DIAGNOSE_FACTBOOK.cmd",
+        "INSTALL_CITL_APPS_PORTABLE.cmd",
+        "LAUNCH_FACTBOOK.cmd",
+        "PORTABLE_APPS",
+        "REPAIR_CITL_APPS.cmd",
+        "RUN_CITL_FLEX.sh",
+        "RUN_FACTBOOK.sh",
+        "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+        "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+        "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd",
+        "START_CITL_UBUNTU.sh",
+        "SYNC_EXES_TO_USB_WINDOWS.cmd",
+        "_work_academic_advisor",
+        "bootstrap",
+        "citl_app_sync.py",
+        "citl_device_registry.json",
+        "citl_fixer.py",
+        "citl_flex_troubleshooter",
+        "citl_patches.json",
+        "diagnose_factbook.sh",
+        "documents",
+        "factbook-assistant",
+        "gpu",
+        "launch_factbook.sh",
+        "launch_flex.sh",
+        "powerflow_builder",
+        "scripts"
+      ],
+      "total_files": 61,
+      "by_kind": {
+        "modified": 28,
+        "new": 33
+      },
+      "files": [
+        {
+          "path": "CITL App Sync.cmd",
+          "kind": "modified",
+          "src_hash": "5bb81ac13dddfb94",
+          "usb_hash": "8cf41aaccd7105b7",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Field Apps.cmd",
+          "kind": "modified",
+          "src_hash": "4730d0facf999974",
+          "usb_hash": "de4a86a888e423e8",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Presentation Suite.cmd",
+          "kind": "modified",
+          "src_hash": "788361fa4dec453d",
+          "usb_hash": "4d771c090fcf9ddd",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Sync Hub.cmd",
+          "kind": "modified",
+          "src_hash": "bffb73683a2c893a",
+          "usb_hash": "b7d033edc5b91c9f",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "CITL Workstation Apps.cmd",
+          "kind": "modified",
+          "src_hash": "cc837af28866e478",
+          "usb_hash": "ca1e4e6aa21d7285",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "citl_app_sync.py",
+          "kind": "new",
+          "src_hash": "4a7e33a1cf078fcd",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_device_registry.json",
+          "kind": "new",
+          "src_hash": "b674a853e767eb95",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "6d21d373de883e51",
+          "usb_hash": "4e9554e85068d8fb",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_patches.json",
+          "kind": "new",
+          "src_hash": "1e7ceff85ef8e8da",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "COPY_THIS_USB_TO_NEXT_WINDOWS.cmd",
+          "kind": "modified",
+          "src_hash": "2ad4552629e2e849",
+          "usb_hash": "bc2af4c189c36ac0",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "DIAGNOSE_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "9d2907d2599ad604",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:44:10-07:00",
+          "commit_msg": "Add 18-stage live pipeline diagnostic with exact-error reporting and fix buttons"
+        },
+        {
+          "path": "diagnose_factbook.sh",
+          "kind": "new",
+          "src_hash": "7a0b290def6788be",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:44:10-07:00",
+          "commit_msg": "Add 18-stage live pipeline diagnostic with exact-error reporting and fix buttons"
+        },
+        {
+          "path": "INSTALL_CITL_APPS_PORTABLE.cmd",
+          "kind": "modified",
+          "src_hash": "01d1c7e9cd7d3bf3",
+          "usb_hash": "114fd2226f451caa",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "LAUNCH_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "0d3d12a899d0fd95",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "launch_factbook.sh",
+          "kind": "new",
+          "src_hash": "d5b6a974c0859784",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "launch_flex.sh",
+          "kind": "new",
+          "src_hash": "6e8740bec7e3a1d1",
+          "usb_hash": "",
+          "commit_date": "2026-04-17T05:36:26-07:00",
+          "commit_msg": "Add comprehensive self-heal system: citl_heal, heal panel, and USB bootstrap"
+        },
+        {
+          "path": "REPAIR_CITL_APPS.cmd",
+          "kind": "modified",
+          "src_hash": "215dce31e24dd422",
+          "usb_hash": "453bb6c563ac6fab",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_CITL_FLEX.sh",
+          "kind": "new",
+          "src_hash": "b450ecd02a762dad",
+          "usb_hash": "",
+          "commit_date": "2026-04-16T02:17:16-07:00",
+          "commit_msg": "Add CITL FLEX Troubleshooter v1.0 \u2014 standalone IT ops app with teal_ops theme"
+        },
+        {
+          "path": "RUN_FACTBOOK.sh",
+          "kind": "modified",
+          "src_hash": "16a00abd950f67e9",
+          "usb_hash": "96f5b2f8378b0ad2",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+          "kind": "new",
+          "src_hash": "066b6e1055add5e0",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+          "kind": "new",
+          "src_hash": "e1c620888adad7c2",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd",
+          "kind": "new",
+          "src_hash": "50be73d637341217",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "START_CITL_UBUNTU.sh",
+          "kind": "modified",
+          "src_hash": "72882cb7c92d8084",
+          "usb_hash": "ef75e8378737134d",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "SYNC_EXES_TO_USB_WINDOWS.cmd",
+          "kind": "modified",
+          "src_hash": "b8a3c51195628095",
+          "usb_hash": "08e2fd9fae2ee207",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "bootstrap/citl_bootstrap_state.json",
+          "kind": "modified",
+          "src_hash": "1cfc023faa4f7530",
+          "usb_hash": "ef13a1f43716a186",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "bootstrap/citl_patch_cadence_state.json",
+          "kind": "new",
+          "src_hash": "931f0cb2cbd67c73",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "CITL-UTILITIES-EASY-RUN-v2/apps/citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "4e9554e85068d8fb",
+          "usb_hash": "6b4e4e05c53172ca",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "citl_flex_troubleshooter/citl_repair_all.py",
+          "kind": "new",
+          "src_hash": "c606d0569ed779d6",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "documents/ticketing_system/exports/example_compiled.json",
+          "kind": "new",
+          "src_hash": "d0812e39a051a664",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/citl_app_sync.py",
+          "kind": "modified",
+          "src_hash": "c82cb0bccff3de59",
+          "usb_hash": "0e5120851f1b1f3e",
+          "commit_date": "2026-04-20T05:36:28-07:00",
+          "commit_msg": "Add Find & Repair UI to CITL Sync, separate USB diagnostic/repair launchers"
+        },
+        {
+          "path": "factbook-assistant/citl_repair_all.py",
+          "kind": "new",
+          "src_hash": "e732e56691f28f7b",
+          "usb_hash": "",
+          "commit_date": "2026-04-20T06:50:53-07:00",
+          "commit_msg": "Fix citl_repair_all: same-drive search only, device memory, precise marker match"
+        },
+        {
+          "path": "factbook-assistant/citl_sync_hub.py",
+          "kind": "modified",
+          "src_hash": "5fc86e72bd1b793f",
+          "usb_hash": "53712ccbc6a7cd46",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "factbook-assistant/DIAGNOSE_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "9d2907d2599ad604",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/diagnose_factbook.sh",
+          "kind": "new",
+          "src_hash": "7a0b290def6788be",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/LAUNCH_FACTBOOK.cmd",
+          "kind": "new",
+          "src_hash": "0d3d12a899d0fd95",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "factbook-assistant/launch_factbook.sh",
+          "kind": "new",
+          "src_hash": "d5b6a974c0859784",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "gpu/burnin/burnin.sh",
+          "kind": "modified",
+          "src_hash": "cc018576a2cf02f9",
+          "usb_hash": "bc9c4fa6f1d473cf",
+          "commit_date": "2025-12-04T01:35:35-08:00",
+          "commit_msg": "Initial clean commit without venv / DLLs / embeddings"
+        },
+        {
+          "path": "gpu/burnin/install_citl_gpu_burn.sh",
+          "kind": "modified",
+          "src_hash": "61f2b0f880ec135e",
+          "usb_hash": "3e3c128a4ce6d842",
+          "commit_date": "2025-12-04T01:35:35-08:00",
+          "commit_msg": "Initial clean commit without venv / DLLs / embeddings"
+        },
+        {
+          "path": "PORTABLE_APPS/CITL/citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "4e9554e85068d8fb",
+          "usb_hash": "6b4e4e05c53172ca",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/build_ticketing_automation_bin.sh",
+          "kind": "new",
+          "src_hash": "8b28a073811c7772",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/build_ticketing_automation_exe.ps1",
+          "kind": "new",
+          "src_hash": "cdafd01a836372f0",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/BUILD_TICKETING_BINARIES.md",
+          "kind": "new",
+          "src_hash": "91f37a665f7d570b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/citl_work_ticketing_gui.py",
+          "kind": "new",
+          "src_hash": "3573fcd5e7f22806",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/flowfx_compiler.py",
+          "kind": "new",
+          "src_hash": "dc89be30c401059c",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/flowfx_validator_pack.py",
+          "kind": "new",
+          "src_hash": "1f20dcab0448d37b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/ops_assistant.py",
+          "kind": "new",
+          "src_hash": "363bab9a657bb2f5",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/README_TICKETING_SYSTEM.md",
+          "kind": "new",
+          "src_hash": "408fe819cb430699",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/RESEARCH_STOPGAP_OPTIONS_2026.md",
+          "kind": "new",
+          "src_hash": "166c254adcaaf9b6",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/__init__.py",
+          "kind": "new",
+          "src_hash": "e3b0c44298fc1c14",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "powerflow_builder/pyi_hooks/pre_find_module_path/hook-tkinter.py",
+          "kind": "new",
+          "src_hash": "fb45d2a363664980",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "scripts/bootstrap_ubuntu.sh",
+          "kind": "modified",
+          "src_hash": "881d52dfe7bbdfda",
+          "usb_hash": "a1568cecfc95ddb1",
+          "commit_date": "2026-02-25T13:00:11-08:00",
+          "commit_msg": "CITL: durable installers (Win+Ubuntu+USB), tabbed GUI (themes/modelfile/translat"
+        },
+        {
+          "path": "scripts/run_ubuntu.sh",
+          "kind": "modified",
+          "src_hash": "756872407a9d16ae",
+          "usb_hash": "4cd24dd505cc09f2",
+          "commit_date": "2026-02-11T18:01:25-08:00",
+          "commit_msg": "Stop tracking venv/backups; add WSL Ubuntu demo launcher; normalize line endings"
+        },
+        {
+          "path": "scripts/sync_flex_to_exfat.py",
+          "kind": "new",
+          "src_hash": "160ce280d88242e3",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        },
+        {
+          "path": "scripts/linux/run.sh",
+          "kind": "modified",
+          "src_hash": "8b1c3f3f24eeea2c",
+          "usb_hash": "844b6feeb35f8480",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "scripts/linux/update.sh",
+          "kind": "modified",
+          "src_hash": "0c8b14096a6fc66b",
+          "usb_hash": "b37325a5083de345",
+          "commit_date": "2026-03-17T02:43:13-07:00",
+          "commit_msg": "CITL App Sync auto-commit 2026-03-17 09:43 UTC"
+        },
+        {
+          "path": "scripts/windows/build_all_citl_exes.ps1",
+          "kind": "modified",
+          "src_hash": "fc0d977b83783aef",
+          "usb_hash": "546418a838450692",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/install_citl_apps_portable.ps1",
+          "kind": "modified",
+          "src_hash": "ca574e64657e1aa6",
+          "usb_hash": "047ffd2a53bb4b7d",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/run_staff_toolkit.ps1",
+          "kind": "modified",
+          "src_hash": "aef0be82ab3ef1f6",
+          "usb_hash": "124733a273c5d8c5",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/run_work_preparedness_launcher.ps1",
+          "kind": "modified",
+          "src_hash": "aef0be82ab3ef1f6",
+          "usb_hash": "124733a273c5d8c5",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "scripts/windows/sync_usb_apps.ps1",
+          "kind": "modified",
+          "src_hash": "9efae1a695f42f7b",
+          "usb_hash": "2383510e4e2a4c9b",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        },
+        {
+          "path": "_work_academic_advisor/app.py",
+          "kind": "new",
+          "src_hash": "9e1fe62e74100a9b",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        }
+      ],
+      "applied": true,
+      "dry_run": false,
+      "applied_at": "2026-04-30T00:55:00.226043+00:00"
+    },
+    {
+      "patch_id": "M-PATCH-0004",
+      "patch_num": 4,
+      "nickname": "Cold Brew",
+      "color_fg": "#2C3E50",
+      "color_bg": "#C8D8E8",
+      "date": "2026-04-30",
+      "time": "01:01:03 UTC",
+      "recorded_at": "2026-04-30T01:01:03.394623+00:00",
+      "recorded_at_local": "2026-04-29T18:01:03.400624-07:00",
+      "source_repo": "C:\\Users\\Doc_M\\CITL",
+      "source_host": "DESKTOP-H3821SL",
+      "source_platform": "Windows",
+      "source_user": "Doc_M",
+      "source_machine_id": "b1e1659b00ab",
+      "source_machine_nickname": "Black Sesame Latte",
+      "source_machine_color_fg": "#424242",
+      "source_machine_color_bg": "#E0E0E0",
+      "source_device_num": 1,
+      "source_device_label": "PC-01",
+      "source_device_nickname": "Taro Bubble Tea",
+      "source_device_color_fg": "#9B59B6",
+      "source_device_color_bg": "#F0E6FF",
+      "patch_type": "sync",
+      "manual_tag": true,
+      "cadence_hours": 48,
+      "collector": false,
+      "collector_app": null,
+      "patch_label": "M-PATCH-0004 Cold Brew",
+      "patch_description": "1 changed file(s) across citl_patches.json",
+      "apps": [
+        "citl_patches.json"
+      ],
+      "total_files": 1,
+      "by_kind": {
+        "modified": 1
+      },
+      "files": [
+        {
+          "path": "citl_patches.json",
+          "kind": "modified",
+          "src_hash": "256074b44dc11179",
+          "usb_hash": "5f38a0ee76195483",
+          "commit_date": "",
+          "commit_msg": ""
+        }
+      ],
+      "applied": true,
+      "dry_run": false,
+      "applied_at": "2026-04-30T01:01:03.429625+00:00"
+    },
+    {
+      "patch_id": "M-PATCH-0005",
+      "patch_num": 5,
+      "nickname": "Strawberry Milk Tea",
+      "color_fg": "#E91E8C",
+      "color_bg": "#FFE6F4",
+      "date": "2026-04-30",
+      "time": "01:11:54 UTC",
+      "recorded_at": "2026-04-30T01:11:54.992565+00:00",
+      "recorded_at_local": "2026-04-29T18:11:54.999565-07:00",
+      "source_repo": "C:\\Users\\Doc_M\\CITL\\CITL-UTILITIES-EASY-RUN-v2\\apps",
+      "source_host": "DESKTOP-H3821SL",
+      "source_platform": "Windows",
+      "source_user": "Doc_M",
+      "source_machine_id": "b1e1659b00ab",
+      "source_machine_nickname": "Black Sesame Latte",
+      "source_machine_color_fg": "#424242",
+      "source_machine_color_bg": "#E0E0E0",
+      "source_device_num": 1,
+      "source_device_label": "PC-01",
+      "source_device_nickname": "Taro Bubble Tea",
+      "source_device_color_fg": "#9B59B6",
+      "source_device_color_bg": "#F0E6FF",
+      "patch_type": "sync",
+      "manual_tag": true,
+      "cadence_hours": 48,
+      "collector": false,
+      "collector_app": null,
+      "patch_label": "M-PATCH-0005 Strawberry Milk Tea",
+      "patch_description": "1 changed file(s) across citl_fixer.py",
+      "apps": [
+        "citl_fixer.py"
+      ],
+      "total_files": 1,
+      "by_kind": {
+        "modified": 1
+      },
+      "files": [
+        {
+          "path": "citl_fixer.py",
+          "kind": "modified",
+          "src_hash": "4e9554e85068d8fb",
+          "usb_hash": "6d21d373de883e51",
+          "commit_date": "",
+          "commit_msg": ""
+        }
+      ],
+      "applied": true,
+      "dry_run": false,
+      "applied_at": "2026-04-30T01:11:55.003567+00:00"
+    },
+    {
+      "patch_id": "M-PATCH-0006",
+      "patch_num": 6,
+      "nickname": "Lavender Oat Latte",
+      "color_fg": "#7C4DFF",
+      "color_bg": "#EDE7FF",
+      "date": "2026-04-30",
+      "time": "01:11:55 UTC",
+      "recorded_at": "2026-04-30T01:11:55.061566+00:00",
+      "recorded_at_local": "2026-04-29T18:11:55.067567-07:00",
+      "source_repo": "C:\\Users\\Doc_M\\CITL\\citl_flex_troubleshooter",
+      "source_host": "DESKTOP-H3821SL",
+      "source_platform": "Windows",
+      "source_user": "Doc_M",
+      "source_machine_id": "b1e1659b00ab",
+      "source_machine_nickname": "Black Sesame Latte",
+      "source_machine_color_fg": "#424242",
+      "source_machine_color_bg": "#E0E0E0",
+      "source_device_num": 1,
+      "source_device_label": "PC-01",
+      "source_device_nickname": "Taro Bubble Tea",
+      "source_device_color_fg": "#9B59B6",
+      "source_device_color_bg": "#F0E6FF",
+      "patch_type": "sync",
+      "manual_tag": true,
+      "cadence_hours": 48,
+      "collector": false,
+      "collector_app": null,
+      "patch_label": "M-PATCH-0006 Lavender Oat Latte",
+      "patch_description": "1 changed file(s) across citl_repair_all.py",
+      "apps": [
+        "citl_repair_all.py"
+      ],
+      "total_files": 1,
+      "by_kind": {
+        "new": 1
+      },
+      "files": [
+        {
+          "path": "citl_repair_all.py",
+          "kind": "new",
+          "src_hash": "c606d0569ed779d6",
+          "usb_hash": "",
+          "commit_date": "",
+          "commit_msg": ""
+        }
+      ],
+      "applied": true,
+      "dry_run": false,
+      "applied_at": "2026-04-30T01:11:55.070566+00:00"
+    },
+    {
+      "patch_id": "M-PATCH-0007",
+      "patch_num": 7,
+      "nickname": "Brown Sugar Latte",
+      "color_fg": "#8D4E00",
+      "color_bg": "#F5E6D3",
+      "date": "2026-04-30",
+      "time": "01:11:55 UTC",
+      "recorded_at": "2026-04-30T01:11:55.352566+00:00",
+      "recorded_at_local": "2026-04-29T18:11:55.358567-07:00",
+      "source_repo": "C:\\Users\\Doc_M\\CITL\\factbook-assistant",
+      "source_host": "DESKTOP-H3821SL",
+      "source_platform": "Windows",
+      "source_user": "Doc_M",
+      "source_machine_id": "b1e1659b00ab",
+      "source_machine_nickname": "Black Sesame Latte",
+      "source_machine_color_fg": "#424242",
+      "source_machine_color_bg": "#E0E0E0",
+      "source_device_num": 1,
+      "source_device_label": "PC-01",
+      "source_device_nickname": "Taro Bubble Tea",
+      "source_device_color_fg": "#9B59B6",
+      "source_device_color_bg": "#F0E6FF",
+      "patch_type": "sync",
+      "manual_tag": true,
+      "cadence_hours": 48,
+      "collector": false,
+      "collector_app": null,
+      "patch_label": "M-PATCH-0007 Brown Sugar Latte",
+      "patch_description": "3 changed file(s) across citl_app_sync.py, citl_repair_all.py, citl_sync_hub.py",
+      "apps": [
+        "citl_app_sync.py",
+        "citl_repair_all.py",
+        "citl_sync_hub.py"
+      ],
+      "total_files": 3,
+      "by_kind": {
+        "modified": 2,
+        "new": 1
+      },
+      "files": [
+        {
+          "path": "citl_app_sync.py",
+          "kind": "modified",
+          "src_hash": "c82cb0bccff3de59",
+          "usb_hash": "0449161d439b2755",
+          "commit_date": "2026-04-20T05:36:28-07:00",
+          "commit_msg": "Add Find & Repair UI to CITL Sync, separate USB diagnostic/repair launchers"
+        },
+        {
+          "path": "citl_repair_all.py",
+          "kind": "modified",
+          "src_hash": "e732e56691f28f7b",
+          "usb_hash": "c606d0569ed779d6",
+          "commit_date": "2026-04-20T06:50:53-07:00",
+          "commit_msg": "Fix citl_repair_all: same-drive search only, device memory, precise marker match"
+        },
+        {
+          "path": "citl_sync_hub.py",
+          "kind": "new",
+          "src_hash": "5fc86e72bd1b793f",
+          "usb_hash": "",
+          "commit_date": "2026-04-13T18:46:18-07:00",
+          "commit_msg": "Merge origin/main; add Doc Composer, grant doc, USB clone GUI, all app launchers"
+        }
+      ],
+      "applied": true,
+      "dry_run": false,
+      "applied_at": "2026-04-30T01:11:55.364565+00:00"
+    }
+  ],
+  "last_sync": "2026-04-30T01:11:55.358567+00:00",
+  "devices": {
+    "7aae78d10ca9d7ef9f4f23c4b98da49a9340a20d481d66b4bcfcdc954a6169c5": {
+      "device_id": "7aae78d10ca9d7ef9f4f23c4b98da49a9340a20d481d66b4bcfcdc954a6169c5",
+      "device_num": 1,
+      "device_label": "PC-01",
+      "nickname": "Taro Bubble Tea",
+      "color_fg": "#9B59B6",
+      "color_bg": "#F0E6FF",
+      "platform": "Windows",
+      "last_repo": "C:\\Users\\Doc_M\\CITL",
+      "last_seen_at": "2026-05-12T00:49:43.324516+00:00"
+    }
+  }
+}

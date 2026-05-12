@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════════════
-#  CITL FLEX Troubleshooter — USB/Linux/macOS Launcher
-# ═══════════════════════════════════════════════════════
+# =======================================================
+#  CITL FLEX Troubleshooter - USB/Linux/macOS Launcher
+# =======================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BOOTSTRAP="$ROOT/citl_bootstrap.py"

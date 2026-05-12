@@ -1,0 +1,139 @@
+{
+  "name": "CITL Ticket Intake Flow",
+  "properties": {
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "When_a_new_item_is_created": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline",
+              "operationId": "GetOnNewItems"
+            },
+            "parameters": {
+              "dataset": "https://contoso.sharepoint.com/sites/it",
+              "table": "ServiceTickets"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "splitOn": "@triggerOutputs()?['body/value']"
+        }
+      },
+      "actions": {
+        "TicketSummary": {
+          "type": "Compose",
+          "inputs": "@{concat('Ticket #', string(triggerBody()?['ID']), ' | ', coalesce(triggerBody()?['Title'],'No title'))}",
+          "runAfter": {}
+        },
+        "NotifyITTeam": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams",
+              "connectionName": "shared_teams",
+              "operationId": "PostMessageToChannelV3"
+            },
+            "parameters": {
+              "groupId": "TEAM_ID_HERE",
+              "channelId": "CHANNEL_ID_HERE",
+              "content": "@{outputs('TicketSummary')}"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "TicketSummary": [
+              "Succeeded"
+            ]
+          }
+        },
+        "NotifyDispatcher": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2"
+            },
+            "parameters": {
+              "To": "ithelp@contoso.edu",
+              "Subject": "@{concat('New Service Ticket #', string(triggerBody()?['ID']))}",
+              "Body": "@{concat('A new ticket was captured from Microsoft Lists. Title: ', coalesce(triggerBody()?['Title'],'No title'))}"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "NotifyITTeam": [
+              "Succeeded"
+            ]
+          }
+        },
+        "CreatePlannerTask": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_planner",
+              "connectionName": "shared_planner",
+              "operationId": "CreateTask_V3"
+            },
+            "parameters": {
+              "groupId": "PLANNER_GROUP_ID",
+              "planId": "PLANNER_PLAN_ID",
+              "title": "@{concat('Ticket #', string(triggerBody()?['ID']), ' - ', coalesce(triggerBody()?['Title'],'No title'))}"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "NotifyDispatcher": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {},
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_teams": {
+        "runtimeSource": "embedded",
+        "connection": {},
+        "api": {
+          "name": "shared_teams"
+        }
+      },
+      "shared_office365": {
+        "runtimeSource": "embedded",
+        "connection": {},
+        "api": {
+          "name": "shared_office365"
+        }
+      },
+      "shared_planner": {
+        "runtimeSource": "embedded",
+        "connection": {},
+        "api": {
+          "name": "shared_planner"
+        }
+      }
+    }
+  },
+  "schemaVersion": "1.0.0.0"
+}

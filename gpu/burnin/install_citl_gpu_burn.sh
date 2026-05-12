@@ -11,7 +11,7 @@ if ! command -v nvidia-smi >/dev/null 2>&1; then
 fi
 
 if [[ "${CITL_DISABLE_GPU_BURN:-0}" == "1" ]]; then
-  echo "[CITL] CITL_DISABLE_GPU_BURN=1 – skipping GPU Burn install."
+  echo "[CITL] CITL_DISABLE_GPU_BURN=1 - skipping GPU Burn install."
   exit 0
 fi
 
@@ -24,7 +24,7 @@ cp -a "${GPU_BURN_SRC_DIR}/." "${GPU_BURN_DST_DIR}/"
 cd "${GPU_BURN_DST_DIR}"
 
 # Build the gpu_burn binary (CUDA toolkit must be present)
-echo "[CITL] Building gpu_burn with nvcc…"
+echo "[CITL] Building gpu_burn with nvcc..."
 if ! command -v nvcc >/dev/null 2>&1; then
   echo "[CITL] ERROR: nvcc (CUDA compiler) not found. Install CUDA toolkit first."
   exit 1
@@ -49,7 +49,7 @@ cd "${GPU_BURN_DIR}"
 # Default: 600 seconds (10 minutes)
 TIME="${1:-600}"
 
-echo "[CITL] Running GPU Burn for ${TIME}s on all GPUs using ~80% memory…"
+echo "[CITL] Running GPU Burn for ${TIME}s on all GPUs using ~80% memory..."
 ./gpu_burn -m 80% -tc "${TIME}"
 EOF
 

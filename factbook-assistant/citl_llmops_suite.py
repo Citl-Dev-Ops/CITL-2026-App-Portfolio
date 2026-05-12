@@ -169,13 +169,31 @@ def _find_llm_studio() -> Optional[Path]:
 
 def _find_advisor() -> Optional[Path]:
     key = "api/app.py"
+
+    # 1. Env var override (works on any machine with the var set)
+    env_path = os.environ.get("CITL_ACADEMIC_ADVISOR_REPO", "").strip()
+    if env_path:
+        p = Path(env_path)
+        if (p / key).exists():
+            return p
+
+    # 2. Well-known fixed paths (dev machine + common install locations)
     fixed = [
         Path(r"C:\00 HENOSIS CODING PROJECTS\CITL PROJECTS\2026 ACADEMIC ADVISOR"),
-        Path(r"C:\Users\Doc_M\AI-Training-Hub"),  # fallback if misnamed
+        Path(r"C:\CITL PROJECTS\2026 ACADEMIC ADVISOR"),
+        Path(r"C:\Users\Public\CITL PROJECTS\2026 ACADEMIC ADVISOR"),
+        Path(r"C:\00 HENOSIS CODING PROJECTS\CITL PROJECTS\rtc-academic-advisor"),
     ]
+    # Also check sibling of this repo root (USB/F drive layout)
+    for anc in [_HERE.parent, _HERE.parent.parent]:
+        fixed.append(anc / "2026 ACADEMIC ADVISOR")
+        fixed.append(anc / "CITL PROJECTS" / "2026 ACADEMIC ADVISOR")
+        fixed.append(anc.parent / "CITL PROJECTS" / "2026 ACADEMIC ADVISOR")
+
     for p in fixed:
-        if (p / "api" / "app.py").exists():
+        if (p / key).exists():
             return p
+
     hints = [
         "2026 ACADEMIC ADVISOR",
         "rtc-academic-advisor",
@@ -183,11 +201,13 @@ def _find_advisor() -> Optional[Path]:
         "ACADEMIC ADVISOR",
         "CITLAdvisor",
     ]
-    # Also check Linux home
+    # 3. Linux home directories
     for nm in hints:
         p = Path.home() / nm
-        if (p / "api" / "app.py").exists():
+        if (p / key).exists():
             return p
+
+    # 4. Drive scan — checks direct children and one level deep on all drives
     return _scan_drives(hints, key)
 
 
@@ -604,7 +624,7 @@ def _build_apps() -> List[dict]:
             "id": "academic_advisor",
             "name": "Academic Advisor",
             "author": "Wahaj Al Obid",
-            "tagline": "AI Degree Audit & Student Advising  [Coming Soon]",
+            "tagline": "AI Degree Audit & Student Advising",
             "icon": "[ADVISOR]",
             "description": (
                 "The CITL Academic Advisor is a full-stack AI advising assistant. It parses "
@@ -639,7 +659,7 @@ def _build_apps() -> List[dict]:
             "tech_stack": "Python 3.11    FastAPI    React 19    TypeScript    Vite    Ollama    SQLite",
             "repo_path":    advisor,
             "launcher_win": advisor_launcher,
-            "launcher_nix": None,
+            "launcher_nix": (advisor / "scripts" / "run_desktop_gui.sh") if advisor else None,
             "key_file":     (advisor / "api" / "app.py") if advisor else None,
             "version_file": None,
             "github_url":   "https://github.com/Citl-Dev-Ops/rtc-academic-advisor",

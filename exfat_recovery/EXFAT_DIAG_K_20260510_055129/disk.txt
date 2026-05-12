@@ -1,0 +1,51 @@
+﻿
+
+DiskNumber            : 3
+PartitionStyle        : MBR
+ProvisioningType      : Fixed
+OperationalStatus     : Online
+HealthStatus          : Healthy
+BusType               : USB
+UniqueIdFormat        : Vendor Specific
+OfflineReason         : 
+ObjectId              : {1}\\DESKTOP-H3821SL\root/Microsoft/Windows/Storage/Providers_v2\WSP_Disk.ObjectId="{7e17c04c-b
+                        795-11ef-93f8-806e6f6e6963}:DI:\\?\usbstor#disk&ven_general&prod_udisk&rev_5.00#7&31038191&0&_&
+                        0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}"
+PassThroughClass      : 
+PassThroughIds        : 
+PassThroughNamespace  : 
+PassThroughServer     : 
+UniqueId              : USBSTOR\DISK&VEN_GENERAL&PROD_UDISK&REV_5.00\7&31038191&0&_&0:DESKTOP-H3821SL
+AdapterSerialNumber   : 
+AllocatedSize         : 62914560000
+BootFromDisk          : False
+FirmwareVersion       : 5.00
+FriendlyName          : General UDisk
+Guid                  : 
+IsBoot                : False
+IsClustered           : False
+IsHighlyAvailable     : False
+IsOffline             : False
+IsReadOnly            : False
+IsScaleOut            : False
+IsSystem              : False
+LargestFreeExtent     : 0
+Location              : Integrated : Bus 0 : Device 0 : Function 8 : Adapter 0 : Port 0
+LogicalSectorSize     : 512
+Manufacturer          : General 
+Model                 : UDisk           
+Number                : 3
+NumberOfPartitions    : 1
+Path                  : \\?\usbstor#disk&ven_general&prod_udisk&rev_5.00#7&31038191&0&_&0#{53f56307-b6bf-11d0-94f2-00a0
+                        c91efb8b}
+PhysicalSectorSize    : 512
+SerialNumber          : 	
+Signature             : 4179450819
+Size                  : 62914560000
+PSComputerName        : 
+CimClass              : ROOT/Microsoft/Windows/Storage:MSFT_Disk
+CimInstanceProperties : {ObjectId, PassThroughClass, PassThroughIds, PassThroughNamespace...}
+CimSystemProperties   : Microsoft.Management.Infrastructure.CimSystemProperties
+
+
+

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 LOGDIR=/var/log/flexcoach-gpu; mkdir -p "$LOGDIR"
 TS=$(date +%Y%m%d-%H%M%S); LOG="$LOGDIR/gpu-burn_$TS.log"

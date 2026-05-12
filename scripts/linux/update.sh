@@ -12,7 +12,7 @@ echo ""
 SUDO=""
 command -v sudo >/dev/null 2>&1 && SUDO="sudo"
 
-# ── 1. System packages ────────────────────────────────────────────────────────
+# -- 1. System packages --------------------------------------------------------
 echo "[1/4] Upgrading system packages..."
 if command -v apt-get >/dev/null 2>&1; then
   $SUDO apt-get update -y
@@ -29,10 +29,10 @@ else
 fi
 echo ""
 
-# ── 2. Python packages ────────────────────────────────────────────────────────
+# -- 2. Python packages --------------------------------------------------------
 echo "[2/4] Upgrading Python packages..."
 if [[ ! -d "$REPO_DIR/.venv" ]]; then
-  echo "  venv not found — running setup.sh first..."
+  echo "  venv not found - running setup.sh first..."
   bash "$REPO_DIR/scripts/linux/setup.sh"
 fi
 
@@ -50,7 +50,7 @@ else
 fi
 echo ""
 
-# ── 3. Ubuntu port sync ───────────────────────────────────────────────────────
+# -- 3. Ubuntu port sync -------------------------------------------------------
 echo "[3/4] Syncing Ubuntu port files..."
 python - <<PYEOF
 import sys
@@ -68,7 +68,7 @@ except Exception as e:
 PYEOF
 echo ""
 
-# ── 4. Desktop shortcuts (.desktop files) ─────────────────────────────────────
+# -- 4. Desktop shortcuts (.desktop files) -------------------------------------
 echo "[4/4] Creating/updating desktop shortcuts..."
 APP_DIR="${HOME}/.local/share/applications"
 mkdir -p "$APP_DIR"

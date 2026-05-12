@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CITL FLEX Troubleshooter v1.0 — Linux/macOS launcher
+# CITL FLEX Troubleshooter v1.0 - Linux/macOS launcher
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXE="$ROOT/dist/CITL-FLEX-Troubleshooter"

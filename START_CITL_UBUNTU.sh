@@ -112,7 +112,7 @@ for candidate in "${CANDIDATES[@]}"; do
         if (( age_days > 14 )); then
             STALE=1
             echo "   [WARN] Repo is stale (${age_days} days > 14 day threshold)"
-            _notify_warn "Local CITL repo is ${age_days} days old — USB sync will update it."
+            _notify_warn "Local CITL repo is ${age_days} days old - USB sync will update it."
         fi
     fi
 done
@@ -136,15 +136,15 @@ if [[ -z "$LOCAL_REPO" ]]; then
 else
     IS_FRESH_INSTALL=0
     if [[ "$STALE" -eq 1 ]]; then
-        echo " === STALE REPO — AUTO-SYNCING FROM USB ==="
+        echo " === STALE REPO - AUTO-SYNCING FROM USB ==="
         DO_SYNC=1
     else
-        echo " === REPO IS FRESH — CHECKING FOR USB UPDATES ==="
+        echo " === REPO IS FRESH - CHECKING FOR USB UPDATES ==="
         # Compare USB and local marker timestamps
         usb_mtime=$(stat -c %Y "$USB_ROOT/$MARKER" 2>/dev/null || echo 0)
         local_mtime=$(stat -c %Y "$LOCAL_REPO/$MARKER" 2>/dev/null || echo 0)
         if (( usb_mtime > local_mtime )); then
-            echo " USB has newer files — syncing..."
+            echo " USB has newer files - syncing..."
             DO_SYNC=1
         else
             echo " Local repo is up to date."
@@ -236,7 +236,7 @@ echo " Python: $PYTHON"
 
 # Check tkinter
 if ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
-    echo " [WARN] tkinter not found — attempting to install..."
+    echo " [WARN] tkinter not found - attempting to install..."
     if command -v apt-get &>/dev/null; then
         sudo apt-get install -y python3-tk 2>/dev/null || {
             echo " [ERROR] Could not install python3-tk. Run manually: sudo apt install python3-tk"

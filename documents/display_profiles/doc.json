@@ -1,0 +1,40 @@
+{
+  "captured": "2026-04-22T21:16:21",
+  "screens": [
+    {
+      "device": "\\\\.\\DISPLAY1",
+      "width": "1920",
+      "height": "1080",
+      "bpp": "32",
+      "primary": "True"
+    },
+    {
+      "device": "\\\\.\\DISPLAY2",
+      "width": "1920",
+      "height": "1080",
+      "bpp": "32",
+      "primary": "False"
+    }
+  ],
+  "adapters": [
+    {
+      "name": "NVIDIA GeForce RTX 3050",
+      "driver": "32.0.15.8129",
+      "width": "1920",
+      "height": "1080",
+      "refresh": "60"
+    }
+  ],
+  "monitors": [
+    {
+      "name": "AOC 2330Fz",
+      "status": "OK"
+    },
+    {
+      "name": "Dell P2222H (HDMI)",
+      "status": "OK"
+    }
+  ],
+  "raw_snapshot": "=== ATTACHED SCREENS ===\n  Screen 1 (PRIMARY): \\\\.\\DISPLAY1  1920x1080  BPP=32\n  Screen 2 (EXTENDED): \\\\.\\DISPLAY2  1920x1080  BPP=32\n\n=== DISPLAY ADAPTERS ===\n  NVIDIA GeForce RTX 3050\n    Driver : 32.0.15.8129\n    Mode   : 1920x1080 @ 60 Hz\n    VRAM   : 4095 MB\n\n=== PNP MONITORS ===\n  [OK] AOC 2330Fz\n  [OK] Dell P2222H (HDMI)\n\n=== DisplayPort / HDMI AUDIO (signal indicator) ===\n",
+  "name": "doc"
+}

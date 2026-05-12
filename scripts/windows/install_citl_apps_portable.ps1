@@ -2,7 +2,7 @@
 <#
   CITL Portable App Installer
   ============================
-  Installs or updates the four CITL USB app bundles to a user-writable
+  Installs or updates CITL USB app bundles to a user-writable
   location - no admin, no registry, no system folders.
 
   Install locations searched (in priority order):
@@ -16,7 +16,7 @@
   Usage (from USB or project root):
     .\install_citl_apps_portable.ps1
     .\install_citl_apps_portable.ps1 -Destination "$env:USERPROFILE\Documents\CITL Apps"
-    .\install_citl_apps_portable.ps1 -Apps sync,presentation
+    .\install_citl_apps_portable.ps1 -Apps sync,presentation,ticketing
     .\install_citl_apps_portable.ps1 -UpdateOnly       # skip copy if not installed
     .\install_citl_apps_portable.ps1 -NoShortcuts      # copy only, no .lnk
     .\install_citl_apps_portable.ps1 -Uninstall        # remove all local copies + shortcuts
@@ -26,7 +26,7 @@
     - Sibling dist\ folder relative to this script repo
 #>
 param(
-    [string]  $Apps        = "all",   # "all" | comma-list: sync,presentation,workstation,field
+    [string]  $Apps        = "all",   # "all" | comma-list: sync,presentation,workstation,field,flex,ticketing
     [string]  $Destination = "",      # override install root; default = Desktop\CITL Apps
     [switch]  $UpdateOnly,            # only update already-installed apps; skip fresh installs
     [switch]  $NoShortcuts,           # skip .lnk creation/update
@@ -100,6 +100,23 @@ $AppDefs = @(
         DistFolder   = "CITL Field Apps"
         ShortcutName = "CITL Field Apps"
     }
+    ,[ordered]@{
+        Key          = "flex"
+        DisplayName  = "CITL FLEX Troubleshooter"
+        ExeName      = "CITL FLEX Troubleshooter.exe"
+        UsbFolder    = "5-CITL-FLEX"
+        DistFolder   = "CITL FLEX Troubleshooter"
+        ShortcutName = "CITL FLEX Troubleshooter"
+    }
+    ,[ordered]@{
+        Key          = "ticketing"
+        DisplayName  = "CITL Ticketing Automation GUI"
+        ExeName      = "CITL Ticketing Automation GUI.exe"
+        UsbFolder    = "6-CITL-WORK-TICKETING"
+        DistFolder   = "CITL Ticketing Automation GUI"
+        DistRoot     = "powerflow_builder\\dist"
+        ShortcutName = "CITL Ticketing Automation GUI"
+    }
 )
 
 # ---- Filter requested apps --------------------------------------------------
@@ -111,7 +128,7 @@ $RequestedKeys = if ($Apps -eq "all") {
 $SelectedApps = $AppDefs | Where-Object { $RequestedKeys -contains $_.Key }
 if (-not $SelectedApps) {
     Write-Fail "No matching apps found for: $Apps"
-    Write-Info "Valid keys: sync, presentation, workstation, field"
+    Write-Info "Valid keys: sync, presentation, workstation, field, flex, ticketing"
     exit 1
 }
 
@@ -145,7 +162,12 @@ function Resolve-Source {
         if (Test-Path (Join-Path $usbSrc $App.ExeName)) { return $usbSrc }
     }
     # 2. dist\ folder
-    $distSrc = Join-Path $DistDir $App.DistFolder
+    $appDistRoot = if ($App.ContainsKey("DistRoot")) {
+        Join-Path $RepoRoot $App.DistRoot
+    } else {
+        $DistDir
+    }
+    $distSrc = Join-Path $appDistRoot $App.DistFolder
     if (Test-Path (Join-Path $distSrc $App.ExeName)) { return $distSrc }
     return $null
 }

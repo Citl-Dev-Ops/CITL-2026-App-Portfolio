@@ -5,13 +5,13 @@ set "ROOT=%~dp0"
 set "EXE=%ROOT%4-CITL-FIELD-APPS\CITL Field Apps\CITL Field Apps.exe"
 set "SCRIPT=%ROOT%factbook-assistant\citl_field_apps.py"
 
-REM ── Try pre-built EXE first ───────────────────────────────────────────────
+REM -- Try pre-built EXE first -----------------------------------------------
 if exist "%EXE%" (
     start "" "%EXE%"
     exit /b 0
 )
 
-REM ── Locate Python ─────────────────────────────────────────────────────────
+REM -- Locate Python ---------------------------------------------------------
 set "PY="
 if exist "%ROOT%.venv\Scripts\python.exe"  set "PY=%ROOT%.venv\Scripts\python.exe"
 if not defined PY if exist "%ROOT%Python\python.exe" set "PY=%ROOT%Python\python.exe"
@@ -41,6 +41,6 @@ if not exist "%SCRIPT%" (
     exit /b 1
 )
 
-REM ── Launch via Python ─────────────────────────────────────────────────────
+REM -- Launch via Python -----------------------------------------------------
 "%PY%" "%SCRIPT%" %*
 exit /b %ERRORLEVEL%

@@ -10,7 +10,7 @@ fi
 
 # Auto-setup if venv is missing
 if [[ ! -d ".venv" ]]; then
-  echo "venv not found — running setup first..."
+  echo "venv not found - running setup first..."
   bash "$REPO_DIR/scripts/linux/setup.sh"
 fi
 

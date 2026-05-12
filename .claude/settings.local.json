@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(git add scripts/bootstrap_ubuntu.sh scripts/linux/run.sh scripts/linux/setup.sh)",
-      "Bash(git update-index --chmod=+x scripts/bootstrap_ubuntu.sh scripts/linux/run.sh scripts/linux/setup.sh)"
+      "Bash(git update-index --chmod=+x scripts/bootstrap_ubuntu.sh scripts/linux/run.sh scripts/linux/setup.sh)",
+      "Read(//c/00 HENOSIS CODING PROJECTS/CITL PROJECTS/2026 ACADEMIC ADVISOR/api/**)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\00 HENOSIS CODING PROJECTS\\\\\" -Recurse -File -ErrorAction SilentlyContinue | Where-Object {$_.Extension -match \"\\\\.\\(py|cmd|ps1|ps\\)$\"} | Select-Object FullName, Length, LastWriteTime | Sort-Object LastWriteTime -Descending | Format-Table -AutoSize)"
+    ],
+    "additionalDirectories": [
+      "C:\\00 HENOSIS CODING PROJECTS\\CITL PROJECTS\\2026 ACADEMIC ADVISOR\\advisor-ui\\src"
     ]
   }
 }

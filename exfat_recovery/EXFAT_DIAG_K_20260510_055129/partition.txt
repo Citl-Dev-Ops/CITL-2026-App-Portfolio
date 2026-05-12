@@ -1,0 +1,43 @@
+﻿
+
+OperationalStatus     : Online
+Type                  : IFS
+DiskPath              : \\?\usbstor#disk&ven_general&prod_udisk&rev_5.00#7&31038191&0&_&0#{53f56307-b6bf-11d0-94f2-00a0
+                        c91efb8b}
+ObjectId              : {1}\\DESKTOP-H3821SL\root/Microsoft/Windows/Storage/Providers_v2\WSP_Partition.ObjectId="{7e17c
+                        04c-b795-11ef-93f8-806e6f6e6963}:PR:{00000000-0000-0000-0000-100000000000}\\?\usbstor#disk&ven_
+                        general&prod_udisk&rev_5.00#7&31038191&0&_&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}"
+PassThroughClass      : 
+PassThroughIds        : 
+PassThroughNamespace  : 
+PassThroughServer     : 
+UniqueId              : {00000000-0000-0000-0000-100000000000}USBSTOR\DISK&VEN_GENERAL&PROD_UDISK&REV_5.00\7&31038191&0
+                        &_&0:DESKTOP-H3821SL
+AccessPaths           : {K:\, \\?\Volume{389a17f8-f5eb-11f0-944b-345a60774797}\}
+DiskId                : \\?\usbstor#disk&ven_general&prod_udisk&rev_5.00#7&31038191&0&_&0#{53f56307-b6bf-11d0-94f2-00a0
+                        c91efb8b}
+DiskNumber            : 3
+DriveLetter           : K
+GptType               : 
+Guid                  : 
+IsActive              : False
+IsBoot                : False
+IsDAX                 : 
+IsHidden              : 
+IsOffline             : False
+IsReadOnly            : 
+IsShadowCopy          : 
+IsSystem              : False
+MbrType               : 7
+NoDefaultDriveLetter  : 
+Offset                : 1048576
+PartitionNumber       : 1
+Size                  : 62913511424
+TransitionState       : 1
+PSComputerName        : 
+CimClass              : ROOT/Microsoft/Windows/Storage:MSFT_Partition
+CimInstanceProperties : {ObjectId, PassThroughClass, PassThroughIds, PassThroughNamespace...}
+CimSystemProperties   : Microsoft.Management.Infrastructure.CimSystemProperties
+
+
+

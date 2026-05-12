@@ -1,6 +1,6 @@
 @echo off
-:: CITL Portable App Installer — no admin required
-:: Installs or updates all four CITL app bundles to your Desktop
+:: CITL Portable App Installer - no admin required
+:: Installs or updates all CITL app bundles to your Desktop
 :: and creates desktop shortcuts. Double-click to run.
 setlocal
 

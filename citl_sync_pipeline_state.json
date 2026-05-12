@@ -1,0 +1,436 @@
+{
+  "history": [
+    {
+      "run_at_utc": "2026-04-30T01:07:35.915689+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:08:30.493813+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 8
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:10:31.489922+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 8
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:11:29.862083+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 4
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:11:53.370376+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 3
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "ok",
+        "stats": {
+          "total_files": 7,
+          "copied": 7,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:13:26.138387+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:14:15.877475+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "ok",
+        "stats": {
+          "total_files": 5,
+          "copied": 5,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:16:08.426307+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "ok",
+        "stats": {
+          "total_files": 2,
+          "copied": 2,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:17:20.413674+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "ok",
+        "stats": {
+          "total_files": 3,
+          "copied": 3,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:18:05.527979+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "ok",
+        "stats": {
+          "total_files": 2,
+          "copied": 2,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:18:34.135070+00:00",
+      "target_mode": "explicit",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "C:\\Users\\Doc_M\\CITL\\PORTABLE_APPS\\CITL",
+        "status": "partial_fail",
+        "stats": {
+          "total_files": 89,
+          "copied": 0,
+          "failed": 89,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 0
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:19:23.503948+00:00",
+      "target_mode": "explicit",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "C:\\Users\\Doc_M\\CITL\\PORTABLE_APPS\\CITL",
+        "status": "blocked_permissions",
+        "reason": "permission denied for target root: C:\\Users\\Doc_M\\CITL\\PORTABLE_APPS\\CITL"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:19:42.201849+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "status": "ok",
+        "stats": {
+          "total_files": 3,
+          "copied": 3,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:36:20.305500+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "volume_id": "",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:37:25.539468+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "volume_id": "K:/unknownfs",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:37:54.247563+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "volume_id": "K:/unknownfs",
+        "status": "ok",
+        "stats": {
+          "total_files": 3,
+          "copied": 3,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-04-30T01:39:04.351368+00:00",
+      "target_mode": "auto",
+      "manual_tag": true,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "volume_id": "K:/unknownfs",
+        "status": "ok",
+        "stats": {
+          "total_files": 3,
+          "copied": 3,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        },
+        "additional_targets": [
+          {
+            "target": "K:\\CITL_FACTBOOK_UBUNTU V1",
+            "stats": {
+              "total_files": 74,
+              "copied": 74,
+              "failed": 0,
+              "missing": 0,
+              "invalid_rel_paths": 0,
+              "manifest_synced": 1
+            },
+            "status": "ok"
+          },
+          {
+            "target": "K:\\PORTABLE_APPS\\CITL",
+            "stats": {
+              "total_files": 72,
+              "copied": 72,
+              "failed": 0,
+              "missing": 0,
+              "invalid_rel_paths": 0,
+              "manifest_synced": 1
+            },
+            "status": "ok"
+          },
+          {
+            "target": "K:\\",
+            "stats": {
+              "total_files": 53,
+              "copied": 53,
+              "failed": 0,
+              "missing": 0,
+              "invalid_rel_paths": 0,
+              "manifest_synced": 1
+            },
+            "status": "ok"
+          }
+        ]
+      }
+    },
+    {
+      "run_at_utc": "2026-05-10T12:45:31.009986+00:00",
+      "target_mode": "auto",
+      "manual_tag": false,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "volume_id": "\\\\?\\Volume{389a17f8-f5eb-11f0-944b-345a60774797}\\",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-05-10T12:47:24.019085+00:00",
+      "target_mode": "auto",
+      "manual_tag": false,
+      "dry_run": true,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 5
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "volume_id": "\\\\?\\Volume{389a17f8-f5eb-11f0-944b-345a60774797}\\",
+        "status": "skipped_apply_disabled_or_dry"
+      }
+    },
+    {
+      "run_at_utc": "2026-05-12T00:49:27.117111+00:00",
+      "target_mode": "auto",
+      "manual_tag": false,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "status": "skipped_no_target",
+        "target": null
+      }
+    }
+  ],
+  "last_run": {
+    "run_at_utc": "2026-05-12T00:49:27.117111+00:00",
+    "target_mode": "auto",
+    "manual_tag": false,
+    "dry_run": false,
+    "auto_apply": true,
+    "stage1": {
+      "target": "C:\\Users\\Doc_M\\CITL",
+      "patches_created": 0
+    },
+    "stage2": {
+      "status": "skipped_no_target",
+      "target": null
+    }
+  }
+}

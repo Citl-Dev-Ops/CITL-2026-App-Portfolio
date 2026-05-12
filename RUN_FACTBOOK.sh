@@ -6,11 +6,11 @@ cd "$DIR"
 
 # Auto-setup if venv is missing
 if [[ ! -d "$DIR/.venv" ]]; then
-  echo "venv not found — running setup first..."
+  echo "venv not found - running setup first..."
   if [[ -f "$DIR/scripts/linux/setup.sh" ]]; then
     bash "$DIR/scripts/linux/setup.sh"
   else
-    echo "ERROR: Cannot find scripts/linux/setup.sh — please run setup manually."
+    echo "ERROR: Cannot find scripts/linux/setup.sh - please run setup manually."
     exit 1
   fi
 fi

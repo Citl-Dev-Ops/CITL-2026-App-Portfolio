@@ -1,0 +1,91 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* ── RTC dark mode design token palette ──────────────────────────────────
+   Renton Technical College brand: Navy #003478  ·  Gold #F7941D
+   Softened for dark mode — no harsh contrast, readable but calm.
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg:         #0C1A2C;   /* deep navy canvas */
+  --bg-alt:     #101F30;   /* slightly lifted */
+  --panel:      #152840;   /* card / panel surface */
+  --panel-hi:   #1B3352;   /* hovered / elevated panel */
+  --panel-deep: #0E1E30;   /* sunken inset areas */
+
+  /* Text */
+  --text:       #D4E4F5;   /* primary — soft blue-white */
+  --muted:      #7A9BBE;   /* secondary / labels */
+  --faint:      #3E5A78;   /* placeholder / disabled */
+
+  /* Borders */
+  --line:       #1D3050;   /* subtle border */
+  --line-hi:    #2A4568;   /* hovered / focus ring base */
+
+  /* RTC Blue accent */
+  --accent:     #3A8FD4;   /* primary CTA / links (RTC navy brightened) */
+  --accent-dim: #205A96;   /* pressed / dark variant */
+  --accent-glow: rgba(58, 143, 212, 0.14);
+
+  /* RTC Gold accent */
+  --gold:       #E89820;   /* RTC gold / highlights */
+  --gold-dim:   #A06810;   /* pressed gold */
+  --gold-glow:  rgba(232, 152, 32, 0.14);
+
+  /* Status */
+  --success:    #2D8A55;
+  --success-bg: rgba(45, 138, 85, 0.12);
+  --warn:       #B87830;
+  --warn-bg:    rgba(184, 120, 48, 0.12);
+  --danger:     #A83838;
+  --danger-bg:  rgba(168, 56, 56, 0.12);
+  --info:       #2870B8;
+  --info-bg:    rgba(40, 112, 184, 0.12);
+
+  /* Typography */
+  --font:       "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono:       "JetBrains Mono", "Consolas", monospace;
+
+  /* Radius */
+  --r-sm:  0.45rem;
+  --r-md:  0.75rem;
+  --r-lg:  1.1rem;
+  --r-xl:  1.5rem;
+
+  /* Shadows */
+  --shadow-sm:  0 2px 8px rgba(0,0,0,0.30);
+  --shadow-md:  0 6px 22px rgba(0,0,0,0.38);
+  --shadow-lg:  0 14px 42px rgba(0,0,0,0.45);
+}
+
+/* ── Reset & Base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-hi); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+/* Links */
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Form elements inherit font */
+button, input, select, textarea { font: inherit; }
+
+/* Selection highlight */
+::selection { background: var(--accent-glow); color: var(--text); }

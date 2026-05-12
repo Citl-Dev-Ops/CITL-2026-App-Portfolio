@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "updated_utc": "2026-04-30T00:42:49Z",
+  "last_applied": {
+    "event": "install",
+    "applied_utc": "2026-04-30T00:42:49Z",
+    "bootstrap_id": "M-20260430T004242Z-a4e6a39923",
+    "bootstrap_created_utc": "2026-04-30T00:42:42Z",
+    "package_path": "C:\\Users\\Doc_M\\CITL\\bootstrap\\patches\\citl_bootstrap_M_20260430T004242Z_a4e6a399.zip",
+    "package_size_bytes": 278872,
+    "apps": [
+      "CITL Academic Advisor",
+      "LLMOps Suite"
+    ],
+    "copied_files": 38,
+    "errors": 15,
+    "bytes_written": 1016906,
+    "rollback_snapshot": "C:\\Users\\Doc_M\\CITL\\bootstrap\\rollback\\rollback_20260430T004249Z_M-20260430T004242Z-a4e6a39923.zip"
+  },
+  "app_patch_state": {
+    "CITL Academic Advisor": {
+      "bootstrap_id": "M-20260430T004242Z-a4e6a39923",
+      "bootstrap_created_utc": "2026-04-30T00:42:42Z",
+      "bootstrap_created_ts": 1777509762.0,
+      "applied_utc": "2026-04-30T00:42:49Z",
+      "package_size_bytes": 278872,
+      "package_path": "C:\\Users\\Doc_M\\CITL\\bootstrap\\patches\\citl_bootstrap_M_20260430T004242Z_a4e6a399.zip",
+      "file_count": 44
+    },
+    "LLMOps Suite": {
+      "bootstrap_id": "M-20260430T004242Z-a4e6a39923",
+      "bootstrap_created_utc": "2026-04-30T00:42:42Z",
+      "bootstrap_created_ts": 1777509762.0,
+      "applied_utc": "2026-04-30T00:42:49Z",
+      "package_size_bytes": 278872,
+      "package_path": "C:\\Users\\Doc_M\\CITL\\bootstrap\\patches\\citl_bootstrap_M_20260430T004242Z_a4e6a399.zip",
+      "file_count": 9
+    }
+  },
+  "history": [
+    {
+      "event": "install",
+      "applied_utc": "2026-04-30T00:42:49Z",
+      "bootstrap_id": "M-20260430T004242Z-a4e6a39923",
+      "bootstrap_created_utc": "2026-04-30T00:42:42Z",
+      "package_path": "C:\\Users\\Doc_M\\CITL\\bootstrap\\patches\\citl_bootstrap_M_20260430T004242Z_a4e6a399.zip",
+      "package_size_bytes": 278872,
+      "apps": [
+        "CITL Academic Advisor",
+        "LLMOps Suite"
+      ],
+      "copied_files": 38,
+      "errors": 15,
+      "bytes_written": 1016906,
+      "rollback_snapshot": "C:\\Users\\Doc_M\\CITL\\bootstrap\\rollback\\rollback_20260430T004249Z_M-20260430T004242Z-a4e6a39923.zip"
+    }
+  ],
+  "rollback_stack": [
+    {
+      "created_utc": "2026-04-30T00:42:49Z",
+      "bootstrap_id": "M-20260430T004242Z-a4e6a39923",
+      "snapshot_path": "C:\\Users\\Doc_M\\CITL\\bootstrap\\rollback\\rollback_20260430T004249Z_M-20260430T004242Z-a4e6a39923.zip",
+      "apps": [
+        "CITL Academic Advisor",
+        "LLMOps Suite"
+      ]
+    }
+  ]
+}

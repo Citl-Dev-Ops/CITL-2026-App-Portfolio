@@ -1,29 +1,47 @@
-"""
+﻿"""
 Adapt Factbook UI for the FLEX Troubleshooter by reusing the Factbook App
 and redirecting its query function to the FLEX RAG backend (query_flex).
 This preserves the Factbook layout, theme, and tools while answering from
 the FLEX corpus.
 """
 from pathlib import Path
-import os
+import importlib.util
 import sys
 
-# Ensure the factbook-assistant package path is importable when run as a script
+
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-factbook_dir = REPO / 'factbook-assistant'
-if str(factbook_dir) not in sys.path:
-    sys.path.insert(0, str(factbook_dir))
 
-# Import the Factbook GUI App and monkeypatch its query backend
-import importlib
-try:
-    fb = importlib.import_module('factbook_assistant_gui')
-except Exception:
-    # Fallback: load by file path
-    spec = importlib.util.spec_from_file_location('factbook_assistant_gui', str(factbook_dir / 'factbook_assistant_gui.py'))
-    fb = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fb)
+
+def _load_factbook_module():
+    """Load the real factbook_assistant_gui.py file, not the frozen wrapper."""
+    candidates = [
+        REPO / "factbook-assistant" / "factbook_assistant_gui.py",
+        HERE / "factbook-assistant" / "factbook_assistant_gui.py",
+        REPO / "_internal" / "factbook-assistant" / "factbook_assistant_gui.py",
+    ]
+
+    fb_gui = next((p for p in candidates if p.is_file()), None)
+    if fb_gui is None:
+        looked = "\n  - " + "\n  - ".join(str(p) for p in candidates)
+        raise FileNotFoundError(
+            "Could not locate factbook_assistant_gui.py in expected paths:" + looked
+        )
+
+    factbook_dir = fb_gui.parent
+    if str(factbook_dir) not in sys.path:
+        sys.path.insert(0, str(factbook_dir))
+
+    spec = importlib.util.spec_from_file_location("factbook_assistant_gui_real", str(fb_gui))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load module spec from: {fb_gui}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+fb = _load_factbook_module()
 
 try:
     import citl_flex_troubleshooter.query_flex as qf
@@ -54,10 +72,9 @@ fb._query_factbook = _flex_query_replacement
 
 def main():
     app = fb.App()
-    app.title("CITL FLEX Troubleshooter — Factbook UI")
+    app.title("CITL FLEX Troubleshooter - Factbook UI")
     app.mainloop()
 
 
 if __name__ == '__main__':
     main()
-

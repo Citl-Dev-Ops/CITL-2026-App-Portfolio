@@ -1,0 +1,28 @@
+﻿
+
+OperationalStatus     : Full Repair Needed
+HealthStatus          : Warning
+DriveType             : Removable
+FileSystemType        : Unknown
+DedupMode             : NotAvailable
+ObjectId              : {1}\\DESKTOP-H3821SL\root/Microsoft/Windows/Storage/Providers_v2\WSP_Volume.ObjectId="{7e17c04c
+                        -b795-11ef-93f8-806e6f6e6963}:VO:\\?\Volume{389a17f8-f5eb-11f0-944b-345a60774797}\"
+PassThroughClass      : 
+PassThroughIds        : 
+PassThroughNamespace  : 
+PassThroughServer     : 
+UniqueId              : \\?\Volume{389a17f8-f5eb-11f0-944b-345a60774797}\
+AllocationUnitSize    : 131072
+DriveLetter           : K
+FileSystem            : exFAT
+FileSystemLabel       : 
+Path                  : \\?\Volume{389a17f8-f5eb-11f0-944b-345a60774797}\
+Size                  : 62910496768
+SizeRemaining         : 3923771392
+PSComputerName        : 
+CimClass              : ROOT/Microsoft/Windows/Storage:MSFT_Volume
+CimInstanceProperties : {ObjectId, PassThroughClass, PassThroughIds, PassThroughNamespace...}
+CimSystemProperties   : Microsoft.Management.Infrastructure.CimSystemProperties
+
+
+

@@ -81,7 +81,7 @@ except Exception:
     _HAS_TR = False
 
 try:
-    from citl_corpus_health import run_health_check
+    from citl_corpus_health import scan_corpus_health as _scan_corpus_health
     _HAS_HEALTH = True
 except Exception:
     _HAS_HEALTH = False
@@ -895,9 +895,8 @@ class FlexTroubleshooterApp(tk.Tk):
                 if build_script.exists():
                     cmd = [sys.executable, str(build_script),
                            "--src", str(src), "--out", str(out),
-                           "--emb-model", emb_model,
-                           "--chunk-size", chunk_sz,
-                           "--overlap", chunk_ov]
+                           "--embed-model", emb_model,
+                           "--chunk", chunk_sz]
                     proc = subprocess.Popen(
                         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, bufsize=1)
@@ -934,13 +933,22 @@ class FlexTroubleshooterApp(tk.Tk):
     def _do_corpus_health(self):
         if not _HAS_HEALTH:
             self._log(self._idx_log,
-                "citl_corpus_health module not available.\n", "warn")
+                "citl_corpus_health module not available — check PYTHONPATH.\n", "warn")
             return
         self._log(self._idx_log, "\n[CORPUS HEALTH CHECK]\n", "head")
         def _run():
             try:
-                report = run_health_check(CORPUS)
-                self.after(0, lambda: self._log(self._idx_log, report + "\n", "ok"))
+                rpt = _scan_corpus_health(source_path=CORPUS)
+                lines = [f"Status: {rpt.overall_status}  [{rpt.timestamp}]"]
+                for e in rpt.embeddings:
+                    lines.append(f"  Embedding {e.name}: {e.status}  "
+                                 f"({e.vector_count} vectors, dim={e.dim})")
+                for ix in rpt.indexes:
+                    lines.append(f"  Index {ix.name}: {ix.chunk_count} chunks")
+                for n in rpt.notes:
+                    lines.append(f"  NOTE: {n}")
+                self.after(0, lambda: self._log(self._idx_log,
+                    "\n".join(lines) + "\n", "ok"))
             except Exception as e:
                 self.after(0, lambda e=e: self._log(self._idx_log, f"Error: {e}\n", "err"))
         threading.Thread(target=_run, daemon=True).start()

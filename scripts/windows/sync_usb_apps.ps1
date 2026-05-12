@@ -16,8 +16,8 @@
        launchers, requirements) -- always
     2. Portable installer scripts                 -- always
     3. Built .exe bundles in numbered USB folders -- always when USB detected
-       (1-CITL-SYNC, 2-CITL-PRESENTATION-SUITE,
-        3-CITL-WORKSTATION-APPS, 4-CITL-FIELD-APPS)
+       (1-CITL-SYNC, 2-CITL-PRESENTATION-SUITE, 3-CITL-WORKSTATION-APPS,
+        4-CITL-FIELD-APPS, 6-CITL-WORK-TICKETING)
     4. Optional: data/ indexes               -- with -IncludeData
     5. Optional: models/ and ollama/         -- with -IncludeModels
     6. Optional: full repo mirror            -- with -FullRepo
@@ -305,8 +305,8 @@ if ($TargetRepo -and (Test-Path $TargetRepo -ErrorAction SilentlyContinue)) {
 # ============================================================
 # 5. SYNC BUILT EXE BUNDLES TO USB NUMBERED FOLDERS
 # ============================================================
-# The four app bundles live in dist\ and get distributed via
-# numbered folders on the USB for easy user access.
+# App bundles live in dist\ (and project-specific build folders)
+# and get distributed via numbered folders on the USB for easy user access.
 # This runs by default whenever we can resolve a USB target.
 
 if ($syncExit -le 1 -and (-not $SkipExeBundles) -and $usbTarget) {
@@ -317,16 +317,22 @@ if ($syncExit -le 1 -and (-not $SkipExeBundles) -and $usbTarget) {
     if (!(Test-Path $DistDir -ErrorAction SilentlyContinue)) {
         Write-Warn "No dist/ folder found. Run BUILD_ALL_CITL_EXES_WINDOWS.cmd first."
     } else {
-        # Map: dist folder name -> USB numbered folder
+        # Map: dist folder name -> USB numbered folder.
+        # Optional SourceRel allows bundles that are built outside root dist\.
         $bundles = @(
             @{ Dist = "CITL App Sync";                 Usb = "1-CITL-SYNC";                   Exe = "CITL App Sync.exe" },
             @{ Dist = "CITL LLMOps Presentation Suite";Usb = "2-CITL-PRESENTATION-SUITE";      Exe = "CITL LLMOps Presentation Suite.exe" },
             @{ Dist = "CITL Workstation Apps";          Usb = "3-CITL-WORKSTATION-APPS";        Exe = "CITL Workstation Apps.exe" },
-            @{ Dist = "CITL Field Apps";                Usb = "4-CITL-FIELD-APPS";              Exe = "CITL Field Apps.exe" }
+            @{ Dist = "CITL Field Apps";                Usb = "4-CITL-FIELD-APPS";              Exe = "CITL Field Apps.exe" },
+            @{ Dist = "CITL Ticketing Automation GUI";  Usb = "6-CITL-WORK-TICKETING";          Exe = "CITL Ticketing Automation GUI.exe"; SourceRel = "powerflow_builder\dist\CITL Ticketing Automation GUI" }
         )
 
         foreach ($b in $bundles) {
-            $src = Join-Path $DistDir $b.Dist
+            $src = if ($b.ContainsKey("SourceRel")) {
+                Join-Path $SourceRepo $b.SourceRel
+            } else {
+                Join-Path $DistDir $b.Dist
+            }
             $dst = Join-Path $usbTarget $b.Usb
 
             if (!(Test-Path (Join-Path $src $b.Exe) -ErrorAction SilentlyContinue)) {
@@ -369,7 +375,23 @@ if ($usbTarget -and $syncExit -le 1) {
     $installerFiles = @(
         @{ Src = (Join-Path $SourceRepo "INSTALL_CITL_APPS_PORTABLE.cmd");          Dst = (Join-Path $usbTarget "INSTALL_CITL_APPS_PORTABLE.cmd") },
         @{ Src = (Join-Path $SourceRepo "SYNC_EXES_TO_USB_WINDOWS.cmd");            Dst = (Join-Path $usbTarget "SYNC_EXES_TO_USB_WINDOWS.cmd") },
-        @{ Src = (Join-Path $SourceRepo "scripts\windows\install_citl_apps_portable.ps1"); Dst = (Join-Path $usbTarget "scripts\windows\install_citl_apps_portable.ps1") }
+        @{ Src = (Join-Path $SourceRepo "RUN_APP_SYNC_WINDOWS.cmd");                 Dst = (Join-Path $usbTarget "RUN_APP_SYNC_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "Run-CITL-App-Sync.ps1");                    Dst = (Join-Path $usbTarget "Run-CITL-App-Sync.ps1") },
+        @{ Src = (Join-Path $SourceRepo "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd");    Dst = (Join-Path $usbTarget "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd");Dst = (Join-Path $usbTarget "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd") },
+        @{ Src = (Join-Path $SourceRepo "REPAIR_CITL_APPS.cmd");                     Dst = (Join-Path $usbTarget "REPAIR_CITL_APPS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "RUN_CITL_FIXER_WINDOWS.cmd");               Dst = (Join-Path $usbTarget "RUN_CITL_FIXER_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "RUN_CITL_FIXER_UBUNTU.sh");                 Dst = (Join-Path $usbTarget "RUN_CITL_FIXER_UBUNTU.sh") },
+        @{ Src = (Join-Path $SourceRepo "PATCH_CITL_48H_AUTO_WINDOWS.cmd");          Dst = (Join-Path $usbTarget "PATCH_CITL_48H_AUTO_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "PATCH_CITL_48H_MANUAL_WINDOWS.cmd");        Dst = (Join-Path $usbTarget "PATCH_CITL_48H_MANUAL_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "REGISTER_PATCH_CADENCE_TASK_WINDOWS.cmd");  Dst = (Join-Path $usbTarget "REGISTER_PATCH_CADENCE_TASK_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "UNREGISTER_PATCH_CADENCE_TASK_WINDOWS.cmd");Dst = (Join-Path $usbTarget "UNREGISTER_PATCH_CADENCE_TASK_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "RUN_CITL_USB_REPAIR_CLONER_WINDOWS.cmd");  Dst = (Join-Path $usbTarget "RUN_CITL_USB_REPAIR_CLONER_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "BUILD_CITL_USB_REPAIR_CLONER_WINDOWS.cmd");Dst = (Join-Path $usbTarget "BUILD_CITL_USB_REPAIR_CLONER_WINDOWS.cmd") },
+        @{ Src = (Join-Path $SourceRepo "scripts\windows\install_citl_apps_portable.ps1"); Dst = (Join-Path $usbTarget "scripts\windows\install_citl_apps_portable.ps1") },
+        @{ Src = (Join-Path $SourceRepo "scripts\windows\sync_usb_apps.ps1");       Dst = (Join-Path $usbTarget "scripts\windows\sync_usb_apps.ps1") },
+        @{ Src = (Join-Path $SourceRepo "scripts\windows\run_work_ticketing_system.ps1"); Dst = (Join-Path $usbTarget "scripts\windows\run_work_ticketing_system.ps1") },
+        @{ Src = (Join-Path $SourceRepo "scripts\windows\citl_usb_repair_clone.py");Dst = (Join-Path $usbTarget "scripts\windows\citl_usb_repair_clone.py") }
     )
 
     foreach ($f in $installerFiles) {
@@ -377,6 +399,14 @@ if ($usbTarget -and $syncExit -le 1) {
             Write-Warn "  Source not found: $($f.Src)"
             continue
         }
+        try {
+            $srcNorm = [System.IO.Path]::GetFullPath([string]$f.Src).TrimEnd('\').ToLowerInvariant()
+            $dstNorm = [System.IO.Path]::GetFullPath([string]$f.Dst).TrimEnd('\').ToLowerInvariant()
+            if ($srcNorm -eq $dstNorm) {
+                Write-Info "  same path, skipped: $(Split-Path $f.Dst -Leaf)"
+                continue
+            }
+        } catch {}
         $dstDir = Split-Path $f.Dst
         if (!(Test-Path $dstDir -ErrorAction SilentlyContinue)) {
             New-Item -ItemType Directory -Path $dstDir -Force | Out-Null
@@ -387,6 +417,24 @@ if ($usbTarget -and $syncExit -le 1) {
         } catch {
             Write-Warn "  Could not copy $(Split-Path $f.Dst -Leaf): $_"
         }
+    }
+
+    # Sync cloner executable bundle if built.
+    Write-Step "Syncing CITL USB Repair Cloner executable..."
+    $clonerExe = Join-Path $SourceRepo "dist\CITL USB Repair Cloner.exe"
+    if (Test-Path $clonerExe -ErrorAction SilentlyContinue) {
+        $clonerDstDir = Join-Path $usbTarget "1-CITL-SYNC\CITL USB Repair Cloner"
+        if (!(Test-Path $clonerDstDir -ErrorAction SilentlyContinue)) {
+            New-Item -ItemType Directory -Path $clonerDstDir -Force | Out-Null
+        }
+        try {
+            Copy-Item -Path $clonerExe -Destination (Join-Path $clonerDstDir "CITL USB Repair Cloner.exe") -Force
+            Write-OK "  CITL USB Repair Cloner.exe"
+        } catch {
+            Write-Warn "  Could not copy cloner exe: $_"
+        }
+    } else {
+        Write-Warn "  Cloner exe not built yet: $clonerExe"
     }
 }
 
@@ -419,6 +467,7 @@ if ($usbTarget) {
 Write-Host ""
 Write-Info "Next steps:"
 Write-Info "  - To build missing EXEs : BUILD_ALL_CITL_EXES_WINDOWS.cmd"
+Write-Info "  - To build USB cloner   : BUILD_CITL_USB_REPAIR_CLONER_WINDOWS.cmd"
 Write-Info "  - To install on desktop : INSTALL_CITL_APPS_PORTABLE.cmd  (or from USB)"
 Write-Info "  - To duplicate to USB   : .\sync_usb_apps.ps1 -DuplicateUsb"
 Write-Host ""

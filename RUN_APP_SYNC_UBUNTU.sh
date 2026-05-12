@@ -27,20 +27,9 @@ if [ -z "$TARGET" ]; then
   done
 fi
 
-if [ -n "$TARGET" ]; then
-  exec bash "$TARGET/RUN_APP_SYNC.sh" "$@"
+if [ -z "$TARGET" ]; then
+  echo "Could not find RUN_APP_SYNC.sh under: $ROOT"
+  exit 1
 fi
 
-if [ -f "$ROOT/factbook-assistant/citl_app_sync.py" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    exec python3 "$ROOT/factbook-assistant/citl_app_sync.py" "$@"
-  elif command -v python >/dev/null 2>&1; then
-    exec python "$ROOT/factbook-assistant/citl_app_sync.py" "$@"
-  else
-    echo "Python not found. Install python3 or add python to PATH."
-    exit 1
-  fi
-fi
-
-echo "Could not find RUN_APP_SYNC.sh or factbook-assistant/citl_app_sync.py under: $ROOT"
-exit 1
+exec bash "$TARGET/RUN_APP_SYNC.sh" "$@"

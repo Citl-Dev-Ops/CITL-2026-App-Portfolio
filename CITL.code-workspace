@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "CITL",
+			"path": "."
+		},
+		{
+			"name": "K:",
+			"path": "K:/"
+		},
+		{
+			"name": "HENOSIS_APP_SYNC",
+			"path": "../../../HENOSIS_APP_SYNC"
+		}
+	],
+	"settings": {}
+}

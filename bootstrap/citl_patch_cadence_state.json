@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "updated_utc": "2026-04-30T00:44:40Z",
+  "last_auto_run_utc": "",
+  "last_auto_run_ts": 0.0,
+  "last_auto_package_id": "",
+  "last_manual_run_utc": "2026-04-30T00:44:40Z",
+  "last_manual_run_ts": 1777509880.0145736,
+  "last_manual_package_id": "M-20260430T004440Z-df034b6967",
+  "history": [
+    {
+      "ran_utc": "2026-04-30T00:42:49Z",
+      "manual": true,
+      "cadence_hours": 48,
+      "package_id": "M-20260430T004242Z-a4e6a39923",
+      "package_path": "C:\\Users\\Doc_M\\CITL\\bootstrap\\patches\\citl_bootstrap_M_20260430T004242Z_a4e6a399.zip",
+      "changed_apps": [
+        "CITL Academic Advisor",
+        "LLMOps Suite"
+      ],
+      "selected_apps": [
+        "CITL Academic Advisor",
+        "LLMOps Suite"
+      ],
+      "target_mode": "both"
+    },
+    {
+      "ran_utc": "2026-04-30T00:44:40Z",
+      "manual": true,
+      "cadence_hours": 48,
+      "package_id": "M-20260430T004440Z-df034b6967",
+      "package_path": "C:\\Users\\Doc_M\\CITL\\bootstrap\\patches\\citl_bootstrap_M_20260430T004440Z_df034b69.zip",
+      "changed_apps": [],
+      "selected_apps": [
+        "CITL App Sync"
+      ],
+      "target_mode": "usb"
+    }
+  ]
+}

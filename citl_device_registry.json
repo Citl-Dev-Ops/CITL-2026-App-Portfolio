@@ -1,0 +1,72 @@
+{
+  "DESKTOP-H3821SL": {
+    "nickname": "DESKTOP-H3821SL",
+    "citl_paths": [],
+    "git_repos": [
+      "C:\\Users\\Doc_M\\CITL"
+    ],
+    "patch_apply": {},
+    "repo_builds": {
+      "C:\\Users\\Doc_M\\CITL": {
+        "path": "C:\\Users\\Doc_M\\CITL",
+        "repo_nickname": "CITL",
+        "last_seen": "2026-04-28T17:28:13",
+        "source": "find_git_repos",
+        "branch": "main",
+        "last_head": "3364bdfe63e81b57e9f1c44ec058cbaffb608527",
+        "last_head_time": "2026-04-21 04:57:20 -0700",
+        "last_head_subject": "Professional screen recorder: region selector, preflight, auto codec check, drive scan",
+        "last_head_author": "Citl-Dev-Ops"
+      }
+    },
+    "events": [
+      {
+        "ts": "2026-04-28T16:45:02",
+        "event": "repo_scan",
+        "source": "find_git_repos",
+        "repo_count": 1
+      },
+      {
+        "ts": "2026-04-28T17:02:14",
+        "event": "repo_scan",
+        "source": "find_git_repos",
+        "repo_count": 1
+      },
+      {
+        "ts": "2026-04-28T17:08:23",
+        "event": "repo_scan",
+        "source": "find_git_repos",
+        "repo_count": 1
+      },
+      {
+        "ts": "2026-04-28T17:08:31",
+        "event": "repo_scan",
+        "source": "find_git_repos",
+        "repo_count": 1
+      },
+      {
+        "ts": "2026-04-28T17:26:39",
+        "event": "repo_scan",
+        "source": "find_git_repos",
+        "repo_count": 1
+      },
+      {
+        "ts": "2026-04-28T17:28:13",
+        "event": "repo_scan",
+        "source": "find_git_repos",
+        "repo_count": 1
+      }
+    ],
+    "first_seen": "2026-04-28T16:45:02",
+    "last_seen": "2026-04-28T17:28:13",
+    "last_connected": "2026-04-28T17:28:13",
+    "last_scan": "2026-04-28T17:28:13",
+    "last_apply": "",
+    "updated": "2026-04-28T17:28:13",
+    "machine_id": "51586fb59b18",
+    "os": "Windows",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "user": "Doc_M",
+    "pinned_repos": []
+  }
+}

@@ -1,0 +1,13 @@
+FLOW "CITL Ticket Intake Flow"
+TRIGGER SHAREPOINT_NEW_ITEM site="https://contoso.sharepoint.com/sites/it" list="ServiceTickets"
+SET TEAM_ID="TEAM_ID_HERE"
+SET CHANNEL_ID="CHANNEL_ID_HERE"
+SET DISPATCH_EMAIL="ithelp@contoso.edu"
+SET GROUP_ID="PLANNER_GROUP_ID"
+SET PLAN_ID="PLANNER_PLAN_ID"
+
+COMPOSE TicketSummary text="fx:concat('Ticket #', string(triggerBody()?['ID']), ' | ', coalesce(triggerBody()?['Title'],'No title'))"
+TEAMS_POST NotifyITTeam team_id="${TEAM_ID}" channel_id="${CHANNEL_ID}" message="fx:outputs('TicketSummary')"
+EMAIL NotifyDispatcher to="${DISPATCH_EMAIL}" subject="fx:concat('New Service Ticket #', string(triggerBody()?['ID']))" body="fx:concat('A new ticket was captured from Microsoft Lists. Title: ', coalesce(triggerBody()?['Title'],'No title'))"
+PLANNER_CREATE_TASK CreatePlannerTask group_id="${GROUP_ID}" plan_id="${PLAN_ID}" title="fx:concat('Ticket #', string(triggerBody()?['ID']), ' - ', coalesce(triggerBody()?['Title'],'No title'))"
+

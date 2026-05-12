@@ -45,10 +45,12 @@ MODEL_SYNC_WARN_BYTES = 8 * 1024 * 1024 * 1024  # 8 GiB
 BOOTSTRAP_SCHEMA_VERSION = 1
 BOOTSTRAP_MANIFEST_NAME = "citl_bootstrap_manifest.json"
 BOOTSTRAP_STATE_REL = "bootstrap/citl_bootstrap_state.json"
+BOOTSTRAP_CADENCE_STATE_REL = "bootstrap/citl_patch_cadence_state.json"
 BOOTSTRAP_PATCH_DIR_REL = "bootstrap/patches"
 BOOTSTRAP_ROLLBACK_DIR_REL = "bootstrap/rollback"
 BOOTSTRAP_ROLLBACK_MANIFEST_NAME = "citl_bootstrap_rollback_manifest.json"
 BOOTSTRAP_WARN_EPSILON_SEC = 2.0
+DEFAULT_PATCH_CADENCE_HOURS = 48
 USB_MEDIA_CACHE_TTL_SEC = 20.0
 DEVICE_PUSH_LOG_NAME = "citl_device_push_log.jsonl"
 TERMUX_SHORTCUT_BACKUP_DIR = "termux_shortcut_backups"
@@ -56,7 +58,15 @@ TERMUX_SHORTCUT_FILE = "CITL_Latest_Push.sh"
 PINNED_APP_NOETIKON = "NOETIKON PRIME"
 PINNED_APP_CANIS = "CANIS COSMOS ASTROLOGY"
 
-REPO_MARKERS: Tuple[str, ...] = (
+SYNC_SCOPE_CITL = "citl"
+SYNC_SCOPE_HENOSIS = "henosis"
+SYNC_TAG_HENOSIS = "henosis_sync"
+SYNC_TAG_CITL = "citl_sync"
+
+ACTIVE_SYNC_SCOPE = SYNC_SCOPE_CITL
+PHONE_DOWNLOAD_DIR = "/sdcard/Download/CITL"
+
+CITL_REPO_MARKERS: Tuple[str, ...] = (
     "factbook-assistant/factbook_assistant_gui.py",
     "factbook_assistant_gui.py",
     "RUN_FACTBOOK.sh",
@@ -64,11 +74,31 @@ REPO_MARKERS: Tuple[str, ...] = (
     "run_citl_factbook_gui_ffmpeg.ps1",
 )
 
+HENOSIS_REPO_MARKERS: Tuple[str, ...] = (
+    ".henosis_sync",
+    "henosis_sync.json",
+    "HENOSIS_SYNC.tag",
+    "NOETIKON_SYNC.tag",
+)
+
+REPO_MARKERS: Tuple[str, ...] = CITL_REPO_MARKERS
+
+CITL_REPO_HINT_KEYWORDS: Tuple[str, ...] = (
+    "citl", "factbook", "llmops",
+)
+
+HENOSIS_REPO_HINT_KEYWORDS: Tuple[str, ...] = (
+    "henosis", "noetikon", "zine", "canis", "studio",
+)
+
+REPO_HINT_KEYWORDS: Tuple[str, ...] = CITL_REPO_HINT_KEYWORDS
+
+
 # ── CITL app registry ─────────────────────────────────────────────────────────
 # "Factbook" is the umbrella name for the main desktop LLM utility.
 # It encompasses: Study/Library Q&A, Transcription, Translation, TTS, and App Sync.
 # Other distinct CITL apps (each may live in their own repo) are listed below it.
-CITL_APPS: Tuple[dict, ...] = (
+CITL_APPS_BASE: Tuple[dict, ...] = (
     {
         # ── UMBRELLA: everything that ships as the "Factbook" desktop app ──────
         "name": "Factbook",
@@ -140,6 +170,35 @@ CITL_APPS: Tuple[dict, ...] = (
         "launcher_win": "RUN_APP_SYNC_WINDOWS.cmd",
         "launcher_nix": "RUN_APP_SYNC_UBUNTU.sh",
         "repo_marker": "factbook-assistant/citl_app_sync.py",
+    },
+    {
+        # ── CITL Fixer / USB Repair Cloner ──────────────────────────────────
+        "name": "CITL Fixer",
+        "description": (
+            "Primary repair, restore, and clone utility for CITL deployments. "
+            "Runs offline diagnostics, applies self-update patch cadence, and "
+            "can clone the latest working payload to replacement USB drives."
+        ),
+        "icon": "🧯",
+        "key_files": [
+            "citl_fixer.py",
+            "citl_repair_all.py",
+            "REPAIR_CITL_APPS.cmd",
+            "RUN_CITL_FIXER_WINDOWS.cmd",
+            "RUN_CITL_FIXER_UBUNTU.sh",
+            "RUN_CITL_USB_REPAIR_CLONER_WINDOWS.cmd",
+            "BUILD_CITL_USB_REPAIR_CLONER_WINDOWS.cmd",
+            "Run-CITL-App-Sync.ps1",
+            "PATCH_CITL_48H_AUTO_WINDOWS.cmd",
+            "PATCH_CITL_48H_MANUAL_WINDOWS.cmd",
+            "REGISTER_PATCH_CADENCE_TASK_WINDOWS.cmd",
+            "UNREGISTER_PATCH_CADENCE_TASK_WINDOWS.cmd",
+            "scripts/windows/citl_usb_repair_clone.py",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_CITL_FIXER_WINDOWS.cmd",
+        "launcher_nix": "RUN_CITL_FIXER_UBUNTU.sh",
+        "repo_marker": "citl_fixer.py",
     },
     {
         # ── LLM Studio / Bot Maker ───────────────────────────────────────────
@@ -404,6 +463,34 @@ CITL_APPS: Tuple[dict, ...] = (
         "repo_marker": "factbook-assistant/citl_field_apps.py",
     },
     {
+        # ── CITL Work Ticketing System ────────────────────────────────────────
+        "name": "CITL Work Ticketing System",
+        "description": (
+            "Powerflow ticketing automation GUI with FlowFX compiler, packet diagnostics, "
+            "connection preflight, SharePoint CRUD tools, and local ticket DB."
+        ),
+        "icon": "🎫",
+        "key_files": [
+            "powerflow_builder/citl_work_ticketing_gui.py",
+            "powerflow_builder/ops_assistant.py",
+            "powerflow_builder/flowfx_compiler.py",
+            "powerflow_builder/flowfx_validator_pack.py",
+            "powerflow_builder/README_TICKETING_SYSTEM.md",
+            "powerflow_builder/build_ticketing_automation_exe.ps1",
+            "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+            "RUN_WORK_TICKETING_SYSTEM_WINDOWS_EXE.cmd",
+            "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+            "scripts/windows/build_all_citl_exes.ps1",
+            "SYNC_EXES_TO_USB_WINDOWS.cmd",
+            "INSTALL_CITL_APPS_PORTABLE.cmd",
+            "scripts/windows/install_citl_apps_portable.ps1",
+        ],
+        "version_file": None,
+        "launcher_win": "RUN_WORK_TICKETING_SYSTEM_WINDOWS.cmd",
+        "launcher_nix": "RUN_WORK_TICKETING_SYSTEM_UBUNTU.sh",
+        "repo_marker": "powerflow_builder/citl_work_ticketing_gui.py",
+    },
+    {
         # ── CITL Sync Hub ─────────────────────────────────────────────────────
         "name": "CITL Sync Hub",
         "description": (
@@ -451,6 +538,129 @@ CITL_APPS: Tuple[dict, ...] = (
         "repo_marker": "citl_flex_troubleshooter/flex_assistant_gui.py",
     },
 )
+
+HENOSIS_SYNC_APPS: Tuple[dict, ...] = (
+    {
+        "name": "NOETIKON PRIME",
+        "description": (
+            "HENOSIS-tagged NOETIKON PRIME repository sync target for mobile/USB patch flows."
+        ),
+        "icon": "🜂",
+        "key_files": ["README.md", "requirements.txt", "pyproject.toml", "src", "app", "scripts", "launchers"],
+        "version_file": None,
+        "launcher_win": None,
+        "launcher_nix": None,
+        "repo_marker": ".henosis_sync",
+        "repo_markers": [".henosis_sync", "NOETIKON_SYNC.tag", "README.md"],
+        "repo_path_env": "HENOSIS_NOETIKON_PRIME_REPO",
+        "sync_tags": [SYNC_TAG_HENOSIS],
+    },
+    {
+        "name": "NOETIKON STUDIO 2",
+        "description": (
+            "HENOSIS-tagged NOETIKON Studio 2 repository sync target for patch continuation and deployment."
+        ),
+        "icon": "🜁",
+        "key_files": ["README.md", "requirements.txt", "pyproject.toml", "src", "app", "scripts", "launchers"],
+        "version_file": None,
+        "launcher_win": None,
+        "launcher_nix": None,
+        "repo_marker": ".henosis_sync",
+        "repo_markers": [".henosis_sync", "NOETIKON_SYNC.tag", "README.md"],
+        "repo_path_env": "HENOSIS_NOETIKON_STUDIO2_REPO",
+        "sync_tags": [SYNC_TAG_HENOSIS],
+    },
+    {
+        "name": "ZINE WRITER",
+        "description": (
+            "HENOSIS-tagged Zine Writer repository sync target for device-aware patch/update continuity."
+        ),
+        "icon": "🜃",
+        "key_files": ["README.md", "requirements.txt", "pyproject.toml", "src", "app", "scripts", "launchers"],
+        "version_file": None,
+        "launcher_win": None,
+        "launcher_nix": None,
+        "repo_marker": ".henosis_sync",
+        "repo_markers": [".henosis_sync", "HENOSIS_SYNC.tag", "README.md"],
+        "repo_path_env": "HENOSIS_ZINE_WRITER_REPO",
+        "sync_tags": [SYNC_TAG_HENOSIS],
+    },
+    {
+        "name": "CANIS COSMOS ASTROLOGY",
+        "description": (
+            "HENOSIS-tagged CANIS COSMOS ASTROLOGY repository sync target."
+        ),
+        "icon": "🜄",
+        "key_files": ["README.md", "requirements.txt", "pyproject.toml", "src", "app", "scripts", "launchers"],
+        "version_file": None,
+        "launcher_win": None,
+        "launcher_nix": None,
+        "repo_marker": ".henosis_sync",
+        "repo_markers": [".henosis_sync", "HENOSIS_SYNC.tag", "README.md"],
+        "repo_path_env": "HENOSIS_CANIS_COSMOS_REPO",
+        "sync_tags": [SYNC_TAG_HENOSIS],
+    },
+)
+
+CITL_APPS: Tuple[dict, ...] = CITL_APPS_BASE
+
+
+def _default_sync_scope() -> str:
+    env_scope = (os.environ.get("CITL_SYNC_SCOPE", "") or "").strip().lower()
+    if env_scope in {SYNC_SCOPE_CITL, SYNC_SCOPE_HENOSIS}:
+        return env_scope
+    henosis_only = (os.environ.get("HENOSIS_SYNC_ONLY", "") or "").strip().lower()
+    if henosis_only in {"1", "true", "yes", "on"}:
+        return SYNC_SCOPE_HENOSIS
+    return SYNC_SCOPE_CITL
+
+
+def _scope_label() -> str:
+    return "HENOSIS" if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS else "CITL"
+
+
+def _app_has_tag(app: dict, tag: str) -> bool:
+    tags = app.get("sync_tags")
+    if not isinstance(tags, (list, tuple, set)):
+        return False
+    want = str(tag or "").strip().lower()
+    if not want:
+        return False
+    for item in tags:
+        if str(item or "").strip().lower() == want:
+            return True
+    return False
+
+
+def _apply_sync_scope(scope: str) -> str:
+    global ACTIVE_SYNC_SCOPE, CITL_APPS, REPO_MARKERS, REPO_HINT_KEYWORDS
+    global APP_SYNC_NAME, DEVICE_PUSH_LOG_NAME, TERMUX_SHORTCUT_FILE, PHONE_DOWNLOAD_DIR
+    normalized = (scope or "").strip().lower()
+    if normalized not in {SYNC_SCOPE_CITL, SYNC_SCOPE_HENOSIS}:
+        normalized = SYNC_SCOPE_CITL
+
+    ACTIVE_SYNC_SCOPE = normalized
+    if normalized == SYNC_SCOPE_HENOSIS:
+        CITL_APPS = tuple(HENOSIS_SYNC_APPS)
+        REPO_MARKERS = HENOSIS_REPO_MARKERS
+        REPO_HINT_KEYWORDS = HENOSIS_REPO_HINT_KEYWORDS
+        APP_SYNC_NAME = "HENOSIS Sync Utility"
+        DEVICE_PUSH_LOG_NAME = "henosis_device_push_log.jsonl"
+        TERMUX_SHORTCUT_FILE = "HENOSIS_Latest_Push.sh"
+        PHONE_DOWNLOAD_DIR = "/sdcard/Download/HENOSIS"
+        return SYNC_SCOPE_HENOSIS
+
+    CITL_APPS = tuple(CITL_APPS_BASE)
+    REPO_MARKERS = CITL_REPO_MARKERS
+    REPO_HINT_KEYWORDS = CITL_REPO_HINT_KEYWORDS
+    APP_SYNC_NAME = "CITL App Sync Utility"
+    DEVICE_PUSH_LOG_NAME = "citl_device_push_log.jsonl"
+    TERMUX_SHORTCUT_FILE = "CITL_Latest_Push.sh"
+    PHONE_DOWNLOAD_DIR = "/sdcard/Download/CITL"
+    return SYNC_SCOPE_CITL
+
+
+_apply_sync_scope(_default_sync_scope())
 
 
 def _read_version_file(repo: Path, rel_path: Optional[str]) -> str:
@@ -975,7 +1185,7 @@ def _sh_single_quote(text: str) -> str:
 
 
 def _append_phone_push_log(serial: str, line: str, log_fn: LogFn = None) -> Tuple[bool, str]:
-    remote_dir = "/sdcard/Download/CITL"
+    remote_dir = PHONE_DOWNLOAD_DIR
     remote_log = f"{remote_dir}/pushed_apps.log"
     cmd = f"mkdir -p {remote_dir} && printf '%s\\n' {_sh_single_quote(line)} >> {remote_log}"
     try:
@@ -1054,12 +1264,12 @@ def _install_termux_shortcut_for_push(
             "#!/data/data/com.termux/files/usr/bin/sh",
             "set -eu",
             f'ARCHIVE="{archive_escaped}"',
-            'echo "CITL push helper"',
+            f'echo "{_scope_label()} push helper"',
             'echo "Archive: $ARCHIVE"',
             'if [ -f "$ARCHIVE" ]; then',
             '  echo "Archive found. Extract with:"',
             '  echo "  pkg install -y unzip"',
-            '  echo "  unzip -o \\"$ARCHIVE\\" -d \\"$HOME/citl_pushes/latest\\""',
+            '  echo "  unzip -o \\"$ARCHIVE\\" -d \\"$HOME/sync_pushes/latest\\""',
             "else",
             '  echo "Archive not found at expected location."',
             "fi",
@@ -1093,7 +1303,7 @@ def _install_termux_shortcut_for_push(
         local_shortcut = tmp_root / TERMUX_SHORTCUT_FILE
         local_shortcut.write_text(script, encoding="utf-8")
         subprocess.run(
-            ["adb", "-s", serial, "shell", "mkdir", "-p", "/sdcard/Download/CITL"],
+            ["adb", "-s", serial, "shell", "mkdir", "-p", PHONE_DOWNLOAD_DIR],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -1102,7 +1312,7 @@ def _install_termux_shortcut_for_push(
             timeout=20.0,
         )
         subprocess.run(
-            ["adb", "-s", serial, "push", str(local_shortcut), f"/sdcard/Download/CITL/{TERMUX_SHORTCUT_FILE}"],
+            ["adb", "-s", serial, "push", str(local_shortcut), f"{PHONE_DOWNLOAD_DIR}/{TERMUX_SHORTCUT_FILE}"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -1113,7 +1323,7 @@ def _install_termux_shortcut_for_push(
     finally:
         shutil.rmtree(tmp_root, ignore_errors=True)
 
-    _safe_log(log_fn, "[TERMUX] shortcut updated: ~/.shortcuts/CITL_Latest_Push.sh\n")
+    _safe_log(log_fn, f"[TERMUX] shortcut updated: ~/.shortcuts/{TERMUX_SHORTCUT_FILE}\n")
     return True, "Termux shortcut updated."
 
 
@@ -1355,11 +1565,22 @@ def _is_external_mount_path(path: Path) -> bool:
     return any(low.startswith(p) for p in prefixes)
 
 
+def _matches_repo_name_hints(path: Path) -> bool:
+    name = str(path.name or "").strip().lower()
+    if not name:
+        return False
+    return any(h in name for h in REPO_HINT_KEYWORDS)
+
+
 def _has_repo_marker(path: Path) -> bool:
     if not path.is_dir():
         return False
     for rel in REPO_MARKERS:
         if (path / rel).exists():
+            return True
+    # In HENOSIS mode, allow git repos whose folder names match HENOSIS hints.
+    if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS:
+        if (path / ".git").exists() and _matches_repo_name_hints(path):
             return True
     return False
 
@@ -1411,11 +1632,16 @@ def _candidate_local_repos(default_source: Path) -> List[Path]:
             home / "CITL" / "CITL_FACTBOOK_UBUNTU",
             home / "CITL" / "CITL",
             home / "CITL" / "CITL - Desktop LLM EZ Install Kits",
+            home / "HENOSIS",
+            home / "Documents" / "HENOSIS",
+            home / "Desktop" / "HENOSIS",
+            home / "Documents" / "NOETIKON",
+            home / "Desktop" / "NOETIKON",
         ]
     )
 
     # Shallow scan for similarly named repos.
-    scan_roots = [home, home / "CITL"]
+    scan_roots = [home, home / "CITL", home / "HENOSIS", home / "Documents", home / "Desktop"]
     for root in _existing_paths(scan_roots):
         try:
             entries = list(os.scandir(root))
@@ -1425,7 +1651,7 @@ def _candidate_local_repos(default_source: Path) -> List[Path]:
             if not ent.is_dir(follow_symlinks=False):
                 continue
             name = ent.name.lower()
-            if "citl" in name or "factbook" in name:
+            if any(h in name for h in REPO_HINT_KEYWORDS):
                 seed.append(Path(ent.path))
                 # One more level.
                 try:
@@ -1435,7 +1661,7 @@ def _candidate_local_repos(default_source: Path) -> List[Path]:
                 for s in sub:
                     if s.is_dir(follow_symlinks=False):
                         sname = s.name.lower()
-                        if "citl" in sname or "factbook" in sname:
+                        if any(h in sname for h in REPO_HINT_KEYWORDS):
                             seed.append(Path(s.path))
 
     uniq: List[Path] = []
@@ -1488,14 +1714,15 @@ def _repo_commit_timestamp(repo: Path) -> float:
 
 
 def _repo_file_timestamp(repo: Path) -> float:
-    probe = [
-        repo / "factbook-assistant" / "citl_app_sync.py",
-        repo / "factbook-assistant" / "factbook_assistant_gui.py",
-        repo / "factbook-assistant" / "build_corpus_index.py",
-        repo / "RUN_FACTBOOK.sh",
-        repo / "Run-CITL.ps1",
-        repo / "factbook_assistant_gui.py",
-    ]
+    probe = [repo / rel for rel in REPO_MARKERS]
+    probe.extend(
+        [
+            repo / "factbook-assistant" / "citl_app_sync.py",
+            repo / "RUN_APP_SYNC_WINDOWS.cmd",
+            repo / "RUN_APP_SYNC_UBUNTU.sh",
+            repo / "README.md",
+        ]
+    )
     mts = [p.stat().st_mtime for p in probe if p.exists()]
     if mts:
         return max(mts)
@@ -1648,7 +1875,8 @@ def _candidate_from_path(
         return None
 
     score, markers, has_git = _score_candidate(cand, source_name)
-    if score < 5:
+    min_score = 3 if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS else 5
+    if score < min_score:
         return None
 
     base_root = root or _guess_usb_root(cand)
@@ -1701,13 +1929,22 @@ def detect_source_repo(source_arg: str = "auto", default_source: Optional[Path] 
         explicit = _normalize_repo_path(raw)
         if explicit is None or not explicit.exists():
             raise FileNotFoundError(f"Source repo not found: {raw}")
-        if not _has_repo_marker(explicit):
-            raise FileNotFoundError(f"Source path is not a CITL repo: {explicit}")
+        valid = _has_repo_marker(explicit)
+        if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS and not valid:
+            valid = ((explicit / ".git").exists() and _matches_repo_name_hints(explicit))
+        if not valid:
+            scope_word = "HENOSIS" if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS else "CITL"
+            raise FileNotFoundError(f"Source path is not a {scope_word} repo: {explicit}")
         ts = max(_repo_commit_timestamp(explicit), _repo_file_timestamp(explicit))
         return SourceDetection(path=explicit, reason="explicit --source", freshness_ts=ts)
 
     candidates = _candidate_local_repos(default_repo)
     if not candidates:
+        if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS and not _has_repo_marker(default_repo):
+            raise FileNotFoundError(
+                "No HENOSIS source repo auto-detected. "
+                "Pass --source <henosis-repo-path> or set HENOSIS_REPO."
+            )
         ts = max(_repo_commit_timestamp(default_repo), _repo_file_timestamp(default_repo))
         return SourceDetection(path=default_repo, reason="fallback default source", freshness_ts=ts)
 
@@ -1800,7 +2037,7 @@ def _iter_candidate_dirs(root: Path, max_depth: int = 3) -> Iterable[Path]:
         seen.add(key)
 
         lower = cur.name.lower()
-        if "citl" in lower or "factbook" in lower:
+        if any(h in lower for h in REPO_HINT_KEYWORDS):
             yield cur
 
         # Common portable layout shortcuts.
@@ -1808,6 +2045,8 @@ def _iter_candidate_dirs(root: Path, max_depth: int = 3) -> Iterable[Path]:
             cur / "CITL",
             cur / "CITL_FACTBOOK_UBUNTU",
             cur / "PORTABLE_APPS" / "CITL",
+            cur / "HENOSIS",
+            cur / "PORTABLE_APPS" / "HENOSIS",
         ]
         for p in quick:
             try:
@@ -1828,7 +2067,7 @@ def _iter_candidate_dirs(root: Path, max_depth: int = 3) -> Iterable[Path]:
                 continue
             nxt = Path(ent.path)
             name = ent.name.lower()
-            if depth == 0 or "citl" in name or "factbook" in name or "portable" in name:
+            if depth == 0 or any(h in name for h in REPO_HINT_KEYWORDS) or "portable" in name:
                 queue.append((nxt, depth + 1))
             elif name in ("apps", "repos"):
                 queue.append((nxt, depth + 1))
@@ -1840,18 +2079,27 @@ def _score_candidate(path: Path, source_name: str) -> Tuple[int, Tuple[str, ...]
         if (path / rel).exists():
             hits.append(rel)
 
-    has_gui = any("factbook_assistant_gui.py" in h for h in hits)
-    if not has_gui:
-        return 0, tuple(), False
+    if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_CITL:
+        has_gui = any("factbook_assistant_gui.py" in h for h in hits)
+        if not has_gui:
+            return 0, tuple(), False
+    else:
+        has_hint_name = _matches_repo_name_hints(path)
+        if not hits and not has_hint_name:
+            return 0, tuple(), False
 
     has_git = (path / ".git").exists()
     pname = path.name.lower()
     score = len(hits) * 2
     if has_git:
         score += 2
-    if "citl" in pname:
+    if any(h in pname for h in REPO_HINT_KEYWORDS):
         score += 2
     if "factbook" in pname:
+        score += 2
+    if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS and "noetikon" in pname:
+        score += 2
+    if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS and "henosis" in pname:
         score += 2
     if source_name and source_name.lower().replace("-", "_") in pname.replace("-", "_"):
         score += 1
@@ -1899,7 +2147,8 @@ def _discover_sync_targets_from_roots(
                 continue
 
             score, markers, has_git = _score_candidate(rp, src_name)
-            if score < 5:
+            min_score = 3 if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS else 5
+            if score < min_score:
                 continue
 
             maybe_add(
@@ -1964,6 +2213,63 @@ def _resolve_candidate_repo_path(raw: str, source_repo: Path) -> Optional[Path]:
         return p
 
 
+def _app_repo_markers(app: dict) -> List[str]:
+    markers: List[str] = []
+    marker = str(app.get("repo_marker") or "").strip()
+    if marker:
+        markers.append(marker)
+    extra = app.get("repo_markers")
+    if isinstance(extra, (list, tuple, set)):
+        for item in extra:
+            rel = str(item or "").strip()
+            if rel:
+                markers.append(rel)
+    # preserve order, remove duplicates
+    out: List[str] = []
+    seen: set = set()
+    for m in markers:
+        if m in seen:
+            continue
+        seen.add(m)
+        out.append(m)
+    return out
+
+
+def _find_scope_repo_candidates_for_app(app: dict, source_repo: Path) -> List[Path]:
+    """Heuristic repo discovery for scope-specific apps (especially HENOSIS repos)."""
+    name = str(app.get("name") or "").strip().lower()
+    tokens = [t for t in re.split(r"[^a-z0-9]+", name) if t]
+    tokens = [t for t in tokens if len(t) >= 3]
+    if not tokens:
+        tokens = [name] if name else []
+
+    roots: List[Path] = []
+    roots.extend([source_repo, source_repo.parent, Path.home(), Path.home() / "Documents", Path.home() / "Desktop"])
+    roots.extend(scan_roots())
+    dedup_roots = _existing_paths(roots)
+
+    out: List[Path] = []
+    seen: set = set()
+    for root in dedup_roots:
+        try:
+            entries = list(os.scandir(root))
+        except Exception:
+            continue
+        for ent in entries:
+            if not ent.is_dir(follow_symlinks=False):
+                continue
+            p = Path(ent.path)
+            low = ent.name.lower()
+            if not any(tok in low for tok in tokens):
+                continue
+            key = str(p)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(p)
+    return out
+
+
 def resolve_app_source_root(app: dict, source_repo: PathLike) -> Path:
     """
     Resolve the best source root for an app:
@@ -1977,7 +2283,8 @@ def resolve_app_source_root(app: dict, source_repo: PathLike) -> Path:
     except Exception:
         pass
 
-    marker = str(app.get("repo_marker") or "").strip()
+    markers = _app_repo_markers(app)
+    marker = markers[0] if markers else ""
     env_key = str(app.get("repo_path_env") or "").strip()
     candidates: List[str] = []
 
@@ -1994,12 +2301,36 @@ def resolve_app_source_root(app: dict, source_repo: PathLike) -> Path:
         p = _resolve_candidate_repo_path(raw, src)
         if p is None or not p.exists():
             continue
-        if marker and not (p / marker).exists():
+        if markers and not any((p / m).exists() for m in markers):
             continue
         return p
 
+    # Scope-aware heuristic fallback (especially for HENOSIS repos connected on USB/mobile sync roots).
+    for p in _find_scope_repo_candidates_for_app(app, src):
+        if not p.exists():
+            continue
+        if markers and not any((p / m).exists() for m in markers):
+            if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS:
+                # For HENOSIS, allow git+name-hint repos even if explicit markers are absent.
+                if not ((p / ".git").exists() and _matches_repo_name_hints(p)):
+                    continue
+            else:
+                continue
+        return p
+
     if marker and (src / marker).exists():
-        return src
+        if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS and _app_has_tag(app, SYNC_TAG_HENOSIS):
+            if not _matches_repo_name_hints(src):
+                # Prevent CITL-source bleed into HENOSIS app slots.
+                pass
+            else:
+                return src
+        else:
+            return src
+
+    if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS and _app_has_tag(app, SYNC_TAG_HENOSIS):
+        app_name = _safe_archive_name(str(app.get("name") or "henosis_app"))
+        return src / "__henosis_repo_not_found__" / app_name
     return src
 
 
@@ -2056,6 +2387,10 @@ def sync_registered_app_key_files(
         if not key_files:
             continue
         app_src = resolve_app_source_root(app, src)
+        if "__henosis_repo_not_found__" in str(app_src):
+            summary[app_name] = {"copied": 0, "skipped": 0, "missing": len(key_files), "errors": 0}
+            _safe_log(log_fn, f"[APP-SYNC][MISS] {app_name}: source repo unresolved for HENOSIS scope\n")
+            continue
         copied = 0
         skipped = 0
         missing = 0
@@ -2241,7 +2576,7 @@ def _run_sync_best_usb(args: argparse.Namespace, source: SourceDetection) -> int
             include_models=bool(args.include_models),
         )
         if chosen is None:
-            print("[ERROR] No compatible USB/external CITL target was detected.")
+            print(f"[ERROR] No compatible USB/external {_scope_label()} target was detected.")
             return 2
         target, comparison = chosen
         target_path = target.path
@@ -2249,7 +2584,7 @@ def _run_sync_best_usb(args: argparse.Namespace, source: SourceDetection) -> int
 
     if target_path is None:
         print("[ERROR] target_path could not be resolved after USB detection. "
-              "Ensure a CITL USB is connected or pass --target-path explicitly.")
+              f"Ensure a {_scope_label()} USB is connected or pass --target-path explicitly.")
         return 2
     print(f"[TARGET] recommendation={comparison.recommendation} ({comparison.summary})")
     if comparison.recommendation == "pull_target_to_source":
@@ -2427,7 +2762,7 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
             print(f"[ERROR] --duplicate-from not detected as a target: {from_path}")
             return 2
         if not _has_repo_marker(from_path):
-            print(f"[ERROR] --duplicate-from is not a CITL repo: {from_path}")
+            print(f"[ERROR] --duplicate-from is not a {_scope_label()} repo: {from_path}")
             return 2
         print(f"[VALIDATE] Source explicitly set: {from_path}")
     if to_path and str(to_path) not in by_path:
@@ -2441,8 +2776,8 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
             print(f"[DUPLICATE] auto-source=this USB ({from_path})")
         else:
             if not targets:
-                print("[ERROR] No external CITL targets were detected for duplication.")
-                print("[ERROR] Connect a USB drive with CITL repo or pass --duplicate-from")
+                print(f"[ERROR] No external {_scope_label()} targets were detected for duplication.")
+                print(f"[ERROR] Connect a USB drive with {_scope_label()} repo or pass --duplicate-from")
                 return 2
             ranked = sorted(targets, key=lambda t: (_repo_freshness(t.path), t.score), reverse=True)
             from_path = ranked[0].path
@@ -2450,7 +2785,7 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
 
     if from_path is None:
         print("[ERROR] Could not determine a duplication source. "
-              "Connect a CITL USB or pass --duplicate-from explicitly.")
+              f"Connect a {_scope_label()} USB or pass --duplicate-from explicitly.")
         return 2
 
     # Validate source is readable
@@ -2465,7 +2800,7 @@ def _run_duplicate_usb(args: argparse.Namespace, source: SourceDetection) -> int
         candidates = [t for t in targets if t.path != from_path]
         if not candidates:
             print("[ERROR] Need at least 2 USB drives for duplication:")
-            print("[ERROR]   - Source USB (with CITL repo)")
+            print(f"[ERROR]   - Source USB (with {_scope_label()} repo)")
             print("[ERROR]   - Destination USB (will be cloned to)")
             print("[ERROR] Connect a second USB drive and try again.")
             return 2
@@ -3447,6 +3782,129 @@ def save_bootstrap_repo_state(repo: PathLike, data: Dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
+def _patch_cadence_state_path(repo: PathLike) -> Path:
+    return Path(repo).expanduser().resolve() / BOOTSTRAP_CADENCE_STATE_REL
+
+
+def _default_patch_cadence_state() -> Dict[str, object]:
+    return {
+        "schema_version": 1,
+        "updated_utc": "",
+        "last_auto_run_utc": "",
+        "last_auto_run_ts": 0.0,
+        "last_auto_package_id": "",
+        "last_manual_run_utc": "",
+        "last_manual_run_ts": 0.0,
+        "last_manual_package_id": "",
+        "history": [],
+    }
+
+
+def load_patch_cadence_state(repo: PathLike) -> Dict[str, object]:
+    state = _default_patch_cadence_state()
+    path = _patch_cadence_state_path(repo)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return state
+    if not isinstance(raw, dict):
+        return state
+    for key in (
+        "updated_utc",
+        "last_auto_run_utc",
+        "last_auto_package_id",
+        "last_manual_run_utc",
+        "last_manual_package_id",
+    ):
+        if isinstance(raw.get(key), str):
+            state[key] = raw.get(key) or ""
+    for key in ("last_auto_run_ts", "last_manual_run_ts"):
+        try:
+            state[key] = float(raw.get(key) or 0.0)
+        except Exception:
+            state[key] = 0.0
+    if isinstance(raw.get("history"), list):
+        state["history"] = raw.get("history") or []
+    return state
+
+
+def save_patch_cadence_state(repo: PathLike, data: Dict[str, object]) -> None:
+    path = _patch_cadence_state_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _default_patch_cadence_state()
+    for key in (
+        "last_auto_run_utc",
+        "last_auto_package_id",
+        "last_manual_run_utc",
+        "last_manual_package_id",
+    ):
+        if isinstance(data.get(key), str):
+            payload[key] = data.get(key) or ""
+    for key in ("last_auto_run_ts", "last_manual_run_ts"):
+        try:
+            payload[key] = float(data.get(key) or 0.0)
+        except Exception:
+            payload[key] = 0.0
+    if isinstance(data.get("history"), list):
+        payload["history"] = list(data.get("history") or [])[-120:]
+    payload["updated_utc"] = _utc_now_iso()
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _default_cadence_app_names() -> List[str]:
+    names: List[str] = []
+    for app in CITL_APPS:
+        app_name = str(app.get("name") or "").strip()
+        if not app_name:
+            continue
+        if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS:
+            if _app_has_tag(app, SYNC_TAG_HENOSIS):
+                names.append(app_name)
+            continue
+        # Prevent HENOSIS apps from bleeding into default CITL cadence runs.
+        if _app_has_tag(app, SYNC_TAG_HENOSIS):
+            continue
+        names.append(app_name)
+    return names
+
+
+def _collect_app_changes_since(
+    source_repo: PathLike,
+    app_names: Sequence[str],
+    since_ts: float,
+) -> Dict[str, Dict[str, object]]:
+    src = Path(source_repo).expanduser().resolve()
+    wanted = {str(n).strip() for n in app_names if str(n).strip()}
+    out: Dict[str, Dict[str, object]] = {}
+    for app in CITL_APPS:
+        app_name = str(app.get("name") or "").strip()
+        if not app_name or app_name not in wanted:
+            continue
+        changed = 0
+        newest_ts = 0.0
+        sample_paths: List[str] = []
+        for rel_path, src_path in _iter_bootstrap_app_files(src, app):
+            try:
+                ts = float(src_path.stat().st_mtime)
+            except Exception:
+                continue
+            if ts + UPDATE_AVAILABLE_EPSILON_SEC < since_ts:
+                continue
+            changed += 1
+            if ts > newest_ts:
+                newest_ts = ts
+            if len(sample_paths) < 10:
+                sample_paths.append(rel_path)
+        if changed > 0:
+            out[app_name] = {
+                "changed_file_count": changed,
+                "newest_ts": newest_ts,
+                "newest_utc": _fmt_ts(newest_ts),
+                "sample_paths": sample_paths,
+            }
+    return out
+
+
 def _iter_bootstrap_app_files(source_repo: Path, app: dict) -> Iterable[Tuple[str, Path]]:
     app_root = resolve_app_source_root(app, source_repo)
     key_files = app.get("key_files") or []
@@ -3608,6 +4066,8 @@ def discover_bootstrap_packages(search_roots: Sequence[Tuple[str, PathLike]]) ->
 def build_bootstrap_package(
     source_repo: PathLike,
     selected_apps: Optional[Sequence[str]] = None,
+    tag_prefix: str = "",
+    build_reason: str = "",
     log_fn: LogFn = None,
 ) -> Tuple[bool, str, Optional[BootstrapPackage]]:
     source = Path(source_repo).expanduser().resolve()
@@ -3662,11 +4122,15 @@ def build_bootstrap_package(
         except Exception:
             digest.update(b"0")
     short_hash = digest.hexdigest()[:10]
-    bootstrap_id = f"{stamp}-{short_hash}"
+    tag_raw = str(tag_prefix or "").strip().upper()
+    tag_clean = re.sub(r"[^A-Z0-9]+", "", tag_raw)[:8]
+    tag_part = f"{tag_clean}-" if tag_clean else ""
+    file_tag_part = f"{tag_clean}_" if tag_clean else ""
+    bootstrap_id = f"{tag_part}{stamp}-{short_hash}"
 
     out_dir = source / BOOTSTRAP_PATCH_DIR_REL
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"citl_bootstrap_{stamp}_{short_hash[:8]}.zip"
+    out_path = out_dir / f"citl_bootstrap_{file_tag_part}{stamp}_{short_hash[:8]}.zip"
 
     apps_manifest = []
     for app_name in sorted(app_files.keys()):
@@ -3687,6 +4151,8 @@ def build_bootstrap_package(
         "generator_version": APP_SYNC_VERSION,
         "source_repo": source.name,
         "source_repo_path": str(source),
+        "build_reason": str(build_reason or "").strip() or None,
+        "patch_tag": tag_clean or None,
         "app_names": sorted(app_files.keys()),
         "apps": apps_manifest,
         "file_count": len(payload_sources),
@@ -4218,7 +4684,7 @@ def build_git_patch_from_commits(
     )
     skip_exact = {_normalize_rel_path(BOOTSTRAP_STATE_REL)}
 
-    # ── 2. Match files to CITL apps ───────────────────────────────────────────
+    # ── 2. Match files to scoped apps ─────────────────────────────────────────
     app_files:       Dict[str, List[str]] = {}
     payload_sources: Dict[str, Path]      = {}
     payload_bytes = 0
@@ -4259,7 +4725,7 @@ def build_git_patch_from_commits(
             app_files[app_name] = sorted(set(app_rels))
             _safe_log(log_fn, f"[GIT-PATCH]   {app_name}: {len(app_rels)} file(s)\n")
 
-    # ── 3. Capture unmatched changed files under "CITL Other" ─────────────────
+    # ── 3. Capture unmatched changed files under scope-specific "Other" bucket ─
     matched: set = set()
     for rels in app_files.values():
         matched.update(rels)
@@ -4277,8 +4743,9 @@ def build_git_patch_from_commits(
                 except Exception:
                     pass
     if unmatched:
-        app_files["CITL Other"] = sorted(unmatched)
-        _safe_log(log_fn, f"[GIT-PATCH]   CITL Other (unmatched changed files): {len(unmatched)}\n")
+        other_label = f"{_scope_label()} Other"
+        app_files[other_label] = sorted(unmatched)
+        _safe_log(log_fn, f"[GIT-PATCH]   {other_label} (unmatched changed files): {len(unmatched)}\n")
 
     if not payload_sources:
         return (
@@ -4988,6 +5455,7 @@ class SyncGUI:
         self._git_statuses: Dict[str, Dict] = {}   # populated by _refresh_git_statuses
         self._git_accounts: List[Dict[str, str]] = []
         self._build_ui()
+        self._apply_scope_ui_rules()
         self.refresh_targets()
         # Fetch git statuses in background at startup
         self.root.after(1500, self._refresh_git_statuses)
@@ -5116,6 +5584,21 @@ class SyncGUI:
         fresh = _fmt_ts(self.source_freshness_ts)
         self.source_meta_var.set(f"Selection: {reason}\nFreshness: {fresh}")
 
+    def _apply_scope_ui_rules(self) -> None:
+        """Hide/disable CITL-specific controls when running in HENOSIS-only mode."""
+        if ACTIVE_SYNC_SCOPE != SYNC_SCOPE_HENOSIS:
+            return
+        try:
+            self.guide_var.set(
+                "Guide: HENOSIS scope active. Only HENOSIS-tagged repos/apps are shown and patched."
+            )
+            self.sync_app_selection_var.set("App inclusion: HENOSIS-tagged apps only.")
+            self.launch_update_var.set("HENOSIS scope: scope-specific launch shortcuts are hidden.")
+            if getattr(self, "launcher_grid", None) is not None:
+                self.launcher_grid.grid_remove()
+        except Exception:
+            pass
+
     def _target_write_check(self, target: Path) -> Tuple[bool, str]:
         probe = target / ".citl_sync_write_test.tmp"
         try:
@@ -5204,6 +5687,8 @@ class SyncGUI:
             return "[PIN-1] NOETIKON", self.colors["accent"]
         if bucket == 1:
             return "[PIN-2] CANIS", self.colors["warn"]
+        if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS:
+            return f"[HEN-{order_idx:02d}]", self.colors["muted"]
         return f"[{order_idx:02d}] RECENT", self.colors["muted"]
 
     def _build_ui(self) -> None:
@@ -5224,7 +5709,7 @@ class SyncGUI:
         ).grid(row=0, column=0, sticky="w")
         self._make_label(
             header,
-            text="Accessible USB and phone sync dashboard for CITL repo copies",
+            text=f"Accessible USB and phone sync dashboard for {_scope_label()} repo copies",
             bg=self.colors["bg"],
             fg=self.colors["muted"],
             font=("Segoe UI", 13, "normal"),
@@ -5438,10 +5923,11 @@ class SyncGUI:
         # ── Application Launcher Buttons ──────────────────────────────────────
         launcher_grid = self.tk.Frame(actions_card, bg=self.colors["panel_alt"])
         launcher_grid.grid(row=7, column=0, sticky="ew", padx=16, pady=(10, 16))
+        self.launcher_grid = launcher_grid
         launcher_grid.grid_columnconfigure(0, weight=1)
         self._make_label(
             launcher_grid,
-            text="Launch CITL Applications",
+            text=f"Launch {_scope_label()} Applications",
             bg=self.colors["panel_alt"],
             fg=self.colors["accent"],
             font=("Segoe UI Semibold", 12, "bold"),
@@ -5485,26 +5971,36 @@ class SyncGUI:
         # ── Find & Repair Factbook ────────────────────────────────────────────
         repair_panel = self.tk.Frame(actions_card, bg=self.colors["panel_alt"])
         repair_panel.grid(row=8, column=0, sticky="ew", padx=16, pady=(4, 16))
+        self.repair_panel = repair_panel
         repair_panel.grid_columnconfigure(0, weight=1)
         repair_panel.grid_columnconfigure(1, weight=1)
+        repair_panel.grid_columnconfigure(2, weight=1)
         self._make_label(
             repair_panel,
-            text="Factbook Diagnostic & Repair",
+            text="Sync Repair Utilities",
             bg=self.colors["panel_alt"],
             fg=self.colors["accent"],
             font=("Segoe UI Semibold", 11, "bold"),
-        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
-        self._make_button(
+        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
+        self.factbook_repair_btn = self._make_button(
             repair_panel,
             "🔍 Find & Repair Factbook",
             self.on_find_and_repair_factbook,
             accent=True,
-        ).grid(row=1, column=0, sticky="ew", padx=(0, 6))
-        self._make_button(
+        )
+        self.factbook_repair_btn.grid(row=1, column=0, sticky="ew", padx=(0, 6))
+        self.factbook_diag_btn = self._make_button(
             repair_panel,
             "🩺 18-Stage Diagnostic",
             self.on_open_factbook_diagnostic,
-        ).grid(row=1, column=1, sticky="ew", padx=(6, 0))
+        )
+        self.factbook_diag_btn.grid(row=1, column=1, sticky="ew", padx=6)
+        self.exfat_repair_btn = self._make_button(
+            repair_panel,
+            "💽 exFAT USB Repair",
+            self.on_open_exfat_repair_utility,
+        )
+        self.exfat_repair_btn.grid(row=1, column=2, sticky="ew", padx=(6, 0))
 
         body = self.tk.Frame(page, bg=self.colors["bg"])
         body.grid(row=3, column=0, sticky="nsew", padx=22, pady=(0, 12))
@@ -5518,7 +6014,7 @@ class SyncGUI:
         tiles_panel.grid_rowconfigure(1, weight=1)
         self._make_label(
             tiles_panel,
-            text="Detected CITL Repo Copies",
+            text=f"Detected {_scope_label()} Repo Copies",
             bg=self.colors["panel"],
             fg=self.colors["accent"],
             font=("Segoe UI Semibold", 14, "bold"),
@@ -5673,7 +6169,7 @@ class SyncGUI:
         apps_panel.grid_columnconfigure(0, weight=1)
         self._make_label(
             apps_panel,
-            text="CITL Apps Overview",
+            text=f"{_scope_label()} Apps Overview",
             bg=self.colors["panel"],
             fg=self.colors["accent"],
             font=("Segoe UI Semibold", 14, "bold"),
@@ -6109,7 +6605,7 @@ class SyncGUI:
         self._refresh_launch_app_list()
         self._append(f"{APP_SYNC_NAME} {APP_SYNC_VERSION}\n")
         self._append("This dashboard now guides USB discovery, safe sync direction, and optional phone export.\n")
-        self._append("Phone export now preserves Termux shortcuts and updates a CITL shortcut for the latest pushed app.\n")
+        self._append(f"Phone export now preserves Termux shortcuts and updates a {_scope_label()} shortcut for the latest pushed app.\n")
         self._append(f"[PUSH_LOG] {_device_push_log_path()}\n")
         self._append("Green recommendation means the PC source is newer and pushing to USB is the safe default.\n")
         self._append("Yellow recommendation means the USB copy appears newer and pulling back to the PC may be safer.\n")
@@ -6369,7 +6865,10 @@ class SyncGUI:
             if mode_norm == "none":
                 choose = False
             elif mode_norm == "core":
-                choose = app_name in {"Factbook", "CITL App Sync", "LLMOps Suite"}
+                if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS:
+                    choose = _app_has_tag(app, SYNC_TAG_HENOSIS)
+                else:
+                    choose = app_name in {"Factbook", "CITL App Sync", "LLMOps Suite"}
             elif mode_norm == "needs_sync":
                 status_text, _ = self._app_usb_comparison(app)
                 normalized = status_text.lower()
@@ -6868,6 +7367,29 @@ class SyncGUI:
             spec.loader.exec_module(mod)
             mod.run_gui()
         threading.Thread(target=_launch, daemon=True).start()
+
+    def on_open_exfat_repair_utility(self) -> None:
+        """Launch the Sync Hub exFAT Repair Utility surface."""
+        here = Path(__file__).parent.resolve()
+        candidates = [
+            here / "citl_sync_hub.py",
+            here.parent / "citl_sync_hub.py",
+        ]
+        hub_path = next((p for p in candidates if p.exists()), None)
+        if hub_path is None:
+            self.messagebox.showerror(
+                "Repair Utility Not Found",
+                "Could not find citl_sync_hub.py in expected locations.\n"
+                "Sync latest CITL utility files first.",
+            )
+            return
+        try:
+            subprocess.Popen([sys.executable, str(hub_path)], cwd=str(hub_path.parent))
+        except Exception as exc:
+            self.messagebox.showerror(
+                "Repair Utility Launch Failed",
+                f"Unable to launch exFAT repair utility:\n{exc}",
+            )
 
     def on_open_diagnostics_window(self) -> None:
         if self.diagnostics_window is not None and self.diagnostics_window.winfo_exists():
@@ -8832,7 +9354,7 @@ class SyncGUI:
         if not self.targets:
             self._make_label(
                 self.tiles_inner,
-                text="No compatible external repo was detected yet. Insert a known USB or external CITL copy and click Refresh USB + Phone.",
+                text=f"No compatible external repo was detected yet. Insert a known USB or external {_scope_label()} copy and click Refresh USB + Phone.",
                 bg=self.colors["panel"],
                 fg=self.colors["muted"],
                 wraplength=860,
@@ -9053,16 +9575,17 @@ class SyncGUI:
 
         def worker() -> None:
             # Always run Ubuntu port checks on source repo at scan time
-            try:
-                ubuntu_results = port_to_ubuntu(
-                    self.source_repo,
-                    log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
-                )
-                any_updated = any("UPDATED" in v for v in ubuntu_results.values())
-                if any_updated:
-                    self.root.after(0, self._render_apps_overview)
-            except Exception as e:
-                self.root.after(0, lambda: self._append(f"[WARN] Ubuntu port check: {e}\n"))
+            if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_CITL:
+                try:
+                    ubuntu_results = port_to_ubuntu(
+                        self.source_repo,
+                        log_fn=lambda s: self.root.after(0, lambda t=s: self._append(t)),
+                    )
+                    any_updated = any("UPDATED" in v for v in ubuntu_results.values())
+                    if any_updated:
+                        self.root.after(0, self._render_apps_overview)
+                except Exception as e:
+                    self.root.after(0, lambda: self._append(f"[WARN] Ubuntu port check: {e}\n"))
 
             try:
                 targets = discover_sync_targets(self.source_repo)
@@ -9109,7 +9632,7 @@ class SyncGUI:
         else:
             self.target_var.set("")
             self.targets_meta_var.set("Targets found: 0")
-            self._append("[SCAN] no compatible external CITL repo found.\n")
+            self._append(f"[SCAN] no compatible external {_scope_label()} repo found.\n")
             self._set_status("No target found. Insert or mount a repo copy and click Refresh USB + Phone.")
 
         self._render_device_buttons()
@@ -9167,7 +9690,7 @@ class SyncGUI:
                 self.messagebox.showerror(
                     "Not found",
                     f"Clone GUI not found at:\n{gui_path}\n\n"
-                    "Run from the main CITL repo directory."
+                    f"Run from the main {_scope_label()} repo directory."
                 )
                 return
             
@@ -9847,7 +10370,7 @@ class SyncGUI:
         if picked is None:
             self.messagebox.showerror(
                 "No destination",
-                "No backup USB destination was detected. Connect another CITL USB and refresh.",
+                f"No backup USB destination was detected. Connect another {_scope_label()} USB and refresh.",
             )
             return
         dest_target, comparison = picked
@@ -9973,7 +10496,7 @@ class SyncGUI:
         if not self.messagebox.askyesno(
             "Confirm USB -> phone export",
             "Create a ZIP bundle from the selected repo copy and push it to the phone's Downloads folder?\n"
-            "Termux shortcuts will be preserved (backup) and a fresh CITL launch shortcut will be written.\n\n"
+            f"Termux shortcuts will be preserved (backup) and a fresh {_scope_label()} launch shortcut will be written.\n\n"
             f"Selected copy:\n{target}\n\n"
             f"Phone:\n{self._device_label(device)}\n\n"
             f"Include data/indexes: {'yes' if include_data else 'no'}\n"
@@ -10137,6 +10660,183 @@ def _resolve_bootstrap_package_path(source: SourceDetection, raw: str) -> Option
     return p
 
 
+def _copy_bootstrap_assets_to_repo(
+    source_repo: PathLike,
+    package: BootstrapPackage,
+    dest_repo: PathLike,
+    log_fn: LogFn = None,
+) -> Tuple[bool, str]:
+    src_repo = Path(source_repo).expanduser().resolve()
+    dst_repo = Path(dest_repo).expanduser().resolve()
+    dst_dir = dst_repo / BOOTSTRAP_PATCH_DIR_REL
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    copied = 0
+    skipped = 0
+    errors = 0
+
+    try:
+        dst_pkg = dst_dir / package.path.name
+        if _needs_copy(package.path, dst_pkg):
+            shutil.copy2(package.path, dst_pkg)
+            copied += 1
+        else:
+            skipped += 1
+    except Exception as e:
+        errors += 1
+        _safe_log(log_fn, f"[PATCH-ASSET][ERR] package copy failed: {e}\n")
+
+    slug = re.sub(r"[^a-zA-Z0-9_.-]+", "_", package.bootstrap_id).strip("_") or "bootstrap"
+    src_patch_dir = src_repo / BOOTSTRAP_PATCH_DIR_REL
+    for ext in ("ps1", "bat", "sh"):
+        src_script = src_patch_dir / f"apply_bootstrap_{slug}.{ext}"
+        if not src_script.is_file():
+            continue
+        try:
+            dst_script = dst_dir / src_script.name
+            if _needs_copy(src_script, dst_script):
+                shutil.copy2(src_script, dst_script)
+                copied += 1
+            else:
+                skipped += 1
+        except Exception as e:
+            errors += 1
+            _safe_log(log_fn, f"[PATCH-ASSET][ERR] script copy failed ({src_script.name}): {e}\n")
+
+    msg = f"copied={copied} skipped={skipped} errors={errors} dest={dst_dir}"
+    return errors == 0, msg
+
+
+def _run_patch_cadence(args: argparse.Namespace, source: SourceDetection) -> int:
+    cadence_hours = max(1, int(getattr(args, "patch_cadence_hours", DEFAULT_PATCH_CADENCE_HOURS) or DEFAULT_PATCH_CADENCE_HOURS))
+    cadence_window_sec = float(cadence_hours) * 3600.0
+    now_ts = time.time()
+    since_ts = now_ts - cadence_window_sec
+    manual_mode = bool(getattr(args, "manual_patch", False))
+    force_mode = bool(getattr(args, "force_patch", False))
+    target_mode = str(getattr(args, "patch_apply_target", "both") or "both").strip().lower()
+    if target_mode not in {"none", "local", "usb", "both"}:
+        print(f"[ERROR] invalid --patch-apply-target: {target_mode}")
+        return 2
+
+    raw_apps = _parse_bootstrap_apps(str(getattr(args, "patch_apps", "") or ""))
+    selected_apps = raw_apps if raw_apps else _default_cadence_app_names()
+    if not selected_apps:
+        print("[ERROR] No apps selected for patch cadence run.")
+        return 2
+
+    state = load_patch_cadence_state(source.path)
+    last_auto_ts = float(state.get("last_auto_run_ts") or 0.0)
+    if (not manual_mode) and (not force_mode) and last_auto_ts > 0:
+        elapsed = now_ts - last_auto_ts
+        if elapsed + UPDATE_AVAILABLE_EPSILON_SEC < cadence_window_sec:
+            wait_sec = max(0.0, cadence_window_sec - elapsed)
+            print(
+                f"[PATCH-CADENCE] skipped: last auto run {_fmt_ts(last_auto_ts)}; "
+                f"next auto window in {int(wait_sec // 3600)}h {int((wait_sec % 3600) // 60)}m."
+            )
+            return 0
+
+    changes = _collect_app_changes_since(source.path, selected_apps, since_ts)
+    changed_apps = sorted(changes.keys())
+    if (not changed_apps) and (not force_mode):
+        print(
+            f"[PATCH-CADENCE] no app key-file changes detected in last {cadence_hours}h "
+            f"across {len(selected_apps)} selected app(s)."
+        )
+        return 0
+
+    build_apps = changed_apps if changed_apps else list(selected_apps)
+    tag_prefix = "M" if manual_mode else "A"
+    reason = f"{'manual' if manual_mode else 'auto'}_{cadence_hours}h"
+
+    print(f"[PATCH-CADENCE] source={source.path}")
+    print(f"[PATCH-CADENCE] mode={'manual' if manual_mode else 'auto'} cadence={cadence_hours}h apps={len(build_apps)}")
+    if changed_apps:
+        for app_name in changed_apps:
+            item = changes.get(app_name) or {}
+            print(
+                f"[PATCH-CADENCE]   {app_name}: changed={item.get('changed_file_count', 0)} "
+                f"newest={item.get('newest_utc', '-')}"
+            )
+    elif force_mode:
+        print("[PATCH-CADENCE] force mode active: packaging selected apps even without recent file changes.")
+
+    ok_build, msg_build, package = build_bootstrap_package(
+        source.path,
+        selected_apps=build_apps,
+        tag_prefix=tag_prefix,
+        build_reason=reason,
+        log_fn=lambda s: print(s, end=""),
+    )
+    print(f"[PATCH-CADENCE] {'OK' if ok_build else 'FAIL'} {msg_build}")
+    if (not ok_build) or package is None:
+        return 4
+
+    history = list(state.get("history") or []) if isinstance(state.get("history"), list) else []
+    history.append(
+        {
+            "ran_utc": _utc_now_iso(),
+            "manual": manual_mode,
+            "cadence_hours": cadence_hours,
+            "package_id": package.bootstrap_id,
+            "package_path": str(package.path),
+            "changed_apps": changed_apps,
+            "selected_apps": build_apps,
+            "target_mode": target_mode,
+        }
+    )
+    state["history"] = history[-120:]
+    if manual_mode:
+        state["last_manual_run_utc"] = _utc_now_iso()
+        state["last_manual_run_ts"] = now_ts
+        state["last_manual_package_id"] = package.bootstrap_id
+    else:
+        state["last_auto_run_utc"] = _utc_now_iso()
+        state["last_auto_run_ts"] = now_ts
+        state["last_auto_package_id"] = package.bootstrap_id
+    save_patch_cadence_state(source.path, state)
+
+    total_errors = 0
+    if target_mode in {"local", "both"}:
+        ok_local, msg_local = apply_bootstrap_package_to_repo(
+            package,
+            source.path,
+            selected_apps=build_apps,
+            log_fn=lambda s: print(s, end=""),
+        )
+        print(f"[PATCH-CADENCE][LOCAL] {'OK' if ok_local else 'WARN'} {msg_local}")
+        if not ok_local:
+            total_errors += 1
+
+    if target_mode in {"usb", "both"}:
+        usb_target = _resolve_bootstrap_target(source, "best-usb")
+        if usb_target is None:
+            print("[PATCH-CADENCE][USB][WARN] No USB target detected.")
+            total_errors += 1
+        else:
+            ok_usb, msg_usb = apply_bootstrap_package_to_repo(
+                package,
+                usb_target,
+                selected_apps=build_apps,
+                log_fn=lambda s: print(s, end=""),
+            )
+            print(f"[PATCH-CADENCE][USB] {'OK' if ok_usb else 'WARN'} {msg_usb}")
+            if not ok_usb:
+                total_errors += 1
+            ok_assets, msg_assets = _copy_bootstrap_assets_to_repo(
+                source.path,
+                package,
+                usb_target,
+                log_fn=lambda s: print(s, end=""),
+            )
+            print(f"[PATCH-CADENCE][USB-ASSETS] {'OK' if ok_assets else 'WARN'} {msg_assets}")
+            if not ok_assets:
+                total_errors += 1
+
+    return 0 if total_errors == 0 else 1
+
+
 def _run_bootstrap_install(args: argparse.Namespace, source: SourceDetection) -> int:
     pkg_path = _resolve_bootstrap_package_path(source, args.bootstrap_install_package)
     if pkg_path is None or not pkg_path.exists():
@@ -10251,7 +10951,15 @@ def _default_source() -> Path:
     if getattr(sys, "frozen", False):
         # Running as a PyInstaller EXE.  Honour CITL_REPO env if set; otherwise
         # walk up 3 levels from EXE: dist/AppName/App.exe -> CITL/
-        env_repo = os.environ.get("CITL_REPO", "").strip()
+        env_keys = ["CITL_REPO"]
+        if ACTIVE_SYNC_SCOPE == SYNC_SCOPE_HENOSIS:
+            env_keys = ["HENOSIS_REPO", "CITL_REPO"]
+        env_repo = ""
+        for key in env_keys:
+            raw = (os.environ.get(key) or "").strip()
+            if raw:
+                env_repo = raw
+                break
         if env_repo and Path(env_repo).is_dir():
             return Path(env_repo)
         return Path(sys.executable).parent.parent.parent
@@ -10259,8 +10967,14 @@ def _default_source() -> Path:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="CITL App Sync Utility")
-    ap.add_argument("--version", action="store_true", help="Print CITL App Sync version and exit")
+    ap = argparse.ArgumentParser(description="Cross-platform app sync utility (CITL/HENOSIS scope)")
+    ap.add_argument(
+        "--sync-scope",
+        default=_default_sync_scope(),
+        choices=[SYNC_SCOPE_CITL, SYNC_SCOPE_HENOSIS],
+        help="Sync scope profile: citl | henosis",
+    )
+    ap.add_argument("--version", action="store_true", help="Print sync utility version and exit")
     ap.add_argument(
         "--source",
         default="auto",
@@ -10281,7 +10995,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument(
         "--duplicate-usb",
         action="store_true",
-        help="Duplicate one USB CITL repo copy to another USB target (headless)",
+        help="Duplicate one USB scoped repo copy to another USB target (headless)",
     )
     ap.add_argument("--duplicate-from", default="", help="Source USB repo path for --duplicate-usb")
     ap.add_argument("--duplicate-to", default="", help="Destination USB repo path for --duplicate-usb")
@@ -10344,18 +11058,59 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default="",
         help="Rollback last bootstrap on target: local | best-usb | <explicit path>",
     )
+    ap.add_argument(
+        "--patch-cadence",
+        action="store_true",
+        help="Build a cadence patch from recently changed app files (48h default) and optionally apply to local/USB.",
+    )
+    ap.add_argument(
+        "--patch-cadence-hours",
+        type=int,
+        default=DEFAULT_PATCH_CADENCE_HOURS,
+        help="Change window for --patch-cadence in hours (default: 48).",
+    )
+    ap.add_argument(
+        "--manual-patch",
+        action="store_true",
+        help="With --patch-cadence, mark package tag prefix as 'M' (manual).",
+    )
+    ap.add_argument(
+        "--force-patch",
+        action="store_true",
+        help="With --patch-cadence, package selected apps even when no recent changes were detected.",
+    )
+    ap.add_argument(
+        "--patch-apply-target",
+        default="both",
+        help="With --patch-cadence: none | local | usb | both (default: both).",
+    )
+    ap.add_argument(
+        "--patch-apps",
+        default="",
+        help="Comma-separated app names for --patch-cadence (default: all CITL-scope apps).",
+    )
     args = ap.parse_args(argv)
+    _apply_sync_scope(getattr(args, "sync_scope", _default_sync_scope()))
 
     if args.version:
         print(f"{APP_SYNC_NAME} {APP_SYNC_VERSION}")
         return 0
 
-    source = detect_source_repo(args.source, default_source=_default_source())
+    try:
+        source = detect_source_repo(args.source, default_source=_default_source())
+    except FileNotFoundError as e:
+        print(f"[ERROR] {e}")
+        return 2
+    except Exception as e:
+        print(f"[ERROR] source detection failed: {e}")
+        return 2
 
     if args.bootstrap_install_package:
         return _run_bootstrap_install(args, source)
     if args.bootstrap_rollback_target:
         return _run_bootstrap_rollback(args, source)
+    if args.patch_cadence:
+        return _run_patch_cadence(args, source)
     if args.detect_json:
         return _print_detect_json(source)
     if args.duplicate_usb:
