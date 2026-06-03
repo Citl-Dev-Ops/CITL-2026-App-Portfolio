@@ -260,7 +260,8 @@ if ($buildFactbook) {
         -HiddenImports @("psutil","tkinter","_tkinter","tkinter.ttk","tkinter.messagebox",
                          "tkinter.filedialog","tkinter.scrolledtext",
                          "citl_factbook_query","citl_auto_index","citl_text_extract",
-                         "citl_theme","citl_translation","parsers") `
+                         "citl_theme","citl_translation","parsers",
+                         "wave","audioop","sunau","aifc","chunk","sndhdr") `
         -AddData @("factbook-assistant\fonts\doc_composer;factbook-assistant\fonts\doc_composer")
     $results["Factbook"] = $ok
 }
@@ -347,7 +348,8 @@ if ($buildFlex) {
         -Entry (Join-Path $Repo "citl_flex_troubleshooter\flex_assistant_gui.py") `
         -HiddenImports @(
             "tkinter","_tkinter","tkinter.ttk","tkinter.messagebox",
-            "tkinter.filedialog","tkinter.scrolledtext","psutil","numpy"
+            "tkinter.filedialog","tkinter.scrolledtext","psutil","numpy",
+            "wave","audioop","sunau","aifc","chunk","sndhdr"
         ) `
         -AddData @(
             "citl_flex_troubleshooter\Modelfile;citl_flex_troubleshooter\Modelfile",

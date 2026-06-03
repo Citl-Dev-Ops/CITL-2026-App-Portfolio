@@ -436,6 +436,14 @@ def attach_startup_check(app) -> None:
                     app.fb_health_label.configure(foreground="#c62828")
                     app.fb_status_var.set(
                         f"Action needed: {problems[0]} — see status bar above")
+                    if not ollama_up and hasattr(app, "on_start_ollama"):
+                        app.fb_health_var.set(
+                            f"⚠  {problem_str}   →  {fix_str}  (click ▶ Start Ollama to fix)")
+                        try:
+                            app.fb_health_label.bind(
+                                "<Button-1>", lambda _e: app.on_start_ollama())
+                        except Exception:
+                            pass
             except Exception:
                 pass
 

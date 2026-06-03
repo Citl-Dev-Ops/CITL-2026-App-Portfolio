@@ -1189,34 +1189,91 @@ def _fix_pip(packages: List[str], log: Callable[[str], None]) -> bool:
     return ok
 
 
-def _fix_start_ollama(log: Callable[[str], None]) -> bool:
-    log("Starting Ollama in background...")
+def _find_ollama_exe() -> Optional[str]:
+    """Search every likely Windows (and Linux/Mac) location for the ollama binary."""
+    import shutil
+    exe = shutil.which("ollama") or shutil.which("ollama.exe")
+    if exe:
+        return exe
+    if platform.system() == "Windows":
+        lappdata = os.environ.get("LOCALAPPDATA", "")
+        username  = os.environ.get("USERNAME", "")
+        for p in [
+            Path(lappdata) / "Programs" / "Ollama" / "ollama.exe",
+            Path(lappdata) / "Ollama" / "ollama.exe",
+            Path("C:/Users") / username / "AppData/Local/Programs/Ollama/ollama.exe",
+            Path("C:/Users") / username / "AppData/Local/Ollama/ollama.exe",
+            Path("C:/Program Files/Ollama/ollama.exe"),
+            Path("C:/Program Files (x86)/Ollama/ollama.exe"),
+        ]:
+            try:
+                if p.exists():
+                    return str(p)
+            except Exception:
+                pass
+    return None
+
+
+def _kill_hung_ollama(log: Callable[[str], None]) -> None:
+    """Kill any stuck ollama.exe processes before a fresh start."""
+    if platform.system() != "Windows":
+        return
     try:
-        if platform.system() == "Windows":
-            subprocess.Popen(["ollama", "serve"],
-                             creationflags=subprocess.CREATE_NEW_CONSOLE)
-        else:
-            subprocess.Popen(["ollama", "serve"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        log("ERROR: 'ollama' not found on PATH.")
-        log("Install from https://ollama.com/download")
-        log("  Windows: winget install Ollama.Ollama")
-        log("  Ubuntu:  curl -fsSL https://ollama.com/install.sh | sh")
+        result = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq ollama.exe", "/FO", "CSV", "/NH"],
+            capture_output=True, text=True, timeout=5)
+        if "ollama.exe" in result.stdout:
+            log("  Found existing ollama.exe — killing it for a clean restart...")
+            subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"],
+                           capture_output=True, timeout=5)
+            time.sleep(1)
+    except Exception as e:
+        log(f"  (kill check skipped: {e})")
+
+
+def _fix_start_ollama(log: Callable[[str], None]) -> bool:
+    ollama_exe = _find_ollama_exe()
+    if not ollama_exe:
+        log("ERROR: ollama executable not found anywhere on this machine.")
+        log("  Expected: %LOCALAPPDATA%\\Programs\\Ollama\\ollama.exe")
+        log("  Install:  winget install Ollama.Ollama")
+        log("  Download: https://ollama.com/download/windows")
         return False
 
-    log("Waiting up to 15 seconds for Ollama to start...")
-    for i in range(15):
+    log(f"Found Ollama: {ollama_exe}")
+    _kill_hung_ollama(log)
+    log("Starting Ollama in background (silent, no console window)...")
+    try:
+        if platform.system() == "Windows":
+            CREATE_NO_WINDOW = 0x08000000
+            DETACHED_PROCESS  = 0x00000008
+            subprocess.Popen(
+                [ollama_exe, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS,
+            )
+        else:
+            subprocess.Popen([ollama_exe, "serve"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        log(f"ERROR launching Ollama: {e}")
+        return False
+
+    log("Waiting up to 45 seconds for Ollama to respond...")
+    host, port = _ollama_hostname(), _ollama_port()
+    for i in range(45):
         time.sleep(1)
         try:
-            s = socket.create_connection((_ollama_hostname(), _ollama_port()), timeout=1)
+            s = socket.create_connection((host, port), timeout=1)
             s.close()
-            log(f"Ollama started after {i+1} seconds.")
+            log(f"Ollama is online after {i+1} seconds.")
             return True
         except Exception:
             pass
-    log("Ollama did not respond within 15 seconds.")
-    log("Try opening a new terminal and running: ollama serve")
+    log("ERROR: Ollama launched but did not respond within 45 seconds.")
+    log("  Possible causes: port 11434 blocked by firewall, CUDA init slow, or Ollama crashed.")
+    log("  Try: open a terminal and run  ollama serve  to see the error output.")
     return False
 
 

@@ -21,9 +21,15 @@ import platform
 import threading
 import subprocess
 import shutil
-import wave
-import audioop
 import math
+try:
+    import wave
+    import audioop
+    _HAS_WAVE = True
+except ModuleNotFoundError:
+    wave = None   # type: ignore[assignment]
+    audioop = None  # type: ignore[assignment]
+    _HAS_WAVE = False
 from pathlib import Path
 from typing import Optional, List
 import tkinter as tk
@@ -243,6 +249,7 @@ class App(tk.Tk):
     # ── UI ────────────────────────────────────────────────────────────────
     def _build_ui(self) -> None:
         self._build_toolbar()
+        self._build_health_bar()
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=4, pady=(0, 4))
         self._build_factbook_tab()
@@ -251,6 +258,165 @@ class App(tk.Tk):
         self._build_library_models_tab()  # RESTORED
         self._build_corpus_health_tab()
         self._build_heal_tab()
+
+    # ── Live health bar (visible on every tab) ────────────────────────────
+    def _build_health_bar(self) -> None:
+        BG   = "#0f1117"   # near-black background — stays consistent across all themes
+        DIM  = "#888888"   # dim text
+        MID  = "#cccccc"   # label text
+        SEP  = "#2a2a3a"   # separator colour
+
+        bar = tk.Frame(self, bg=BG, height=36)
+        bar.pack(fill="x", padx=0, pady=0)
+        bar.pack_propagate(False)
+
+        # ── Left: "SYSTEM STATUS" header ──────────────────────────────────
+        tk.Label(bar, text="  SYSTEM STATUS", fg="#4a7cdc", bg=BG,
+                 font=("Segoe UI", 8, "bold")).pack(side="left", padx=(8, 4))
+        tk.Label(bar, text="│", fg=SEP, bg=BG,
+                 font=("Segoe UI", 10)).pack(side="left", padx=4)
+
+        def _indicator(dot_init: str = "●") -> tuple:
+            """Return (dot_label, text_label) packed into bar."""
+            dot = tk.Label(bar, text=dot_init, fg="#444455", bg=BG,
+                           font=("Segoe UI", 12))
+            dot.pack(side="left", padx=(4, 0))
+            lbl = tk.Label(bar, text="", fg=MID, bg=BG,
+                           font=("Segoe UI", 9))
+            lbl.pack(side="left", padx=(3, 0))
+            return dot, lbl
+
+        self._hb_ollama_dot, self._hb_ollama_lbl = _indicator()
+        tk.Label(bar, text="│", fg=SEP, bg=BG,
+                 font=("Segoe UI", 10)).pack(side="left", padx=8)
+
+        self._hb_model_dot,  self._hb_model_lbl  = _indicator()
+        tk.Label(bar, text="│", fg=SEP, bg=BG,
+                 font=("Segoe UI", 10)).pack(side="left", padx=8)
+
+        self._hb_index_dot,  self._hb_index_lbl  = _indicator()
+        tk.Label(bar, text="│", fg=SEP, bg=BG,
+                 font=("Segoe UI", 10)).pack(side="left", padx=8)
+
+        self._hb_audio_dot,  self._hb_audio_lbl  = _indicator()
+
+        # ── Right side: timestamp + manual refresh ─────────────────────
+        def _manual_refresh() -> None:
+            self._hb_ts_lbl.configure(text="  refreshing…")
+            self._health_bar_poll(force=True)
+
+        tk.Button(bar, text="↻", fg=DIM, bg=BG, activebackground=BG,
+                  activeforeground="#ffffff", relief="flat", bd=0, cursor="hand2",
+                  font=("Segoe UI", 11), command=_manual_refresh
+                  ).pack(side="right", padx=(0, 6))
+
+        self._hb_ts_lbl = tk.Label(bar, text="  initialising…", fg=DIM, bg=BG,
+                                    font=("Segoe UI", 8, "italic"))
+        self._hb_ts_lbl.pack(side="right", padx=2)
+
+        # Kick off live polling
+        self.after(1500, self._health_bar_poll)
+
+    def _health_bar_poll(self, force: bool = False) -> None:
+        """Run one health check cycle in a background thread, then reschedule."""
+        def _check():
+            host = self._normalize_host(
+                self.fb_host_var.get() if hasattr(self, "fb_host_var") else "http://127.0.0.1:11434")
+
+            # 1. Ollama
+            ollama_ok, models = False, []
+            try:
+                resp = urlopen(Request(f"{host}/api/tags"), timeout=2)
+                data = json.loads(resp.read())
+                models = [m.get("name", "") for m in (data.get("models") or [])]
+                ollama_ok = True
+            except Exception:
+                pass
+
+            # 2. Active model
+            active_model = ""
+            if hasattr(self, "fb_model_var"):
+                active_model = self.fb_model_var.get().strip()
+            model_ok = ollama_ok and bool(active_model) and any(
+                active_model.lower() in m.lower() for m in models)
+
+            # 3. Index chunk count
+            chunk_count = 0
+            try:
+                idx_dir = HERE / "data" / "indexes"
+                for f in idx_dir.glob("*.jsonl"):
+                    chunk_count += sum(1 for _ in f.open(encoding="utf-8", errors="ignore"))
+            except Exception:
+                pass
+            index_ok = chunk_count >= 50
+
+            # 4. Audio devices
+            audio_ok = _HAS_AUDIO
+            if _HAS_AUDIO:
+                try:
+                    import sounddevice as _sd  # type: ignore[import-untyped]
+                    audio_ok = len(_sd.query_devices()) > 0
+                except Exception:
+                    pass
+
+            import datetime
+            ts = datetime.datetime.now().strftime("%H:%M:%S")
+
+            self.after(0, lambda: self._health_bar_apply(
+                ollama_ok, models, active_model, model_ok,
+                chunk_count, index_ok, audio_ok, ts))
+
+        threading.Thread(target=_check, daemon=True).start()
+        if not force:
+            self.after(12_000, self._health_bar_poll)   # re-poll every 12 s
+
+    def _health_bar_apply(self, ollama_ok: bool, models: list, active_model: str,
+                           model_ok: bool, chunk_count: int, index_ok: bool,
+                           audio_ok: bool, ts: str) -> None:
+        GREEN, AMBER, RED = "#00e676", "#ffb300", "#ff5252"
+
+        # Ollama dot + label
+        if ollama_ok:
+            self._hb_ollama_dot.configure(fg=GREEN)
+            self._hb_ollama_lbl.configure(
+                text=f"Ollama  ({len(models)} model{'s' if len(models)!=1 else ''})")
+        else:
+            self._hb_ollama_dot.configure(fg=RED)
+            self._hb_ollama_lbl.configure(text="Ollama  OFFLINE")
+
+        # Model dot + label
+        if model_ok:
+            self._hb_model_dot.configure(fg=GREEN)
+            short = active_model[:26] + "…" if len(active_model) > 27 else active_model
+            self._hb_model_lbl.configure(text=f"Model  {short}")
+        elif ollama_ok and models:
+            self._hb_model_dot.configure(fg=AMBER)
+            self._hb_model_lbl.configure(text="Model  not loaded")
+        else:
+            self._hb_model_dot.configure(fg=RED)
+            self._hb_model_lbl.configure(text="Model  unavailable")
+
+        # Index dot + label
+        if index_ok:
+            self._hb_index_dot.configure(fg=GREEN)
+            count_str = f"{chunk_count:,}"
+            self._hb_index_lbl.configure(text=f"Index  {count_str} chunks")
+        elif chunk_count > 0:
+            self._hb_index_dot.configure(fg=AMBER)
+            self._hb_index_lbl.configure(text=f"Index  thin ({chunk_count} chunks)")
+        else:
+            self._hb_index_dot.configure(fg=RED)
+            self._hb_index_lbl.configure(text="Index  empty")
+
+        # Audio dot + label
+        if audio_ok:
+            self._hb_audio_dot.configure(fg=GREEN)
+            self._hb_audio_lbl.configure(text="Audio  ready")
+        else:
+            self._hb_audio_dot.configure(fg=AMBER)
+            self._hb_audio_lbl.configure(text="Audio  no device")
+
+        self._hb_ts_lbl.configure(text=f"checked {ts}")
 
     def _build_toolbar(self) -> None:
         bar = ttk.Frame(self)
@@ -433,6 +599,8 @@ class App(tk.Tk):
         btn_row.grid(row=3, column=0, columnspan=4, sticky="w", pady=(4, 0))
         ttk.Button(btn_row, text="Ask Factbook", command=self.on_ask_factbook).pack(side="left")
         ttk.Button(btn_row, text="→ Translate Answer", command=self.on_send_factbook_to_translate).pack(side="left", padx=8)
+        ttk.Separator(btn_row, orient="vertical").pack(side="left", fill="y", padx=8)
+        ttk.Button(btn_row, text="▶ Start Ollama", command=self.on_start_ollama).pack(side="left")
 
         self.fb_status_var = tk.StringVar(value="Ready.")
         ttk.Label(tab, textvariable=self.fb_status_var).pack(anchor="w", pady=(6, 0))
@@ -752,6 +920,90 @@ class App(tk.Tk):
         model_name = self.fb_model_var.get().strip() or self.m_name.get().strip()
         self._auto_graft_last_model_if_needed(model_name, self.m_path.get().strip())
 
+    def on_start_ollama(self) -> None:
+        host = self._normalize_host(self.fb_host_var.get().strip())
+        # Check if already running
+        try:
+            urlopen(Request(f"{host}/api/tags", headers={"Accept": "application/json"}), timeout=2)
+            self.fb_status_var.set("Ollama is already running. Refreshing model list...")
+            self.on_refresh_models()
+            return
+        except Exception:
+            pass
+
+        # Comprehensive exe search — not just PATH
+        exe = _which_ollama()
+        if not exe:
+            lappdata = os.environ.get("LOCALAPPDATA", "")
+            username  = os.environ.get("USERNAME", "")
+            for c in [
+                Path(lappdata) / "Programs" / "Ollama" / "ollama.exe",
+                Path(lappdata) / "Ollama" / "ollama.exe",
+                Path("C:/Users") / username / "AppData/Local/Programs/Ollama/ollama.exe",
+                Path(r"C:/Program Files/Ollama/ollama.exe"),
+                Path(r"C:/Program Files (x86)/Ollama/ollama.exe"),
+            ]:
+                try:
+                    if c.exists():
+                        exe = str(c)
+                        break
+                except Exception:
+                    pass
+        if not exe:
+            self.fb_status_var.set(
+                "Cannot find ollama.exe — install Ollama from ollama.com, then retry.")
+            return
+
+        self.fb_status_var.set(f"Launching Ollama — waiting up to 45 s...")
+
+        _exe, _host = exe, host
+
+        def _start():
+            # Kill any hung ollama.exe first
+            try:
+                r = subprocess.run(
+                    ["tasklist", "/FI", "IMAGENAME eq ollama.exe", "/FO", "CSV", "/NH"],
+                    capture_output=True, text=True, timeout=5)
+                if "ollama.exe" in r.stdout:
+                    self.after(0, lambda: self.fb_status_var.set(
+                        "Killing stuck ollama.exe then restarting..."))
+                    subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"],
+                                   capture_output=True, timeout=5)
+                    time.sleep(1.5)
+            except Exception:
+                pass
+
+            try:
+                CREATE_NO_WINDOW = 0x08000000
+                DETACHED_PROCESS  = 0x00000008
+                subprocess.Popen(
+                    [_exe, "serve"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS,
+                )
+            except Exception as e:
+                self.after(0, lambda err=str(e): self.fb_status_var.set(
+                    f"Failed to start Ollama: {err}"))
+                return
+
+            for i in range(45):
+                time.sleep(1)
+                try:
+                    urlopen(Request(f"{_host}/api/tags"), timeout=2)
+                    self.after(0, lambda n=i+1: (
+                        self.fb_status_var.set(f"Ollama online after {n}s."),
+                        self.on_refresh_models(),
+                    ))
+                    return
+                except Exception:
+                    pass
+            self.after(0, lambda: self.fb_status_var.set(
+                "Ollama started but not responding after 45 s. "
+                "Open a terminal and run  ollama serve  to see the error."))
+
+        threading.Thread(target=_start, daemon=True).start()
+
     def on_ask_factbook(self) -> None:
         q = self.fb_question.get("1.0", "end").strip()
         if not q:
@@ -893,6 +1145,9 @@ class App(tk.Tk):
             self.last_wav = None
 
     def _wav_evidence(self, wav_path: str) -> dict:
+        if not _HAS_WAVE:
+            return {"channels": 1, "samplerate": 0, "sampwidth": 2,
+                    "nframes": 0, "duration": 0.0, "peak_dbfs": -99.0, "rms_dbfs": -99.0}
         p = Path(wav_path)
         with wave.open(str(p), "rb") as wf:
             channels = int(wf.getnchannels())

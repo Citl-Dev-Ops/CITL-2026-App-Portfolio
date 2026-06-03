@@ -30,6 +30,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
 import urllib.error
 from dataclasses import dataclass, field
@@ -233,8 +234,10 @@ def check_tkinter() -> List[DiagnosticResult]:
 
 # ── 4. Ollama layer ───────────────────────────────────────────────────────────
 
-_LLM_PREFERRED  = ["mistral:7b-instruct", "mistral", "llama3", "phi3", "gemma"]
+_LLM_PREFERRED  = ["mistral:7b-instruct", "mistral", "llama3", "phi3", "gemma",
+                   "olmo2", "olmo"]
 _EMB_PREFERRED  = ["nomic-embed-text", "mxbai-embed-large"]
+_MM_PREFERRED   = ["molmo"]  # AllenAI multimodal / vision models
 
 
 def check_ollama_layer() -> List[DiagnosticResult]:
@@ -287,12 +290,21 @@ def check_ollama_layer() -> List[DiagnosticResult]:
         results.append(DiagnosticResult(
             "Ollama", "LLM model", "error",
             "No LLM models installed. App cannot answer questions.",
-            detail="Run: ollama pull mistral:7b-instruct",
-            actions=[HealAction(
-                "Pull mistral:7b-instruct",
-                "ollama pull mistral:7b-instruct",
-                lambda log: _run_cmd(["ollama", "pull", "mistral:7b-instruct"], log, timeout=600),
-            )],
+            detail="Run: ollama pull mistral:7b-instruct  OR  ollama pull olmo2:7b",
+            actions=[
+                HealAction(
+                    "Pull mistral:7b-instruct",
+                    "ollama pull mistral:7b-instruct",
+                    lambda log: _run_cmd(["ollama", "pull", "mistral:7b-instruct"],
+                                         log, timeout=600),
+                ),
+                HealAction(
+                    "Pull OLMo2 7B (AllenAI)",
+                    "ollama pull olmo2:7b",
+                    lambda log: _run_cmd(["ollama", "pull", "olmo2:7b"],
+                                         log, timeout=7200),
+                ),
+            ],
         ))
     else:
         results.append(DiagnosticResult(
@@ -317,6 +329,28 @@ def check_ollama_layer() -> List[DiagnosticResult]:
     else:
         results.append(DiagnosticResult("Ollama", "Embed model", "ok",
                                         "Embedding model available"))
+
+    # 4c-2. AllenAI multimodal (informational — not required for RAG)
+    has_mm = any(any(p in m for p in _MM_PREFERRED) for m in models)
+    if not has_mm:
+        results.append(DiagnosticResult(
+            "Ollama", "AllenAI Vision (Molmo)", "warn",
+            "No AllenAI Molmo vision model installed — multimodal queries unavailable.",
+            detail="Optional: ollama pull molmo7b-d-0924  or  ollama pull molmo7b-o-0924",
+            actions=[
+                HealAction("Pull Molmo 7B-D (Vision)",
+                           "ollama pull molmo7b-d-0924",
+                           lambda log: _run_cmd(["ollama", "pull", "molmo7b-d-0924"],
+                                                log, timeout=7200)),
+                HealAction("Pull OLMo2 7B (LLM)",
+                           "ollama pull olmo2:7b",
+                           lambda log: _run_cmd(["ollama", "pull", "olmo2:7b"],
+                                                log, timeout=7200)),
+            ],
+        ))
+    else:
+        results.append(DiagnosticResult("Ollama", "AllenAI Vision (Molmo)", "ok",
+                                        "Molmo multimodal model available"))
 
     # 4d. Port 11434 sanity (only if local)
     if "127.0.0.1" in host or "localhost" in host:
@@ -767,22 +801,80 @@ def check_network() -> List[DiagnosticResult]:
 # HEAL FUNCTIONS
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _find_ollama_exe() -> Optional[str]:
+    exe = shutil.which("ollama") or shutil.which("ollama.exe")
+    if exe:
+        return exe
+    if platform.system() == "Windows":
+        lappdata = os.environ.get("LOCALAPPDATA", "")
+        username  = os.environ.get("USERNAME", "")
+        for p in [
+            Path(lappdata) / "Programs" / "Ollama" / "ollama.exe",
+            Path(lappdata) / "Ollama" / "ollama.exe",
+            Path("C:/Users") / username / "AppData/Local/Programs/Ollama/ollama.exe",
+            Path("C:/Program Files/Ollama/ollama.exe"),
+            Path("C:/Program Files (x86)/Ollama/ollama.exe"),
+        ]:
+            try:
+                if p.exists():
+                    return str(p)
+            except Exception:
+                pass
+    return None
+
+
+def _kill_hung_ollama(log: Callable[[str], None]) -> None:
+    if platform.system() != "Windows":
+        return
+    try:
+        r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq ollama.exe", "/FO", "CSV", "/NH"],
+                           capture_output=True, text=True, timeout=5)
+        if "ollama.exe" in r.stdout:
+            log("Killing existing ollama.exe for clean restart…")
+            subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"],
+                           capture_output=True, timeout=5)
+            time.sleep(1)
+    except Exception:
+        pass
+
+
 def _start_ollama(log: Callable[[str], None]) -> None:
     log("Attempting to start Ollama…")
-    if platform.system() == "Windows":
-        try:
-            subprocess.Popen(["ollama", "serve"],
-                             creationflags=subprocess.CREATE_NEW_CONSOLE)
-            log("Ollama started in a new terminal window.")
-            log("Wait ~5 seconds, then re-run diagnostics.")
-        except FileNotFoundError:
-            log("ERROR: 'ollama' not found on PATH.")
-            log("Install Ollama from https://ollama.com/download")
-    else:
-        subprocess.Popen(["ollama", "serve"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        log("Ollama started in background.")
-        log("Wait ~5 seconds, then re-run diagnostics.")
+    exe = _find_ollama_exe()
+    if not exe:
+        log("ERROR: ollama executable not found on PATH or in AppData\\Programs\\Ollama.")
+        log("Install from https://ollama.com/download")
+        return
+    log(f"Found: {exe}")
+    _kill_hung_ollama(log)
+    try:
+        if platform.system() == "Windows":
+            CREATE_NO_WINDOW = 0x08000000
+            DETACHED_PROCESS  = 0x00000008
+            subprocess.Popen(
+                [exe, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS,
+            )
+        else:
+            subprocess.Popen([exe, "serve"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log("Ollama launched. Waiting up to 30 s for API…")
+        import socket as _sock
+        for i in range(30):
+            time.sleep(1)
+            try:
+                s = _sock.create_connection(("127.0.0.1", 11434), timeout=1)
+                s.close()
+                log(f"Ollama is online after {i+1}s. Re-run diagnostics.")
+                return
+            except Exception:
+                pass
+        log("ERROR: Ollama launched but did not respond within 30 s.")
+        log("Open a terminal and run  ollama serve  to see the error output.")
+    except Exception as e:
+        log(f"ERROR launching Ollama: {e}")
 
 
 def _run_bootstrap(log: Callable[[str], None]) -> None:
@@ -898,14 +990,36 @@ def _build_exe(name: str, log: Callable[[str], None]) -> None:
     }
     entry = script_map.get(name)
     if not entry or not entry.exists():
+        # Search sibling paths before giving up
+        for alt in ["flex_troubleshooter_gui.py", "flex_assistant_gui.py",
+                    "citl_gui_entry.py", "factbook_assistant_gui_entry.py"]:
+            for search_dir in [_FLEX_DIR, HERE, _ROOT]:
+                candidate = search_dir / alt
+                if candidate.exists() and (
+                    ("FLEX" in name and "flex" in alt.lower()) or
+                    ("Factbook" in name and ("factbook" in alt.lower() or "gui_entry" in alt))
+                ):
+                    entry = candidate
+                    log(f"Using entry script: {entry}")
+                    break
+            if entry and entry.exists():
+                break
+    if not entry or not entry.exists():
         log(f"ERROR: Entry script for {name} not found.")
+        log(f"  Searched: {HERE}, {_FLEX_DIR}")
         return
-    if not shutil.which("pyinstaller"):
+    try:
+        import PyInstaller  # noqa: F401
+    except ImportError:
         log("PyInstaller not found. Installing…")
         if not _pip_install("pyinstaller", log):
             return
     _run_cmd([
-        "pyinstaller", "--onefile", "--noconsole",
+        sys.executable, "-m", "PyInstaller",
+        "--onefile", "--noconsole",
+        "--hidden-import=wave",
+        "--hidden-import=audioop",
+        "--hidden-import=colorsys",
         "--name", name.replace(".exe", ""),
         str(entry),
     ], log, timeout=300)

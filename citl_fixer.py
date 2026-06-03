@@ -49,6 +49,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        if hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # ── Locate USB root (where THIS file lives) ────────────────────────────────────
 USB_ROOT  = Path(__file__).resolve().parent
 FA_DIR    = USB_ROOT / "factbook-assistant"
@@ -56,10 +63,6 @@ SCRIPTS   = USB_ROOT / "scripts"
 DIST      = USB_ROOT / "dist"
 IS_WIN    = platform.system() == "Windows"
 IS_LINUX  = platform.system() == "Linux"
-AUTO_PATCH_RUNNER_WIN = USB_ROOT / "PATCH_CITL_48H_AUTO_WINDOWS.cmd"
-AUTO_PATCH_STATE = USB_ROOT / "bootstrap" / "citl_fixer_auto_patch_state.json"
-AUTO_PATCH_MIN_INTERVAL_SEC = 20 * 60
-LOGS_DIR = USB_ROOT / "logs"
 
 # Make our modules importable
 for _p in (str(FA_DIR), str(USB_ROOT)):
@@ -118,108 +121,6 @@ def _run(cmd: List[str], timeout: int = 180,
         return False, str(e)
 
 
-def _maybe_run_windows_auto_patch(
-    log: Callable[[str], None] = print,
-    *,
-    force: bool = False,
-) -> bool:
-    """Run CITL patch cadence from Fixer on Windows, throttled by a local stamp."""
-    if not IS_WIN:
-        return False
-    if os.environ.get("CITL_DISABLE_AUTO_PATCH", "").strip() == "1":
-        log("[AUTO-PATCH] disabled via CITL_DISABLE_AUTO_PATCH=1")
-        return False
-    if not AUTO_PATCH_RUNNER_WIN.exists():
-        log(f"[AUTO-PATCH][WARN] runner not found: {AUTO_PATCH_RUNNER_WIN}")
-        return False
-
-    now_ts = time.time()
-    if not force:
-        try:
-            if AUTO_PATCH_STATE.exists():
-                data = json.loads(AUTO_PATCH_STATE.read_text(encoding="utf-8"))
-                last_ts = float(data.get("last_run_ts") or 0.0)
-                if last_ts > 0 and (now_ts - last_ts) < AUTO_PATCH_MIN_INTERVAL_SEC:
-                    mins = int((AUTO_PATCH_MIN_INTERVAL_SEC - (now_ts - last_ts)) // 60)
-                    log(f"[AUTO-PATCH] skipped (recent run). retry in ~{max(0, mins)} min.")
-                    return False
-        except Exception:
-            pass
-
-    log("[AUTO-PATCH] running PATCH_CITL_48H_AUTO_WINDOWS.cmd ...")
-    ok, out = _run(
-        ["cmd.exe", "/c", str(AUTO_PATCH_RUNNER_WIN)],
-        timeout=1800,
-        log=log,
-    )
-    try:
-        AUTO_PATCH_STATE.parent.mkdir(parents=True, exist_ok=True)
-        AUTO_PATCH_STATE.write_text(
-            json.dumps(
-                {
-                    "last_run_utc": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-                    "last_run_ts": now_ts,
-                    "ok": bool(ok),
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-    except Exception:
-        pass
-    if ok:
-        log("[AUTO-PATCH] completed.")
-    else:
-        preview = (out or "").strip().splitlines()
-        tail = preview[-1] if preview else "no output"
-        log(f"[AUTO-PATCH][WARN] runner reported failure: {tail}")
-    return ok
-
-
-def _run_usb_clone_from_fixer(
-    target_arg: str,
-    *,
-    source_arg: str = "auto",
-    log: Callable[[str], None] = print,
-) -> int:
-    """Clone latest CITL repo payload to a replacement USB target."""
-    if not IS_WIN:
-        log("[CLONE][ERROR] USB clone shortcut is currently implemented for Windows only.")
-        return 2
-    cloner = USB_ROOT / "scripts" / "windows" / "citl_usb_repair_clone.py"
-    if not cloner.exists():
-        log(f"[CLONE][ERROR] Missing cloner script: {cloner}")
-        return 2
-    target_clean = (target_arg or "").strip() or "auto"
-    source_clean = (source_arg or "").strip() or "auto"
-    cmd = [
-        sys.executable,
-        str(cloner),
-        "--action",
-        "clone",
-        "--source",
-        source_clean,
-        "--target",
-        target_clean,
-    ]
-    log(f"[CLONE] launching: {' '.join(cmd)}")
-    ok, _ = _run(cmd, timeout=7200, log=log)
-    if ok:
-        log(f"[CLONE] completed for target={target_clean}")
-        return 0
-    log(f"[CLONE][ERROR] failed for target={target_clean}")
-    return 1
-
-
-def _write_crash_log(prefix: str = "citl_fixer_crash") -> Path:
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out = LOGS_DIR / f"{prefix}_{stamp}.log"
-    out.write_text(traceback.format_exc(), encoding="utf-8")
-    return out
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # OLLAMA HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -239,7 +140,32 @@ def _ollama_api(timeout: float = 5.0) -> Tuple[bool, List[str]]:
         return False, []
 
 
+def _find_ollama_windows() -> Optional[str]:
+    """Search common Windows install locations for ollama.exe."""
+    if not IS_WIN:
+        return None
+    lappdata = os.environ.get("LOCALAPPDATA", "")
+    username = os.environ.get("USERNAME", "")
+    candidates = [
+        Path(lappdata) / "Programs" / "Ollama" / "ollama.exe",
+        Path(lappdata) / "Ollama" / "ollama.exe",
+        Path("C:/Users") / username / "AppData/Local/Programs/Ollama/ollama.exe",
+        Path("C:/Users") / username / "AppData/Local/Ollama/ollama.exe",
+        Path("C:/Program Files/Ollama/ollama.exe"),
+        Path("C:/Program Files (x86)/Ollama/ollama.exe"),
+    ]
+    for p in candidates:
+        try:
+            if p.exists():
+                return str(p)
+        except Exception:
+            pass
+    return None
+
+
 def _start_ollama(log: Callable[[str], None] = print) -> bool:
+    if IS_WIN:
+        return _start_ollama_windows(log)
     log("Starting Ollama in background…")
     try:
         subprocess.Popen(["ollama", "serve"],
@@ -260,6 +186,72 @@ def _start_ollama(log: Callable[[str], None] = print) -> bool:
         return False
 
 
+def _start_ollama_windows(log: Callable[[str], None] = print) -> bool:
+    """Start Ollama on Windows without spawning a visible console window."""
+    log("Starting Ollama (Windows background process)…")
+    ollama_exe = (shutil.which("ollama") or shutil.which("ollama.exe")
+                  or _find_ollama_windows())
+    if not ollama_exe:
+        log("  ERROR: ollama.exe not found.")
+        log("  Install from: https://ollama.com/download/windows")
+        log("  Or run:  winget install Ollama.Ollama")
+        return False
+    try:
+        CREATE_NO_WINDOW = 0x08000000
+        DETACHED_PROCESS = 0x00000008
+        subprocess.Popen(
+            [ollama_exe, "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS,
+        )
+        log(f"  Launched: {ollama_exe} serve  — waiting for port 11434…")
+        for i in range(20):
+            time.sleep(1)
+            up, _ = _ollama_api(timeout=2)
+            if up:
+                log(f"  Ollama ready after {i + 1}s.")
+                return True
+        log("  ERROR: Ollama did not respond within 20 seconds after launch.")
+        return False
+    except Exception as e:
+        log(f"  ERROR launching Ollama: {e}")
+        return False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PATCH ORIGIN VALIDATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _validate_patch_origin(patch_metadata: dict, log: Callable[[str], None] = print) -> bool:
+    """
+    Validate that a patch originated from an authorized device.
+    Patches should only be synced from the home/primary device.
+    """
+    if not isinstance(patch_metadata, dict):
+        return False
+    
+    source_platform = patch_metadata.get("source_platform", "")
+    source_machine = patch_metadata.get("source_machine_nickname", "")
+    
+    # Patches should come from Windows (home device) or explicitly authorized Linux devices
+    authorized_platforms = {"Windows", "Ubuntu"}
+    authorized_machines = {"DESKTOP", "citl-mainframe"}  # Partial matches accepted
+    
+    if source_platform not in authorized_platforms:
+        log(f"[PATCH] WARNING: Patch from unauthorized platform: {source_platform}")
+        return False
+    
+    # Check machine authorization
+    if source_machine:
+        is_authorized = any(auth in source_machine for auth in authorized_machines)
+        if not is_authorized:
+            log(f"[PATCH] WARNING: Patch from unauthorized machine: {source_machine}")
+            return False
+    
+    return True
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # INDIVIDUAL CHECKS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -278,19 +270,6 @@ def check_tkinter() -> CheckResult:
         import tkinter  # noqa
         return CheckResult("tkinter", True, "tkinter available")
     except ImportError:
-        if IS_WIN:
-            def _fix(log=print):
-                log("Install/repair Python from python.org with Tcl/Tk enabled.")
-                return False
-            return CheckResult(
-                "tkinter",
-                False,
-                "tkinter not found — GUI unavailable",
-                fix_fn=_fix,
-                fix_label="Repair Python install (include Tcl/Tk)",
-                detail="Download and repair Python from https://www.python.org/downloads/windows/",
-            )
-
         def _fix(log=print):
             ok, _ = _run(["sudo", "apt-get", "install", "-y", "python3-tk"], log=log)
             return ok
@@ -360,7 +339,8 @@ def check_ollama() -> List[CheckResult]:
     results.append(CheckResult("Ollama running", True,
                                f"Ollama at {host} — {len(models)} model(s)"))
 
-    _LLM = ["mistral", "llama3", "phi3", "gemma", "olmo", "citl-custom"]
+    _LLM = ["mistral", "llama3", "phi3", "gemma", "olmo", "citl-custom",
+            "qwen", "deepseek", "command-r", "vicuna", "falcon"]
     has_llm = any(any(w in m for w in _LLM) for m in models)
     if not has_llm:
         def _pull_llm(log=print):
@@ -521,6 +501,55 @@ def _discover_citl_installs() -> List[Path]:
     if not any(str(c.resolve()) == str(USB_ROOT.resolve()) for c in candidates):
         candidates.insert(0, USB_ROOT)
     return candidates
+
+
+def _resolve_required_citl_file(rel_name: str, preferred_root: Path = USB_ROOT) -> Optional[Path]:
+    """Find a required CITL file across local installs and attached drives."""
+    rel = Path(rel_name)
+    roots: List[Path] = [preferred_root, Path(__file__).resolve().parent]
+    roots.extend(_discover_citl_installs())
+    if IS_WIN:
+        roots.extend(Path(f"{letter}:\\") / sub
+                     for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                     for sub in ("CITL-REIMAGER", "CITL", ""))
+    else:
+        for base in (Path("/media"), Path("/mnt"), Path("/run/media")):
+            try:
+                for mount in base.iterdir():
+                    roots.extend([mount, mount / "CITL-REIMAGER", mount / "CITL"])
+            except (PermissionError, OSError):
+                pass
+
+    seen = set()
+    for root in roots:
+        try:
+            candidate = (root / rel).resolve()
+        except (OSError, RuntimeError):
+            continue
+        key = str(candidate).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return None
+
+
+def _ensure_required_citl_file(rel_name: str, target_root: Path = USB_ROOT) -> Optional[Path]:
+    """Ensure a required file exists at target_root, copying from another CITL repo if needed."""
+    target = target_root / rel_name
+    if target.exists():
+        return target
+    source = _resolve_required_citl_file(rel_name, target_root)
+    if source is None:
+        return None
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source.resolve() != target.resolve():
+            shutil.copy2(source, target)
+        return target
+    except Exception:
+        return source if source.exists() else None
 
 
 # Legacy alias kept so old call-sites still work
@@ -1239,6 +1268,127 @@ def check_advisor_api_deps() -> List[CheckResult]:
     return results
 
 
+def check_advisor_ollama_windows() -> List[CheckResult]:
+    """
+    Windows-specific: verify Ollama is installed, running on port 11434,
+    and that /api/generate (the endpoint used by the Academic Advisor) responds.
+    Targets the exact WinError 10061 failure shown in the Advisor UI.
+    """
+    if not IS_WIN:
+        return []
+    results: List[CheckResult] = []
+
+    # ── 1. ollama.exe installed? ──────────────────────────────────────────────
+    ollama_exe = (shutil.which("ollama") or shutil.which("ollama.exe")
+                  or _find_ollama_windows())
+    if not ollama_exe:
+        def _install_ollama(log=print):
+            log("  Installing Ollama via winget…")
+            ok, out = _run(
+                ["winget", "install", "Ollama.Ollama",
+                 "--silent", "--accept-source-agreements"],
+                timeout=300, log=log)
+            for line in out.splitlines():
+                log(line)
+            found = _find_ollama_windows() or shutil.which("ollama")
+            if found:
+                log(f"  Installed: {found}")
+                return True
+            log("  winget install failed — download manually from https://ollama.com/download/windows")
+            return False
+        results.append(CheckResult(
+            "Advisor: Ollama installed", False,
+            "ollama.exe not found — Academic Advisor cannot reach LLM",
+            fix_fn=_install_ollama,
+            fix_label="Install Ollama via winget",
+            detail=("Ollama is required for the Academic Advisor.\n"
+                    "Install: winget install Ollama.Ollama\n"
+                    "Or download: https://ollama.com/download/windows")))
+        return results
+    results.append(CheckResult("Advisor: Ollama installed", True,
+                               f"ollama.exe found: {ollama_exe}"))
+
+    # ── 2. Port 11434 open? (WinError 10061 = connection refused) ────────────
+    port_open = False
+    try:
+        s = socket.create_connection(("127.0.0.1", 11434), timeout=2)
+        s.close()
+        port_open = True
+    except (ConnectionRefusedError, OSError):
+        pass
+
+    if not port_open:
+        def _start_win(log=print): return _start_ollama_windows(log)
+        results.append(CheckResult(
+            "Advisor: Ollama running", False,
+            "WinError 10061 — port 11434 refused (Ollama service not running)",
+            fix_fn=_start_win,
+            fix_label="Start Ollama service",
+            detail=("Run in a terminal:  ollama serve\n"
+                    "Or use the 'Start Ollama' button in the Launch Apps tab.\n"
+                    "To start automatically at login: add 'ollama serve' to Task Scheduler.")))
+        results.append(CheckResult("Advisor: /api/generate", False,
+                                   "Cannot test — Ollama not running; fix above first"))
+        return results
+    results.append(CheckResult("Advisor: Ollama running", True,
+                               "Port 11434 open — Ollama service is responding"))
+
+    # ── 3. Model installed that Advisor can use? ──────────────────────────────
+    up, models = _ollama_api()
+    advisor_keywords = ("qwen", "mistral", "llama", "phi", "gemma",
+                        "deepseek", "command-r", "vicuna", "falcon")
+    advisor_model = next(
+        (m for m in models
+         if any(k in m.lower() for k in advisor_keywords)),
+        models[0] if models else None,
+    )
+    if not advisor_model:
+        def _pull_default(log=print):
+            ok, _ = _run(["ollama", "pull", "qwen2.5:7b-instruct"],
+                         timeout=900, log=log)
+            return ok
+        results.append(CheckResult(
+            "Advisor: LLM model", False,
+            "No LLM model installed — Advisor dropdown will have nothing to call",
+            fix_fn=_pull_default, fix_label="Pull qwen2.5:7b-instruct",
+            detail="ollama pull qwen2.5:7b-instruct"))
+        return results
+    results.append(CheckResult("Advisor: LLM model", True,
+                               f"Model available: {advisor_model}"))
+
+    # ── 4. Live /api/generate test ────────────────────────────────────────────
+    try:
+        payload = json.dumps({
+            "model": advisor_model,
+            "prompt": "Reply with one word: OK",
+            "stream": False,
+        }).encode()
+        req = urllib.request.Request(
+            _ollama_host() + "/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=45) as r:
+            data = json.loads(r.read().decode())
+        resp = str(data.get("response", "")).strip()[:80]
+        results.append(CheckResult(
+            "Advisor: /api/generate", True,
+            f"Live call OK ({advisor_model}) → {repr(resp)}"))
+    except urllib.error.URLError as e:
+        results.append(CheckResult(
+            "Advisor: /api/generate", False,
+            f"/api/generate failed: {e.reason}",
+            detail=(f"Full error: {e}\n"
+                    "If this is WinError 10061, Ollama stopped after the port check.\n"
+                    "Try: ollama serve  in a terminal, then re-run checks.")))
+    except Exception as e:
+        results.append(CheckResult(
+            "Advisor: /api/generate", False,
+            f"/api/generate error: {e}",
+            detail=str(e)))
+    return results
+
+
 def check_key_citl_scripts() -> List[CheckResult]:
     CRITICAL = [
         (USB_ROOT / "citl_fixer.py",               "Fixer"),
@@ -1436,19 +1586,31 @@ def check_usb_repo_dirty() -> CheckResult:
 # ── Ollama Version ────────────────────────────────────────────────────────────
 
 def check_ollama_version() -> CheckResult:
-    if not shutil.which("ollama"):
+    ollama_exe = shutil.which("ollama") or shutil.which("ollama.exe")
+    if not ollama_exe and IS_WIN:
+        ollama_exe = _find_ollama_windows()
+    if not ollama_exe:
         def _fix(log=print):
             if IS_WIN:
-                log("  Download from: https://ollama.com/download/windows")
-                return False
+                log("  Installing Ollama via winget…")
+                ok, out = _run(
+                    ["winget", "install", "Ollama.Ollama",
+                     "--silent", "--accept-source-agreements"],
+                    timeout=300, log=log)
+                for line in out.splitlines():
+                    log(line)
+                return bool(_find_ollama_windows() or shutil.which("ollama"))
             ok, _ = _run(
                 ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
                 timeout=300, log=log)
             return ok
-        return CheckResult("Ollama binary", False, "ollama not found on PATH",
-                           fix_fn=_fix, fix_label="Install Ollama",
-                           detail="https://ollama.com/download")
-    ok, out = _run(["ollama", "--version"], timeout=8)
+        return CheckResult("Ollama binary", False,
+                           "ollama not found on PATH or in AppData\\Local\\Programs\\Ollama",
+                           fix_fn=_fix,
+                           fix_label="Install Ollama (winget)" if IS_WIN else "Install Ollama",
+                           detail="https://ollama.com/download/windows" if IS_WIN
+                                  else "https://ollama.com/download")
+    ok, out = _run([ollama_exe, "--version"], timeout=8)
     ver = out.strip() if ok else "?"
     m = re.search(r"(\d+)\.(\d+)", ver)
     if m and (int(m.group(1)), int(m.group(2))) < (0, 3):
@@ -1551,6 +1713,8 @@ def run_all_checks(fb_root: Optional[Path] = None,
         log("── Platform: Windows ────────────────────────────────")
         results += [check_powershell_policy(), check_long_paths_windows(),
                     check_windows_defender_exclusion()]
+        log("── Academic Advisor / Ollama (Windows) ──────────────")
+        results += check_advisor_ollama_windows()
     else:
         log("── Platform: Ubuntu / Linux ─────────────────────────")
         results += [check_display_server(), check_apt_available(), check_systemd_ollama()]
@@ -2046,11 +2210,16 @@ def run_gui():
         _log_write(boot_log,
                    f"── Bootstrap started {datetime.now().strftime('%H:%M:%S')} ──")
 
-        boot_py = USB_ROOT / "citl_bootstrap.py"
-        if not boot_py.exists():
-            _log_write(boot_log, f"  ERROR: {boot_py} not found on USB.")
+        boot_py = _ensure_required_citl_file("citl_bootstrap.py", USB_ROOT)
+        if not boot_py or not boot_py.exists():
+            _log_write(
+                boot_log,
+                "  ERROR: citl_bootstrap.py not found after searching local installs and attached drives.",
+            )
             _boot_running[0] = False
             return
+        if boot_py.parent != USB_ROOT:
+            _log_write(boot_log, f"  RECOVERED: using bootstrap from {boot_py}")
 
         cmd = [sys.executable, str(boot_py), "--cli"] + list(extra_args)
 
@@ -2112,9 +2281,7 @@ def run_gui():
             raise ImportError("spec loader not available")
     except Exception as _sync_exc:
         tk.Label(tab_sync,
-                 text="Sync engine unavailable: "
-                      + str(_sync_exc)
-                      + "\n\nEnsure citl_app_sync.py is on the USB root.",
+                 text="Sync engine unavailable: " + str(_sync_exc) + "\n\nEnsure citl_app_sync.py is on the USB root.",
                  fg=T["warn"], bg=T["bg"],
                  font=("Consolas", 9), justify="left", padx=20, pady=20,
                  anchor="nw").pack(fill="both", expand=True)
@@ -2233,6 +2400,33 @@ def run_gui():
                   "x-terminal-emulator || gnome-terminal || xterm"],
                  shell=False),
              2, 2)
+
+    _app_btn("Academic Advisor",
+             T["accent"],
+             lambda: _launch_app(FA_DIR / "citl_academic_advisor.py"),
+             3, 0)
+
+    def _do_start_ollama_win():
+        _llog("Starting Ollama service (Windows background)…")
+        def _bg():
+            ok = _start_ollama_windows(_llog)
+            root.after(0, lambda: _llog(
+                "  Ollama started — ready for Academic Advisor." if ok
+                else "  Failed to start Ollama — see log above."))
+        threading.Thread(target=_bg, daemon=True).start()
+
+    _app_btn("Start Ollama (Win)" if IS_WIN else "Start Ollama",
+             T["warn"],
+             _do_start_ollama_win if IS_WIN else lambda: _llog(
+                 _run(["ollama", "serve"], timeout=3)),
+             3, 1)
+
+    _app_btn("Open USB Root",
+             T["skip"],
+             lambda: subprocess.Popen(
+                 ["explorer", str(USB_ROOT)] if IS_WIN
+                 else ["xdg-open", str(USB_ROOT)]),
+             3, 2)
 
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -2539,6 +2733,276 @@ def run_gui():
         target=_run_portable_diagnostics, daemon=True).start())
 
     # ══════════════════════════════════════════════════════════════════════════
+    # TAB — USB REIMAGER DEPLOY
+    # ══════════════════════════════════════════════════════════════════════════
+    tab_usb = tk.Frame(nb, bg=T["bg"])
+    nb.add(tab_usb, text="  USB Reimager  ")
+
+    def _usb_lbl(parent, text, font_size=9, bold=False, color=None):
+        f = ("Consolas", font_size, "bold") if bold else ("Consolas", font_size)
+        tk.Label(parent, text=text, bg=T["bg"], fg=color or T["txt_fg"],
+                 font=f, anchor="w", justify="left").pack(anchor="w", padx=8, pady=1)
+
+    def _usb_sect(parent, title):
+        tk.Label(parent, text=f"  {title}", bg=T["hl2"], fg=T["status"],
+                 font=("Consolas", 9, "bold"),
+                 anchor="w").pack(fill="x", padx=4, pady=(6, 2))
+        f = tk.Frame(parent, bg=T["bg"])
+        f.pack(fill="x", padx=12, pady=2)
+        return f
+
+    # Header
+    hdr = tk.Frame(tab_usb, bg=T["hl2"], pady=6)
+    hdr.pack(fill="x", padx=4, pady=4)
+    tk.Label(hdr, text="  CITL Reimager  —  USB Fleet Deploy",
+             bg=T["hl2"], fg=T["accent"],
+             font=("Consolas", 11, "bold")).pack(side="left", padx=10)
+    tk.Label(hdr, text="Push CITL Reimager to connected ExFAT drives",
+             bg=T["hl2"], fg=T["txt_fg"],
+             font=("Consolas", 8)).pack(side="right", padx=10)
+
+    usb_body = tk.Frame(tab_usb, bg=T["bg"])
+    usb_body.pack(fill="both", expand=True)
+
+    # Left: controls
+    usb_left = tk.Frame(usb_body, bg=T["bg"], width=360)
+    usb_left.pack(side="left", fill="y", padx=(4, 0), pady=4)
+    usb_left.pack_propagate(False)
+
+    # Right: log
+    usb_right = tk.Frame(usb_body, bg=T["bg"])
+    usb_right.pack(side="left", fill="both", expand=True, padx=4, pady=4)
+    usb_log = _make_log(usb_right, height=30)
+    usb_log.pack(fill="both", expand=True)
+
+    def _ulog(msg, tag=""):
+        _log_write(usb_log, msg)
+
+    # ── Source section ────────────────────────────────────────────────────────
+    src_sect = _usb_sect(usb_left, "Source (CITL Reimager scripts)")
+
+    reimager_src = USB_ROOT / "CITL-Cannakit" / "reimager"
+    src_var = tk.StringVar(value=str(reimager_src))
+    src_ent = tk.Entry(src_sect, textvariable=src_var, width=36,
+                       bg=T["txt_bg"], fg=T["txt_fg"],
+                       insertbackground=T["accent"], font=("Consolas", 8))
+    src_ent.pack(fill="x", pady=2)
+
+    def _usb_browse_src():
+        from tkinter import filedialog
+        p = filedialog.askdirectory(title="Select reimager scripts folder",
+                                    initialdir=str(reimager_src))
+        if p:
+            src_var.set(p)
+    _btn(src_sect, "Browse…", T["btn"], _usb_browse_src, side="left")
+
+    def _src_ok():
+        p = Path(src_var.get())
+        return (p / "citl_reimager.sh").exists()
+
+    src_status = tk.Label(src_sect, text="", bg=T["bg"],
+                          font=("Consolas", 7))
+    src_status.pack(anchor="w", pady=1)
+
+    def _refresh_src_status():
+        if _src_ok():
+            src_status.configure(text="✓ Scripts found", fg=T["ok"])
+        else:
+            src_status.configure(text="✗ citl_reimager.sh not found", fg=T["err"])
+    _refresh_src_status()
+    src_var.trace_add("write", lambda *_: _refresh_src_status())
+
+    # ── Target drives section ─────────────────────────────────────────────────
+    tgt_sect = _usb_sect(usb_left, "Target ExFAT USB Drives")
+
+    usb_listbox = tk.Listbox(tgt_sect, height=8, selectmode="multiple",
+                             bg=T["txt_bg"], fg=T["txt_fg"],
+                             selectbackground=T["accent"],
+                             font=("Consolas", 9))
+    usb_listbox.pack(fill="x", pady=2)
+
+    usb_drive_map = {}   # listbox_index → drive_letter
+
+    def _usb_scan():
+        usb_listbox.delete(0, "end")
+        usb_drive_map.clear()
+        _ulog("Scanning for ExFAT drives...\n")
+        found = []
+        try:
+            if IS_WIN:
+                out = subprocess.check_output(
+                    ["powershell", "-NoProfile", "-Command",
+                     "Get-Volume | Where-Object { $_.FileSystemType -eq 'ExFAT' "
+                     "-and $_.DriveLetter } | "
+                     "Select-Object DriveLetter,Size,FileSystemLabel | "
+                     "ConvertTo-Csv -NoTypeInformation"],
+                    text=True, timeout=10)
+                for line in out.strip().splitlines()[1:]:
+                    cols = [c.strip('"') for c in line.split(",")]
+                    if not cols or not cols[0]:
+                        continue
+                    letter = cols[0] + ":\\"
+                    size_gb = (round(int(cols[1]) / (1024**3), 1)
+                               if cols[1].isdigit() else "?")
+                    label = cols[2] if len(cols) > 2 else ""
+                    entry = f"{letter}  [{label or 'unlabelled'}]  {size_gb} GB"
+                    found.append((letter, entry))
+            else:
+                # Linux: use lsblk
+                out = subprocess.check_output(
+                    ["lsblk", "-J", "-o", "PATH,FSTYPE,LABEL,MOUNTPOINT,SIZE"],
+                    text=True, timeout=5)
+                import json as _json
+                data = _json.loads(out)
+                def _flat(devs, acc=None):
+                    if acc is None: acc = []
+                    for d in devs:
+                        acc.append(d)
+                        _flat(d.get("children", []), acc)
+                    return acc
+                for d in _flat(data.get("blockdevices", [])):
+                    if (d.get("fstype") or "") == "exfat":
+                        path = d.get("path", "")
+                        label = d.get("label", "") or ""
+                        mnt = d.get("mountpoint", "") or "unmounted"
+                        size = d.get("size", "") or ""
+                        entry = f"{path}  [{label}  {size}  {mnt}]"
+                        found.append((mnt if mnt != "unmounted" else path, entry))
+        except Exception as e:
+            _ulog(f"Scan error: {e}\n")
+
+        if found:
+            for i, (drive, entry) in enumerate(found):
+                usb_listbox.insert("end", f"  {entry}")
+                usb_drive_map[i] = drive
+            usb_listbox.select_set(0, "end")   # pre-select all
+            _ulog(f"Found {len(found)} ExFAT drive(s). All pre-selected.\n")
+        else:
+            usb_listbox.insert("end", "  No ExFAT drives detected")
+            _ulog("No ExFAT drives found. Connect a USB formatted as ExFAT.\n")
+
+    _btn(tgt_sect, "Scan Drives", T["accent"], _usb_scan, side="left")
+    _btn(tgt_sect, "Select All",  T["btn"],
+         lambda: usb_listbox.select_set(0, "end"), side="left")
+    _btn(tgt_sect, "Clear",       T["btn"],
+         lambda: usb_listbox.selection_clear(0, "end"), side="left")
+
+    # ── Deploy section ────────────────────────────────────────────────────────
+    dep_sect = _usb_sect(usb_left, "Deploy")
+
+    def _usb_deploy():
+        if not _src_ok():
+            _ulog(f"ERROR: Source not found: {src_var.get()}\n")
+            return
+        sel = usb_listbox.curselection()
+        if not sel:
+            _ulog("No drives selected. Select at least one target drive.\n")
+            return
+        targets = [usb_drive_map[i] for i in sel if i in usb_drive_map]
+        if not targets:
+            _ulog("No valid targets — re-scan drives.\n")
+            return
+        src = Path(src_var.get())
+        _ulog(f"\n{'─'*60}\nDeploying CITL Reimager to {len(targets)} drive(s)...\n")
+        _set_status(f"Deploying to {len(targets)} USB drive(s)…")
+
+        def _bg():
+            ok = 0; fail = 0
+            for tgt in targets:
+                _ulog(f"  → {tgt}...")
+                try:
+                    if IS_WIN:
+                        dest = os.path.join(tgt, "citl_reimager")
+                        os.makedirs(dest, exist_ok=True)
+                        r = subprocess.run(
+                            ["robocopy", str(src), dest,
+                             "/E", "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS"],
+                            capture_output=True, text=True, timeout=300)
+                        success = r.returncode < 8
+                    else:
+                        dest = os.path.join(tgt, "citl_reimager")
+                        os.makedirs(dest, exist_ok=True)
+                        r = subprocess.run(
+                            ["rsync", "-a", "--delete",
+                             str(src) + "/", dest + "/"],
+                            capture_output=True, text=True, timeout=300)
+                        success = r.returncode == 0
+
+                    if success:
+                        # Write manifest
+                        manifest = os.path.join(
+                            dest if IS_WIN else dest, "MANIFEST.txt")
+                        try:
+                            with open(manifest, "w") as mf:
+                                mf.write(
+                                    f"CITL Reimager\n"
+                                    f"Deployed: {datetime.now().isoformat()}\n"
+                                    f"Source:   {src}\n"
+                                    f"Target:   {tgt}\n"
+                                    f"Machine:  {platform.node()}\n"
+                                )
+                        except Exception:
+                            pass
+                        _ulog(f"  DONE: {tgt}\n")
+                        ok += 1
+                    else:
+                        out = (r.stderr or r.stdout or "")[:300]
+                        _ulog(f"  FAILED: {tgt} — {out}\n")
+                        fail += 1
+                except Exception as e:
+                    _ulog(f"  ERROR: {tgt} — {e}\n")
+                    fail += 1
+
+            summary = f"\nDeploy complete: {ok} OK, {fail} failed.\n"
+            _ulog(summary)
+            _set_status(f"USB deploy: {ok} OK, {fail} failed",
+                        T["ok"] if fail == 0 else T["warn"])
+
+        threading.Thread(target=_bg, daemon=True).start()
+
+    _btn(dep_sect, "Deploy to Selected Drives", T["ok"],   _usb_deploy, side="left")
+
+    # ── What this fixes section ───────────────────────────────────────────────
+    fix_sect = _usb_sect(usb_left, "What This Fixes (Changelog Summary)")
+    fixes_text = tk.Text(usb_left, height=14, wrap="word",
+                         bg=T["txt_bg"], fg=T["txt_fg"],
+                         font=("Consolas", 7), relief="flat",
+                         state="normal", padx=6, pady=4)
+    fixes_text.pack(fill="x", padx=12, pady=2)
+    fixes_text.insert("end",
+        "GRUB SHELL AT BOOT (Ubuntu UEFI)\n"
+        "─────────────────────────────────\n"
+        "Problem:  Adding the ExFAT partition (sdb4) changed the partition layout\n"
+        "          that GRUB had compiled its UUID search path against.\n"
+        "          Result: GRUB found its EFI binary but not grub.cfg → shell.\n"
+        "Fix:      fix_usb_grub.sh reinstalls GRUB with --removable --no-nvram\n"
+        "          and writes a label-based grub.cfg (search --label CITLBOOT)\n"
+        "          that is immune to UUID changes and partition additions.\n"
+        "\n"
+        "UBUNTU DRIVE IMAGING FAILURES\n"
+        "─────────────────────────────────\n"
+        "Problem:  Original scripts had no partitioner, no squashfs extractor,\n"
+        "          no grub-install on target. Used chroot apt (needed internet).\n"
+        "          IFS change broke read/awk. Prompts blocked GUI calls.\n"
+        "Fix:      citl_reimager.sh v2.1 uses host grub-install (no internet),\n"
+        "          lsblk JSON (no column-shift), /dev/tty for all prompts,\n"
+        "          and global vars (not captured stdout) for partition results.\n"
+        "\n"
+        "FLEET USB SYNC\n"
+        "─────────────────────────────────\n"
+        "Enabled:  fleet_sync_usb.sh syncs content from one source USB to all\n"
+        "          connected ExFAT targets in parallel (up to 4 at once).\n"
+        "          GUI streams PROGRESS/DONE/FAILED lines in real time.\n"
+    )
+    fixes_text.configure(state="disabled")
+
+    # Auto-scan on tab open
+    def _on_usb_tab_select(event):
+        if nb.select() == nb.tabs()[-2]:   # second-to-last = this tab
+            _usb_scan()
+    nb.bind("<<NotebookTabChanged>>", _on_usb_tab_select)
+
+    # ══════════════════════════════════════════════════════════════════════════
     # TAB 4 — FULL LOG
     # ══════════════════════════════════════════════════════════════════════════
     tab_log = tk.Frame(nb, bg=T["bg"])
@@ -2584,49 +3048,16 @@ def run_gui():
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _entry_main() -> int:
+if __name__ == "__main__":
     ap = argparse.ArgumentParser(
         description="CITL Fixer — USB Repair & Launch Station (Windows & Ubuntu)")
     ap.add_argument("--cli",  action="store_true", help="Terminal-only mode")
     ap.add_argument("--fix",  action="store_true", help="Auto-fix all issues (CLI)")
     ap.add_argument("--path", type=Path, default=None,
                     help="Factbook root to diagnose (skips auto-search)")
-    ap.add_argument("--no-auto-update", action="store_true",
-                    help="Skip auto patch cadence run on startup.")
-    ap.add_argument("--force-auto-update", action="store_true",
-                    help="Force patch cadence runner now, ignoring local throttle.")
-    ap.add_argument("--clone-usb-target", default="",
-                    help="Clone latest current CITL repo snapshot to a replacement USB target path (or 'auto').")
-    ap.add_argument("--clone-usb-source", default="auto",
-                    help="Optional source path for --clone-usb-target (default: auto).")
     args = ap.parse_args()
 
-    try:
-        if IS_WIN and not args.no_auto_update:
-            _maybe_run_windows_auto_patch(log=print, force=bool(args.force_auto_update))
-
-        if str(args.clone_usb_target or "").strip():
-            return _run_usb_clone_from_fixer(
-                str(args.clone_usb_target),
-                source_arg=str(args.clone_usb_source or "auto"),
-                log=print,
-            )
-
-        if args.cli or args.fix:
-            run_cli(auto_fix=args.fix)
-        else:
-            run_gui()
-        return 0
-    except Exception:
-        crash_log = _write_crash_log()
-        print(f"[FATAL] CITL Fixer crashed. Crash log: {crash_log}")
-        try:
-            print("[FATAL] Attempting CLI fallback diagnostics...")
-            run_cli(auto_fix=False)
-        except Exception:
-            pass
-        return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(_entry_main())
+    if args.cli or args.fix:
+        run_cli(auto_fix=args.fix)
+    else:
+        run_gui()

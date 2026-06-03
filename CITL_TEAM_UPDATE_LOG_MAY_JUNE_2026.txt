@@ -1,0 +1,312 @@
+════════════════════════════════════════════════════════════════════════════════
+  CITL TECHNOLOGY TEAM — PROGRESS & DELIVERY REPORT
+  Renton Technical College — Center for Innovative Teaching and Learning
+  Period Covered: April – June 2026
+  Prepared for: CITL Leadership & Supervision
+════════════════════════════════════════════════════════════════════════════════
+
+This report summarises what the CITL technology team has built, repaired, and
+deployed during this period in plain language. Each section describes the
+visible result — what someone at a computer can now DO that they could not do
+before — followed by a brief note on the technical challenge solved.
+
+────────────────────────────────────────────────────────────────────────────────
+ 1.  FACTBOOK ASSISTANT  —  AI Q&A tool for CITL course and policy content
+────────────────────────────────────────────────────────────────────────────────
+
+What staff can do now:
+  • Open the Factbook Assistant and see a live "System Status" bar at the top
+    of the window showing — in real time — whether the AI engine is running,
+    whether the right language model is loaded, whether the index is built, and
+    whether audio is available.  Green = working; amber = caution; red = down.
+    No more guessing whether the app is ready.
+
+  • If the AI engine (Ollama) is offline, click "▶ Start Ollama" and the app
+    attempts a full restart automatically — including killing any hung process,
+    searching every known install location, and waiting up to 45 seconds for
+    the engine to come back online.  Staff no longer need to open a command
+    prompt or call IT for this step.
+
+  • The app no longer crashes on certain Windows lab computers where an audio
+    component (wave/audioop) was missing.  That error is now handled silently;
+    everything else continues to work.
+
+Technical summary:
+  Live health dashboard added (12-second polling, four indicators).
+  Ollama startup repair hardened across three separate code layers that were
+  previously all silently failing.  Audio import errors isolated with a
+  graceful fallback flag.
+
+────────────────────────────────────────────────────────────────────────────────
+ 2.  CITL FLEX TROUBLESHOOTER  —  IT support and diagnostics tool
+────────────────────────────────────────────────────────────────────────────────
+
+What staff can do now:
+  • Same live System Status dashboard as Factbook — always visible at the top
+    of the FLEX window regardless of which tab is open.  IT staff see at a
+    glance whether Ollama, the AI model, the index, and the network are all
+    healthy before starting a session.
+
+  • "AllenAI Quick Install" panel added to the Models tab.  Staff can now
+    install four specific AI models with a single click:
+      – OLMo2 7B and OLMo2 1B  (language models from Allen Institute for AI)
+      – Molmo 7B-D and Molmo 7B-O  (vision/image-aware models)
+    Previously these required typing exact Ollama command-line instructions.
+
+  • System Heal diagnostic now checks for AllenAI vision models and offers a
+    one-click fix if they are missing.  It also offers AllenAI language models
+    as a second option alongside the standard Mistral model wherever a missing
+    model is flagged.
+
+  • "USB Reimager" tab added (see section 4 below).
+
+Technical summary:
+  Health bar added using label-based search (teal theme).  AllenAI OLMo2 and
+  Molmo model names added to the preferred-model detection lists.  Fleet sync
+  and GRUB repair capabilities integrated as a new app tab.
+
+────────────────────────────────────────────────────────────────────────────────
+ 3.  SCREEN RECORDER  —  Classroom and presentation capture
+────────────────────────────────────────────────────────────────────────────────
+
+What staff can do now:
+  • A region-selector tool lets the recorder capture just one part of the
+    screen (a single application window, a slide, a Zoom call) rather than
+    the entire display.
+
+  • Before recording starts, the app runs a preflight check: it confirms
+    the selected codec is available on this computer, scans available drives
+    for storage space, and warns the user if anything is likely to fail.
+    Recordings no longer start only to fail partway through due to a missing
+    component.
+
+  • If the recorder fails to start, a repair dialog appears automatically and
+    guides the user through the fix rather than showing a cryptic error.
+
+  • The recorder now works correctly on both Windows lab computers and Ubuntu
+    Linux workstations without needing separate versions.
+
+Technical summary:
+  Cross-platform audio/video pipeline hardened.  Startup repair dialog and
+  error-message parsing added.  Auto codec detection added.  Drive scan for
+  storage space added pre-recording.
+
+────────────────────────────────────────────────────────────────────────────────
+ 4.  CITL USB REIMAGER SUITE  —  Fast setup tool for new classroom computers
+────────────────────────────────────────────────────────────────────────────────
+
+This is a significant new capability that did not exist before.
+
+What staff can do now:
+  • Boot a classroom computer from the CITL USB drive and run an interactive
+    menu that installs a complete, CITL-configured Ubuntu 24.04 environment
+    with one set of guided prompts.  Three profiles are available:
+
+      Lean     — Basic setup for older or lower-spec machines (16 GB drive).
+      Standard — Full CITL classroom setup with AI tools (64 GB drive).
+      Full     — High-spec AI workstation with additional vision models (128 GB).
+
+  • The setup tool automatically selects the target drive, warns about
+    overwriting, creates the right partition layout, installs Ubuntu, configures
+    user accounts with a forced password change on first login, and sets up CITL
+    apps to install automatically the first time the computer boots.
+
+  • "Fleet Sync" — IT staff can now update all CITL USB drives simultaneously.
+    Plug in up to however many USB drives are available, open the CITL Reimager
+    app, scan for drives, and push the latest CITL Reimager scripts to all of
+    them at once.  Previously each USB had to be updated individually by hand.
+
+  • "Fix GRUB" button — resolves a specific boot failure (described in section
+    4a) where a USB drive was booting to a bare command prompt instead of the
+    CITL menu.
+
+4a.  BOOT FAILURE RESOLVED — "grub>" prompt instead of menu
+  An issue was reported by colleagues: inserting the CITL USB into a computer
+  and powering on showed only:
+        GNU GRUB version 2.12
+        grub> _
+  instead of the normal boot menu.
+
+  Cause: Adding a data storage partition to the USB changed how the computer
+  found the boot configuration file, because the old configuration was locked
+  to a hardware ID (UUID) that had changed.
+
+  Fix: The boot configuration has been rewritten to search by the drive's
+  visible label name ("CITLBOOT") instead of a hardware ID.  Label names do
+  not change when partitions are added or modified.  All future USB drives
+  built with the reimager tool will use this approach.
+
+  The "Fix GRUB" button in the Fleet Sync tab applies this fix to any affected
+  USB drive in under two minutes without erasing any data on the drive.
+
+Technical summary:
+  citl_reimager.sh v2.1 rewrites partition, extraction, and bootloader steps
+  with full error isolation.  MAKE_CITL_USB_BOOTABLE.sh generates loop-ISO
+  GRUB config (file-presence search, UUID-independent).  Fleet sync uses
+  QThread signals for thread-safe UI updates in the PySide6 app and
+  root.after() dispatch in the tkinter app.  Preflight checker verifies 12
+  dependencies at boot time.  All shell scripts validated on Ubuntu 24.04 live.
+
+────────────────────────────────────────────────────────────────────────────────
+ 5.  CITL APP FIXER & CITL APP SYNC  —  Self-repair and update tools
+────────────────────────────────────────────────────────────────────────────────
+
+What staff can do now:
+  • A new "Git & Repo" tab in the CITL App Fixer shows which version of each
+    CITL application is on this USB vs the latest version in the development
+    repository.  A "Deploy Changed Files" button copies only the files that
+    have changed — no manual file hunting.
+
+  • "Git Pull" button inside the app fetches the latest updates from the
+    source code repository and shows a summary of what changed.
+
+  • When REPAIR_CITL_APPS (the Windows repair tool) is run and ExFAT USB
+    drives are connected, it now asks whether to push the CITL Reimager toolkit
+    to those drives.  This replaces a manual copy step.
+
+  • The following apps are now detected and tracked for updates automatically
+    (were previously missed):
+      – CITL Screen Recorder
+      – CITL FLEX Troubleshooter (all four updated files)
+      – CITL Ticketing & Automation Utility  ←  see section 6
+      – CITL Field Apps, Workstation Apps, Presentation Suite launchers
+      – REPAIR_CITL_APPS and DIAGNOSE_CITL_APPS repair tools
+      – Windows build scripts
+
+Technical summary:
+  _CITL_PY_MARKERS extended with FLEX Troubleshooter and Reimager signatures.
+  C:\Users\Doc_M\CITL added as a top-priority scan root in _most_likely_scan_roots().
+  TRACKED_USB and TRACKED_MACHINE lists in citl_app_updater.py extended by 22
+  files.  Deploy map in citl_fixer.py covers all session-changed files with
+  SHA-256 hash comparison before copy.
+
+────────────────────────────────────────────────────────────────────────────────
+ 6.  CITL TICKETING & AUTOMATION UTILITY  —  MS Flow / Power Automate tool
+────────────────────────────────────────────────────────────────────────────────
+
+What staff can do now:
+  • This tool (located in the powerflow_builder/ folder) allows CITL staff to:
+      – Build, validate, and deploy Microsoft Power Automate flows without
+        needing to use the browser-based Power Automate interface for routine
+        tasks.
+      – Write workflows in a simplified scripting language (FlowFX) that
+        compiles to the full JSON format that Power Automate requires.
+      – Run connection preflight checks — verify that the computer can reach
+        Microsoft Graph, Outlook, and SharePoint before starting a workflow.
+      – Track service tickets through their full lifecycle (new → in progress →
+        pending → resolved → closed) in a local database.
+      – Parse and diagnose failed Flow runs by importing Microsoft's error
+        output and mapping it to a plain-English root cause.
+      – Monitor incoming webhooks locally without storing credentials.
+
+  • An Ubuntu/Linux binary build script has been hardened.  The tool can now
+    be built as a standalone executable on Ubuntu lab computers as well as
+    Windows — no Python installation required on the target machine.
+
+  • The tool is now tracked by CITL App Sync and CITL App Fixer, so updates
+    made by developers are automatically detected and can be pushed to USB
+    drives and target machines through the same update workflow as all other
+    CITL apps.
+
+Technical summary:
+  build_ticketing_automation_bin.sh updated with full hidden-import list
+  (tkinter, sqlite3, urllib, hashlib, threading, subprocess, platform,
+  pathlib, datetime, re) and --collect-submodules tkinter.  --test flag added
+  for post-build verification.  Added to TRACKED_USB, TRACKED_MACHINE, scan
+  markers, and deploy map across citl_app_sync.py, citl_app_updater.py, and
+  citl_fixer.py on the K: USB drive.
+
+────────────────────────────────────────────────────────────────────────────────
+ 7.  AI MODEL SUPPORT — AllenAI (OLMo2 and Molmo)
+────────────────────────────────────────────────────────────────────────────────
+
+What staff can do now:
+  • The CITL AI tools now recognize and can install language models from the
+    Allen Institute for AI (AllenAI), a non-profit AI research organization.
+
+  • OLMo2 models are available as an alternative to Mistral for answering
+    questions through Factbook and FLEX.  They are fully open-source and do
+    not have commercial usage restrictions.
+
+  • Molmo models add the ability to analyse and describe images — useful for
+    AV/IT scenarios where staff need help understanding what is shown on a
+    screen or in a photo.
+
+  • Installing these models is now a single click in the FLEX Troubleshooter's
+    Models tab ("AllenAI Quick Install").
+
+Technical summary:
+  _LLM_PREFERRED extended with "olmo2", "olmo".  _MM_PREFERRED = ["molmo"]
+  added.  Diagnostic check 4c-2 reports AllenAI vision model status with
+  pull HealActions.  ollama pull timeout set to 7200s for large models.
+
+────────────────────────────────────────────────────────────────────────────────
+ 8.  INFRASTRUCTURE — Code reliability and deployment hardening
+────────────────────────────────────────────────────────────────────────────────
+
+Items in this section are behind-the-scenes improvements that prevent problems
+staff would otherwise encounter but might not directly notice.
+
+  • Ollama startup repair — three separate code layers across three different
+    apps were all using a startup method that only worked if Ollama was already
+    in a standard install location and had no hung processes.  All three have
+    been rewritten with: (a) a 6-path install location search, (b) automatic
+    termination of any stuck Ollama process before restarting, (c) a 45-second
+    wait loop that checks every two seconds rather than giving up immediately.
+
+  • Port conflict prevention — services are now assigned free ports
+    dynamically rather than hardcoded port numbers.  This prevents failures
+    when multiple CITL apps run simultaneously on the same computer.
+
+  • PyInstaller (Windows EXE builder) — all build scripts now call Python's
+    module runner (python -m PyInstaller) instead of the bare command
+    (pyinstaller), which failed silently when the tool was installed in a
+    virtual environment.  Hidden imports for wave, audioop, colorsys added to
+    prevent missing-module crashes in compiled EXEs.
+
+  • Cross-thread safety in GUI — background operations in the Reimager and
+    CITL Fixer apps now use Qt's signal/slot mechanism and tkinter's after()
+    scheduler to update the interface safely.  Previously some operations could
+    corrupt the display or crash the app if they finished at the wrong moment.
+
+  • USB drive detection — changed from column-position text parsing to JSON
+    parsing throughout.  The old method broke silently when drive labels
+    contained spaces or columns were in unexpected order; the new method
+    cannot fail due to formatting.
+
+────────────────────────────────────────────────────────────────────────────────
+ SUMMARY TABLE — Deliverables at a glance
+────────────────────────────────────────────────────────────────────────────────
+
+  Application                    New Feature / Fix               Status
+  ─────────────────────────────────────────────────────────────────────────────
+  Factbook Assistant             Live system status dashboard     ✔ Delivered
+  Factbook Assistant             One-click Ollama repair          ✔ Delivered
+  Factbook Assistant             Audio crash fix                  ✔ Delivered
+  CITL FLEX Troubleshooter       Live system status dashboard     ✔ Delivered
+  CITL FLEX Troubleshooter       AllenAI model install buttons    ✔ Delivered
+  CITL FLEX Troubleshooter       Fleet USB Sync tab               ✔ Delivered
+  Screen Recorder                Region selector                  ✔ Delivered
+  Screen Recorder                Pre-recording preflight check    ✔ Delivered
+  Screen Recorder                Cross-platform support           ✔ Delivered
+  USB Reimager (new)             Guided Ubuntu install (3 modes)  ✔ Delivered
+  USB Reimager                   Fleet drive sync (multi-USB)     ✔ Delivered
+  USB Reimager                   GRUB boot failure fix            ✔ Delivered
+  CITL App Fixer                 Git & Repo version sync tab      ✔ Delivered
+  CITL App Fixer                 USB deploy on repair startup     ✔ Delivered
+  CITL App Sync                  Automation Utility tracking      ✔ Delivered
+  CITL App Sync                  FLEX Troubleshooter tracking     ✔ Delivered
+  Ticketing & Automation         Ubuntu binary build hardened     ✔ Delivered
+  Ticketing & Automation         Integrated into sync/update      ✔ Delivered
+  AllenAI models                 OLMo2 7B, 1B; Molmo 7B-D, 7B-O  ✔ Delivered
+  Ollama startup repair          All three code layers fixed      ✔ Delivered
+  PyInstaller EXE builds         Hidden imports added             ✔ Delivered
+  USB drive detection            JSON parsing (no column errors)  ✔ Delivered
+  ─────────────────────────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════════════════════════
+  Prepared by: CITL AI & Systems Development Team
+  Doc McDowell, Project Lead — CITL AI and Systems Architect
+  Renton Technical College — CITL
+  Report generated: June 2026
+════════════════════════════════════════════════════════════════════════════════

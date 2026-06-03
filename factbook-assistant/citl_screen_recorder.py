@@ -290,6 +290,22 @@ def _set_window_topmost(hwnd: Optional[int], enabled: bool) -> bool:
         return False
 
 
+def _get_window_rect(hwnd: int) -> Optional[Tuple[int, int, int, int]]:
+    """Return (x, y, w, h) screen rect of a window, or None."""
+    if sys.platform != "win32" or not hwnd:
+        return None
+    try:
+        rect = wintypes.RECT()
+        if ctypes.windll.user32.GetWindowRect(int(hwnd), ctypes.byref(rect)):
+            x, y = rect.left, rect.top
+            w, h = rect.right - rect.left, rect.bottom - rect.top
+            if w > 0 and h > 0:
+                return x, y, w, h
+    except Exception:
+        pass
+    return None
+
+
 def _find_ffmpeg() -> Optional[str]:
     """Locate FFmpeg on Windows or Ubuntu. Returns full path or None."""
     ff = shutil.which("ffmpeg")
@@ -722,6 +738,9 @@ class RecordingSession:
         cmd.extend(vflags)
         if self.fmt["vcodec"] in ("libx264", "libvpx-vp9"):
             cmd.extend(["-pix_fmt", "yuv420p"])
+            # libx264/vp9 require even dimensions; gdigrab hwnd capture can
+            # produce odd sizes (e.g. 857px wide) that cause encoder failure.
+            cmd.extend(["-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2"])
 
         supports_audio = bool(self.fmt.get("audio"))
         if supports_audio and self.audio_enabled and self.audio_device:
@@ -1100,6 +1119,176 @@ class RegionSelector:
         self.on_cancel()
 
 
+class RecordingBorderOverlay:
+    """
+    Screen-share-style colored border drawn around the recording target window.
+    Transparent interior, always-on-top, click-through — like Zoom / Teams / OBS.
+    """
+
+    THICKNESS     = 3
+    COLOR_REC     = "#d84444"   # COLORS["accent"] — active recording
+    COLOR_PREVIEW = "#ffd369"   # COLORS["warn"]   — preview flash
+    TRANSPARENT   = "black"     # transparentcolor key; must match canvas bg
+    LABEL_BG      = "#5a1010"
+    LABEL_FG      = "#f5eeee"
+    POLL_MS       = 250
+
+    def __init__(self, root: tk.Tk):
+        self.root        = root
+        self._win: Optional[tk.Toplevel] = None
+        self._canvas: Optional[tk.Canvas] = None
+        self._poll_job: Optional[str] = None
+        self._hwnd: Optional[int] = None
+        self._color: str = self.COLOR_REC
+        self._label_text: str = "● REC"
+        self._last_geom: Optional[Tuple[int, int, int, int]] = None
+        self._active: bool = False
+
+    # ── public API ────────────────────────────────────────────────────────────
+
+    def start(self, hwnd: Optional[int],
+              color: str = COLOR_REC, label: str = "● REC"):
+        """Show border around hwnd and begin tracking."""
+        self._hwnd = hwnd
+        self._color = color
+        self._label_text = label
+        self._last_geom = None
+        self._active = True
+        self._ensure_win()
+        self._schedule_poll()
+
+    def update_hwnd(self, hwnd: Optional[int]):
+        """Update the tracked window without restarting."""
+        if self._hwnd != hwnd:
+            self._hwnd = hwnd
+            self._last_geom = None
+
+    def stop(self):
+        """Hide the border and tear down the overlay window."""
+        self._active = False
+        self._hwnd = None
+        if self._poll_job:
+            try:
+                self.root.after_cancel(self._poll_job)
+            except Exception:
+                pass
+            self._poll_job = None
+        if self._win:
+            try:
+                self._win.destroy()
+            except Exception:
+                pass
+            self._win = None
+        self._canvas = None
+        self._last_geom = None
+
+    def preview(self, hwnd: Optional[int], duration_ms: int = 2500):
+        """Flash the border for duration_ms then stop (used by Preview button)."""
+        self.start(hwnd, color=self.COLOR_PREVIEW, label="● PREVIEW")
+        self.root.after(duration_ms, self._end_preview)
+
+    def _end_preview(self):
+        if self._active and self._color == self.COLOR_PREVIEW:
+            self.stop()
+
+    # ── internals ─────────────────────────────────────────────────────────────
+
+    def _ensure_win(self):
+        if self._win:
+            return
+        win = tk.Toplevel(self.root)
+        win.overrideredirect(True)
+        win.attributes("-topmost", True)
+        win.attributes("-transparentcolor", self.TRANSPARENT)
+        win.configure(bg=self.TRANSPARENT)
+        win.withdraw()
+
+        canvas = tk.Canvas(win, bg=self.TRANSPARENT, highlightthickness=0)
+        canvas.pack(fill="both", expand=True)
+
+        # Make the entire overlay click-through on Windows via WS_EX_TRANSPARENT
+        if sys.platform == "win32":
+            win.update_idletasks()
+            try:
+                inner = int(win.winfo_id())
+                # GA_ROOT=2: walk up to the actual top-level HWND
+                GA_ROOT = 2
+                outer = ctypes.windll.user32.GetAncestor(inner, GA_ROOT)
+                target = outer if outer else inner
+                GWL_EXSTYLE    = -20
+                WS_EX_LAYERED  = 0x00080000
+                WS_EX_TRANSPARENT = 0x00000020
+                style = ctypes.windll.user32.GetWindowLongW(target, GWL_EXSTYLE)
+                ctypes.windll.user32.SetWindowLongW(
+                    target, GWL_EXSTYLE,
+                    style | WS_EX_LAYERED | WS_EX_TRANSPARENT,
+                )
+            except Exception:
+                pass
+
+        self._win    = win
+        self._canvas = canvas
+
+    def _schedule_poll(self):
+        if not self._active:
+            return
+        self._poll_job = self.root.after(self.POLL_MS, self._tick)
+
+    def _tick(self):
+        if not self._active or not self._win:
+            return
+        rect = _get_window_rect(self._hwnd) if self._hwnd else None
+        B = self.THICKNESS
+
+        if rect:
+            x, y, w, h = rect
+            ox, oy = x - B, y - B
+            ow, oh = w + 2 * B, h + 2 * B
+            geom = (ox, oy, ow, oh)
+
+            if geom != self._last_geom:
+                self._last_geom = geom
+                self._win.geometry(f"{ow}x{oh}+{ox}+{oy}")
+                self._draw(ow, oh)
+
+            if not self._win.winfo_viewable():
+                self._win.deiconify()
+        else:
+            if self._win.winfo_viewable():
+                self._win.withdraw()
+
+        self._schedule_poll()
+
+    def _draw(self, w: int, h: int):
+        c = self._canvas
+        if not c:
+            return
+        c.delete("all")
+        B = self.THICKNESS
+
+        # Full-window rectangle: opaque colored border, transparent interior
+        c.create_rectangle(
+            0, 0, w - 1, h - 1,
+            outline=self._color, width=B * 2,
+            fill=self.TRANSPARENT,
+        )
+
+        # Small label pill anchored to top-left corner of the border
+        lx, ly = B + 6, B + 6
+        lw, lh = 66, 18
+        c.create_rectangle(
+            lx, ly, lx + lw, ly + lh,
+            fill=self.LABEL_BG, outline=self._color, width=1,
+        )
+        c.create_text(
+            lx + lw // 2, ly + lh // 2,
+            text=self._label_text,
+            fill=self._color,
+            font=("Consolas", 8, "bold"),
+            anchor="center",
+        )
+
+
 _FFMPEG_ERROR_PATTERNS: List[Tuple[str, str]] = [
     # (match fragment, human description)
     ("Could not find a valid device",       "capture device not found"),
@@ -1200,6 +1389,10 @@ class ScreenRecorderApp:
         self.auto_retarget_var = tk.BooleanVar(value=True)
         self.pin_target_var = tk.BooleanVar(value=True)
 
+        # Recording border overlay (screen-share-style crop indicator)
+        self._overlay = RecordingBorderOverlay(self.root)
+        self._win_status_label: Optional[tk.Label] = None
+
         # Region / crop state
         self._crop_region: Optional[Tuple[int, int, int, int]] = None
         self._region_var = tk.StringVar(value="Full window / screen")
@@ -1264,14 +1457,31 @@ class ScreenRecorderApp:
             font=(FONT, 8),
         ).pack(anchor="w", padx=8, pady=(0, 4))
         self.window_combo = ttk.Combobox(wbox, textvariable=self.window_var, state="readonly")
-        self.window_combo.pack(fill="x", padx=8, pady=(0, 6))
+        self.window_combo.pack(fill="x", padx=8, pady=(0, 4))
+        self.window_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_win_status())
+
+        # Live window-status indicator row
+        status_row = tk.Frame(wbox, bg=COLORS["card"])
+        status_row.pack(fill="x", padx=8, pady=(0, 4))
+        self._win_status_label = tk.Label(
+            status_row, text="",
+            bg=COLORS["card"], fg=COLORS["muted"],
+            font=("Consolas", 8), anchor="w",
+        )
+        self._win_status_label.pack(side="left", fill="x", expand=True)
+
         btn_row_w = tk.Frame(wbox, bg=COLORS["card"])
         btn_row_w.pack(anchor="w", padx=8, pady=(0, 8))
         tk.Button(btn_row_w, text="Refresh Windows", command=self._refresh_windows,
                   bg=COLORS["btn"], fg=COLORS["text"], relief="flat").pack(side="left")
+        tk.Button(
+            btn_row_w, text="Preview Target",
+            command=self._preview_target,
+            bg=COLORS["btn_hi"], fg=COLORS["text"], relief="flat",
+        ).pack(side="left", padx=6)
         tk.Button(btn_row_w, text="Repair FFmpeg",
                   command=self._repair_ffmpeg,
-                  bg=COLORS["btn_acc"], fg=COLORS["text"], relief="flat").pack(side="left", padx=6)
+                  bg=COLORS["btn_acc"], fg=COLORS["text"], relief="flat").pack(side="left")
 
         cfg = tk.LabelFrame(body, text="Recording Options", font=(FONT, 9, "bold"), bg=COLORS["card"], fg=COLORS["text"], bd=1, relief="solid")
         cfg.pack(fill="x", pady=(0, 8))
@@ -1636,6 +1846,7 @@ class ScreenRecorderApp:
         self._consume_target_signal()
         auto_switch = not (self.session and self.session.running)
         self._refresh_windows(auto_select_new=auto_switch, log=False)
+        self._update_win_status()
         if self._pending_target_prefix:
             matched = self._select_window_by_prefix(self._pending_target_prefix)
             if matched:
@@ -1650,6 +1861,42 @@ class ScreenRecorderApp:
                 self._pending_target_prefix = ""
                 self._pending_target_deadline = 0.0
         self._window_watch_job = self.root.after(WINDOW_WATCH_MS, self._window_watch_tick)
+
+    # ── Window status indicator + preview ─────────────────────────────────────
+
+    def _update_win_status(self):
+        """Refresh the live window-status label below the combo."""
+        if not self._win_status_label:
+            return
+        title = self._clean_selected_title()
+        if not title or "no CITL windows open" in title.lower():
+            self._win_status_label.config(text="", fg=COLORS["muted"])
+            return
+        hwnd = self._resolve_hwnd_for_title(title)
+        if hwnd and _is_valid_hwnd(hwnd):
+            rect = _get_window_rect(hwnd)
+            dim = f"  {rect[2]}×{rect[3]}" if rect else ""
+            self._win_status_label.config(
+                text=f"● HWND {hwnd}{dim}  —  window accessible",
+                fg=COLORS["ok"],
+            )
+        else:
+            self._win_status_label.config(
+                text="● window handle not found — click Refresh Windows",
+                fg=COLORS["danger"],
+            )
+
+    def _preview_target(self):
+        """Flash the recording border around the currently selected window for 2.5 s."""
+        if self.session and self.session.running:
+            return  # overlay already showing as REC border
+        title = self._clean_selected_title()
+        hwnd  = self._resolve_hwnd_for_title(title) if title else None
+        if not hwnd or not _is_valid_hwnd(hwnd):
+            self._log("[PREVIEW] Window not found — select a valid target first.\n")
+            return
+        self._log(f"[PREVIEW] Highlighting: {title}\n")
+        self._overlay.preview(hwnd, duration_ms=2500)
 
     # ── Region selection ──────────────────────────────────────────────────────
 
@@ -1821,6 +2068,10 @@ class ScreenRecorderApp:
                 if self.pin_target_var.get() and _set_window_topmost(hwnd, True):
                     self._topmost_hwnd = hwnd
 
+            # Show screen-share-style recording border
+            if sys.platform == "win32" and hwnd and _is_valid_hwnd(hwnd):
+                self._overlay.start(hwnd)
+
             def safe_log(msg: str):
                 self.root.after(0, lambda: self._log(msg))
 
@@ -1898,6 +2149,7 @@ class ScreenRecorderApp:
             self.session.stop()
 
     def _on_recording_done(self, rc: int, path: str):
+        self._overlay.stop()
         self.btn_start.config(state="normal", bg=COLORS["btn_acc"])
         self.btn_stop.config(state="disabled", bg=COLORS["btn"], fg=COLORS["muted"])
         next_title = self._retarget_pending_title.strip()
@@ -2116,6 +2368,7 @@ class ScreenRecorderApp:
                 self.session.stop()
             except Exception:
                 pass
+        self._overlay.stop()
         self._release_topmost()
         self.root.destroy()
 

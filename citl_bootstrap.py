@@ -223,26 +223,72 @@ def _check_ollama_api(host: str, timeout: float = 5.0) -> Tuple[bool, List[str]]
         return False, []
 
 
+def _find_ollama_exe() -> Optional[str]:
+    exe = shutil.which("ollama") or shutil.which("ollama.exe")
+    if exe:
+        return exe
+    if platform.system() == "Windows":
+        lappdata = os.environ.get("LOCALAPPDATA", "")
+        username  = os.environ.get("USERNAME", "")
+        for p in [
+            Path(lappdata) / "Programs" / "Ollama" / "ollama.exe",
+            Path(lappdata) / "Ollama" / "ollama.exe",
+            Path("C:/Users") / username / "AppData/Local/Programs/Ollama/ollama.exe",
+            Path("C:/Program Files/Ollama/ollama.exe"),
+            Path("C:/Program Files (x86)/Ollama/ollama.exe"),
+        ]:
+            try:
+                if p.exists():
+                    return str(p)
+            except Exception:
+                pass
+    return None
+
+
+def _kill_hung_ollama() -> None:
+    if platform.system() != "Windows":
+        return
+    try:
+        r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq ollama.exe", "/FO", "CSV", "/NH"],
+                           capture_output=True, text=True, timeout=5)
+        if "ollama.exe" in r.stdout:
+            _inf("Killing existing ollama.exe for clean restart…")
+            subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"],
+                           capture_output=True, timeout=5)
+            time.sleep(1)
+    except Exception:
+        pass
+
+
 def _start_ollama_bg() -> bool:
-    _inf("Starting Ollama in background…")
+    exe = _find_ollama_exe()
+    if not exe:
+        _err("ollama executable not found. Install from https://ollama.com/download/windows")
+        _err("  or run: winget install Ollama.Ollama")
+        return False
+    _inf(f"Starting Ollama in background: {exe}")
+    _kill_hung_ollama()
     try:
         if platform.system() == "Windows":
-            subprocess.Popen(["ollama", "serve"],
-                             creationflags=subprocess.CREATE_NEW_CONSOLE)
+            CREATE_NO_WINDOW = 0x08000000
+            DETACHED_PROCESS  = 0x00000008
+            subprocess.Popen(
+                [exe, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS,
+            )
         else:
-            subprocess.Popen(["ollama", "serve"],
+            subprocess.Popen([exe, "serve"],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # Wait up to 12s for it to come up
-        for _ in range(12):
+        for i in range(45):
             time.sleep(1)
             up, _ = _check_ollama_api(_ollama_host(), timeout=2)
             if up:
-                _ok("Ollama started")
+                _ok(f"Ollama started after {i+1}s")
                 return True
-        _err("Ollama did not respond within 12 seconds")
-        return False
-    except FileNotFoundError:
-        _err("'ollama' not found on PATH. Install from https://ollama.com/download")
+        _err("Ollama launched but did not respond within 45 seconds.")
+        _err("Open a terminal and run  ollama serve  to see error output.")
         return False
     except Exception as e:
         _err(f"Could not start Ollama: {e}")

@@ -204,6 +204,7 @@ class FlexTroubleshooterApp(tk.Tk):
         self.minsize(820, 580)
 
         self._apply_theme(self._palette_name)
+        self._build_health_bar()
 
         nb = ttk.Notebook(self)
         nb.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
@@ -216,6 +217,7 @@ class FlexTroubleshooterApp(tk.Tk):
         self._build_models_tab(nb)
         self._build_settings_tab(nb)
         self._build_heal_tab(nb)
+        self._build_usb_deploy_tab(nb)
 
         self._statusbar = tk.Label(self, text="Ready — FLEX corpus loaded.",
                                    anchor=tk.W, padx=6, pady=2,
@@ -252,6 +254,108 @@ class FlexTroubleshooterApp(tk.Tk):
     def _status(self, msg: str):
         try:
             self._statusbar.configure(text=msg)
+        except Exception:
+            pass
+
+    # ── Health bar ───────────────────────────────────────────────────────────
+    def _build_health_bar(self) -> None:
+        BG = "#091820"; DIM = "#4a7a8a"; MID = "#80bcbf"; SEP = "#15303a"
+        bar = tk.Frame(self, bg=BG, height=36)
+        bar.pack(fill="x", padx=0, pady=0)
+        bar.pack_propagate(False)
+
+        tk.Label(bar, text="  SYSTEM STATUS", fg="#00C8A8", bg=BG,
+                 font=("Segoe UI", 8, "bold")).pack(side="left", padx=(8, 4))
+
+        def _sep():
+            tk.Frame(bar, bg=SEP, width=1, height=22).pack(side="left", padx=6)
+
+        def _indicator(label: str):
+            dot = tk.Label(bar, text="●", fg=DIM, bg=BG, font=("Segoe UI", 10))
+            dot.pack(side="left", padx=(0, 2))
+            tk.Label(bar, text=label, fg=MID, bg=BG,
+                     font=("Segoe UI", 8)).pack(side="left", padx=(0, 4))
+            return dot
+
+        self._hb_dot_ollama = _indicator("Ollama")
+        _sep()
+        self._hb_dot_model  = _indicator("LLM")
+        _sep()
+        self._hb_dot_index  = _indicator("Index")
+        _sep()
+        self._hb_dot_net    = _indicator("Network")
+
+        self._hb_ts = tk.Label(bar, text="", fg=DIM, bg=BG, font=("Consolas", 7))
+        self._hb_ts.pack(side="right", padx=(0, 8))
+
+        tk.Button(
+            bar, text="↻", fg="#00C8A8", bg=BG, relief="flat",
+            activebackground="#0A2030", activeforeground="#00E5C8",
+            font=("Segoe UI", 10), cursor="hand2",
+            command=lambda: threading.Thread(
+                target=lambda: self._health_bar_poll(force=True),
+                daemon=True).start(),
+        ).pack(side="right", padx=4)
+
+        self.after(1500, self._health_bar_poll)
+
+    def _health_bar_poll(self, force: bool = False) -> None:
+        def _check():
+            GREEN = "#00e676"; AMBER = "#ffb300"; RED = "#ff5252"
+            state: dict = {}
+
+            # Ollama
+            try:
+                s = socket.create_connection(("127.0.0.1", 11434), timeout=2)
+                s.close()
+                state["ollama"] = GREEN
+                ollama_ok = True
+            except OSError:
+                state["ollama"] = RED
+                ollama_ok = False
+
+            # LLM model
+            if ollama_ok:
+                try:
+                    models = _list_models(self._host)
+                    state["model"] = GREEN if models else AMBER
+                except Exception:
+                    state["model"] = AMBER
+            else:
+                state["model"] = RED
+
+            # FLEX Index
+            state["index"] = (
+                GREEN if CORPUS.exists() and CORPUS.stat().st_size > 1024 else AMBER
+            )
+
+            # Network
+            try:
+                socket.create_connection(("8.8.8.8", 53), timeout=2).close()
+                state["net"] = GREEN
+            except OSError:
+                state["net"] = AMBER
+
+            state["ts"] = datetime.now().strftime("%H:%M:%S")
+            self.after(0, lambda s=state: self._health_bar_apply(s))
+            if not force:
+                self.after(12_000, self._health_bar_poll)
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _health_bar_apply(self, state: dict) -> None:
+        for key, attr in (
+            ("ollama", "_hb_dot_ollama"),
+            ("model",  "_hb_dot_model"),
+            ("index",  "_hb_dot_index"),
+            ("net",    "_hb_dot_net"),
+        ):
+            try:
+                getattr(self, attr).configure(fg=state.get(key, "#888"))
+            except Exception:
+                pass
+        try:
+            self._hb_ts.configure(text=f"updated {state.get('ts', '')}")
         except Exception:
             pass
 
@@ -982,6 +1086,16 @@ class FlexTroubleshooterApp(tk.Tk):
         del_lf = self._lf(left, "Delete Selected")
         self._btn(del_lf, "Delete Model", self._do_delete_model).pack(fill=tk.X)
 
+        allen_lf = self._lf(left, "AllenAI Quick Install")
+        self._btn(allen_lf, "OLMo2 7B  (LLM)",
+                  lambda: self._pull_allenai("olmo2:7b")).pack(fill=tk.X, pady=1)
+        self._btn(allen_lf, "OLMo2 1B  (Fast LLM)",
+                  lambda: self._pull_allenai("olmo2:1b")).pack(fill=tk.X, pady=1)
+        self._btn(allen_lf, "Molmo 7B-D  (Vision)",
+                  lambda: self._pull_allenai("molmo7b-d-0924")).pack(fill=tk.X, pady=1)
+        self._btn(allen_lf, "Molmo 7B-O  (Vision)",
+                  lambda: self._pull_allenai("molmo7b-o-0924")).pack(fill=tk.X, pady=1)
+
         # Right: Modelfile editor
         right = ttk.Frame(f)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=4)
@@ -1050,6 +1164,24 @@ class FlexTroubleshooterApp(tk.Tk):
                 self.after(0, lambda: (
                     self._log(self._mdl_log, f"Deleted {name}\n", "ok"),
                     self._refresh_models_tab()
+                ))
+            except Exception as e:
+                self.after(0, lambda e=e: self._log(self._mdl_log, f"ERROR: {e}\n", "err"))
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _pull_allenai(self, model_tag: str) -> None:
+        self._log(self._mdl_log, f"Pulling AllenAI {model_tag} — this may take 10-30 min…\n", "head")
+        def _run():
+            try:
+                r = subprocess.run(
+                    ["ollama", "pull", model_tag],
+                    capture_output=True, text=True, timeout=7200)
+                out = (r.stdout or r.stderr or "")[:800]
+                tag = "ok" if r.returncode == 0 else "err"
+                self.after(0, lambda: (
+                    self._log(self._mdl_log, out + "\n", tag),
+                    self._refresh_models_tab(),
+                    self._health_bar_poll(force=True),
                 ))
             except Exception as e:
                 self.after(0, lambda e=e: self._log(self._mdl_log, f"ERROR: {e}\n", "err"))
@@ -1322,6 +1454,490 @@ class FlexTroubleshooterApp(tk.Tk):
                       text=f"Heal panel unavailable: {e}",
                       wraplength=500, justify="left").pack(padx=20, pady=20)
 
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TAB 8 — USB Reimager Deploy
+    # ─────────────────────────────────────────────────────────────────────────
+    def _build_usb_deploy_tab(self, nb):
+        f = ttk.Frame(nb, padding=4)
+        nb.add(f, text=" USB Reimager ")
+
+        top = self._lf(f, "CITL Reimager USB Deploy")
+        ttk.Label(top,
+                  text="Detect connected ExFAT drives and push the CITL Reimager toolkit to them.",
+                  wraplength=700, justify="left").pack(anchor=tk.W, pady=(0, 4))
+
+        btn_row = ttk.Frame(top)
+        btn_row.pack(fill=tk.X, pady=2)
+        self._btn(btn_row, "Scan for ExFAT Drives",
+                  self._usb_scan_drives).pack(side=tk.LEFT, padx=(0, 4))
+        self._btn(btn_row, "Deploy to Selected Drive",
+                  self._usb_deploy_selected).pack(side=tk.LEFT, padx=4)
+        self._btn(btn_row, "Fix USB GRUB Config",
+                  self._usb_fix_grub).pack(side=tk.LEFT, padx=4)
+        self._btn(btn_row, "Open Reimager Scripts",
+                  self._usb_open_scripts).pack(side=tk.RIGHT)
+
+        # Drive list
+        drives_lf = self._lf(f, "Detected ExFAT Drives")
+        col_frame = ttk.Frame(drives_lf)
+        col_frame.pack(fill=tk.BOTH, expand=True)
+        self._usb_listbox = tk.Listbox(col_frame, height=6,
+                                        bg=self._p["entry_bg"],
+                                        fg=self._p["entry_fg"],
+                                        selectbackground=self._p["select_bg"],
+                                        font=("Consolas", 9))
+        sb_usb = ttk.Scrollbar(col_frame, command=self._usb_listbox.yview)
+        self._usb_listbox.configure(yscrollcommand=sb_usb.set)
+        sb_usb.pack(side=tk.RIGHT, fill=tk.Y)
+        self._usb_listbox.pack(fill=tk.BOTH, expand=True)
+
+        # Profile selector
+        prof_lf = self._lf(f, "Reimager Profile (written to USB)")
+        self._usb_profile = tk.StringVar(value="standard")
+        for val, lbl in (("lean",     "Lean — Ubuntu minimal + phi3:mini  (16 GB+)"),
+                          ("standard", "Standard — Ubuntu + mistral:7b + Factbook  (64 GB+)"),
+                          ("full",     "Full — Standard + OLMo2 + Molmo vision  (128 GB+)")):
+            ttk.Radiobutton(prof_lf, text=lbl,
+                             variable=self._usb_profile, value=val).pack(anchor=tk.W)
+
+        # GRUB fix section
+        grub_lf = self._lf(f, "GRUB Repair  (fix 'grub>' shell on boot)")
+        ttk.Label(grub_lf,
+                  text="If your CITL USB boots to a GRUB shell instead of the menu,\n"
+                       "select the USB device below and click 'Fix USB GRUB Config'.",
+                  font=("Consolas", 8), justify="left").pack(anchor=tk.W)
+        grub_row = ttk.Frame(grub_lf)
+        grub_row.pack(fill=tk.X, pady=4)
+        ttk.Label(grub_row, text="USB device:").pack(side=tk.LEFT, padx=(0, 4))
+        self._grub_dev = ttk.Entry(grub_row, width=16)
+        self._grub_dev.insert(0, "/dev/sdb")
+        self._grub_dev.pack(side=tk.LEFT, padx=4)
+        ttk.Label(grub_row,
+                  text="(run as root — requires grub-install on host)",
+                  font=("Consolas", 7)).pack(side=tk.LEFT, padx=8)
+
+        # Log output
+        log_lf = self._lf(f, "Output", expand=True)
+        self._usb_log = self._scrolled_text(log_lf, height=6)
+        self._usb_log.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+
+        # ── Fleet Sync ───────────────────────────────────────────────────────
+        fleet_lf = self._lf(f, "Fleet Update  —  Push to All Connected USB Drives")
+        ttk.Label(fleet_lf,
+                  text="Select source (the USB with updated CITL Reimager), "
+                       "scan targets, then sync all at once.",
+                  wraplength=700, justify="left").pack(anchor=tk.W, pady=(0, 4))
+
+        src_row = ttk.Frame(fleet_lf)
+        src_row.pack(fill=tk.X, pady=2)
+        ttk.Label(src_row, text="Source USB device:").pack(side=tk.LEFT, padx=(0, 4))
+        self._fleet_src = ttk.Entry(src_row, width=14)
+        self._fleet_src.insert(0, "/dev/sdb")
+        self._fleet_src.pack(side=tk.LEFT, padx=4)
+        ttk.Label(src_row,
+                  text="(leave blank to auto-detect)", font=("Consolas", 7)
+                  ).pack(side=tk.LEFT, padx=4)
+
+        fleet_btn_row = ttk.Frame(fleet_lf)
+        fleet_btn_row.pack(fill=tk.X, pady=2)
+        self._btn(fleet_btn_row, "Scan Fleet Drives",
+                  self._fleet_scan).pack(side=tk.LEFT, padx=(0, 4))
+        self._btn(fleet_btn_row, "Sync All Fleet Drives",
+                  self._fleet_sync_all).pack(side=tk.LEFT, padx=4)
+        self._btn(fleet_btn_row, "Dry Run (preview only)",
+                  lambda: self._fleet_sync_all(dry_run=True)).pack(side=tk.LEFT, padx=4)
+
+        fleet_drives_lf = self._lf(fleet_lf, "Detected Target Drives")
+        self._fleet_listbox = tk.Listbox(fleet_drives_lf, height=5, selectmode=tk.MULTIPLE,
+                                          bg=self._p["entry_bg"], fg=self._p["entry_fg"],
+                                          selectbackground=self._p["select_bg"],
+                                          font=("Consolas", 9))
+        fleet_sb = ttk.Scrollbar(fleet_drives_lf, command=self._fleet_listbox.yview)
+        self._fleet_listbox.configure(yscrollcommand=fleet_sb.set)
+        fleet_sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self._fleet_listbox.pack(fill=tk.BOTH, expand=True)
+
+        self._usb_scan_drives()
+
+    def _usb_script_path(self) -> str:
+        here = Path(__file__).resolve().parent
+        for candidate in (
+            here.parent / "CITL-Cannakit" / "reimager",
+            here / "reimager",
+            Path("CITL-Cannakit") / "reimager",
+        ):
+            if candidate.exists():
+                return str(candidate)
+        return str(here.parent / "CITL-Cannakit" / "reimager")
+
+    def _usb_scan_drives(self):
+        self._usb_listbox.delete(0, tk.END)
+        self._log(self._usb_log, "Scanning for ExFAT drives…\n", "head")
+
+        def _run():
+            drives = []
+            if platform.system() == "Windows":
+                try:
+                    out = subprocess.check_output(
+                        ["powershell", "-NoProfile", "-Command",
+                         "Get-Volume | Where-Object {$_.FileSystemType -eq 'ExFAT'} | "
+                         "Select-Object DriveLetter,Size,FileSystemLabel | "
+                         "ConvertTo-Csv -NoTypeInformation"],
+                        text=True, timeout=15)
+                    for line in out.strip().splitlines()[1:]:
+                        parts = [p.strip('"') for p in line.split(",")]
+                        if parts and parts[0]:
+                            letter, size_b, label = parts[0], parts[1], parts[2]
+                            size_gb = int(size_b) // (1024 ** 3) if size_b.isdigit() else "?"
+                            drives.append(f"{letter}:\\  [{label or 'unlabelled'}  {size_gb} GB]")
+                except Exception as e:
+                    drives.append(f"ERROR: {e}")
+            else:
+                deploy_sh = Path(self._usb_script_path()) / "deploy_reimager_to_usb.sh"
+                if deploy_sh.exists():
+                    try:
+                        out = subprocess.check_output(
+                            ["bash", str(deploy_sh), "--list-only"],
+                            text=True, timeout=10)
+                        for line in out.strip().splitlines():
+                            if line.startswith("DRIVE:"):
+                                drives.append(line[6:].replace("|", "  "))
+                            elif line == "NO_EXFAT_DRIVES":
+                                drives.append("No ExFAT drives detected")
+                    except Exception as e:
+                        drives.append(f"ERROR: {e}")
+                else:
+                    try:
+                        out = subprocess.check_output(
+                            ["lsblk", "-rno", "PATH,FSTYPE,LABEL,SIZE"],
+                            text=True, timeout=5)
+                        for line in out.splitlines():
+                            cols = line.split()
+                            if len(cols) >= 2 and cols[1] == "exfat":
+                                label = cols[2] if len(cols) > 2 else "unlabelled"
+                                size  = cols[3] if len(cols) > 3 else "?"
+                                drives.append(f"{cols[0]}  [{label}  {size}]")
+                    except Exception as e:
+                        drives.append(f"ERROR: {e}")
+
+            def _update():
+                self._usb_listbox.delete(0, tk.END)
+                if not drives:
+                    self._log(self._usb_log, "No ExFAT drives found.\n", "warn")
+                    self._usb_listbox.insert(tk.END, "  No ExFAT drives detected")
+                else:
+                    for d in drives:
+                        self._usb_listbox.insert(tk.END, f"  {d}")
+                    self._log(self._usb_log,
+                              f"Found {len(drives)} ExFAT drive(s).\n", "ok")
+            self.after(0, _update)
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _usb_deploy_selected(self):
+        sel = self._usb_listbox.curselection()
+        if not sel:
+            messagebox.showwarning("Select Drive", "Select an ExFAT drive from the list first.")
+            return
+        entry = self._usb_listbox.get(sel[0]).strip()
+        profile = self._usb_profile.get()
+
+        # Extract device/path from the listbox entry
+        dev_or_path = entry.split()[0] if entry else ""
+        if not dev_or_path or "No ExFAT" in entry:
+            messagebox.showwarning("No Drive", "No valid drive selected.")
+            return
+
+        if not messagebox.askyesno(
+                "Confirm Deploy",
+                f"Deploy CITL Reimager ({profile}) to:\n  {dev_or_path}\n\nThis will write files to that drive."):
+            return
+
+        self._log(self._usb_log,
+                  f"Deploying CITL Reimager ({profile}) → {dev_or_path}…\n", "head")
+
+        def _run():
+            script_dir = self._usb_script_path()
+            deploy_sh = str(Path(script_dir) / "deploy_reimager_to_usb.sh")
+
+            try:
+                if platform.system() == "Windows":
+                    # Windows: use robocopy to copy script dir to ExFAT drive
+                    dest = f"{dev_or_path}citl_reimager"
+                    cmd = ["robocopy", script_dir, dest,
+                           "/E", "/R:2", "/W:1", "/NFL", "/NDL", "/NJH"]
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                    # robocopy exits 1 on success (files copied)
+                    ok = r.returncode in (0, 1, 2, 3)
+                    out = r.stdout[:800] if ok else (r.stderr or r.stdout)[:800]
+                    tag = "ok" if ok else "err"
+                    result = f"DEPLOYED:{dest}" if ok else f"FAILED:{r.returncode}"
+                else:
+                    # Linux: use deploy script with sudo
+                    if dev_or_path.startswith("/dev/"):
+                        args = ["sudo", "bash", deploy_sh,
+                                "--target-dev", dev_or_path, "--quiet"]
+                    else:
+                        args = ["sudo", "bash", deploy_sh,
+                                "--target-mount", dev_or_path, "--quiet"]
+                    r = subprocess.run(args, capture_output=True, text=True, timeout=300)
+                    out = (r.stdout + r.stderr)[:800]
+                    tag = "ok" if r.returncode == 0 else "err"
+                    result = out.strip()
+
+                def _update(o=out, t=tag, res=result):
+                    self._log(self._usb_log, o + "\n", t)
+                    if "DEPLOYED:" in res:
+                        messagebox.showinfo("Deploy Complete",
+                                            f"CITL Reimager deployed successfully!\n\n{res}")
+                    elif "FAILED:" in res:
+                        messagebox.showerror("Deploy Failed", res)
+                self.after(0, _update)
+
+            except Exception as e:
+                self.after(0, lambda e=e: (
+                    self._log(self._usb_log, f"ERROR: {e}\n", "err"),
+                ))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _usb_fix_grub(self):
+        dev = self._grub_dev.get().strip()
+        if not dev:
+            messagebox.showwarning("No Device", "Enter the USB device (e.g. /dev/sdb).")
+            return
+        if platform.system() == "Windows":
+            messagebox.showinfo("Windows", "GRUB repair must run on the Ubuntu mainframe.\n"
+                                           "Run: sudo bash fix_usb_grub.sh /dev/sdb")
+            return
+
+        script_dir = self._usb_script_path()
+        fix_sh = str(Path(script_dir) / "fix_usb_grub.sh")
+        if not Path(fix_sh).exists():
+            messagebox.showerror("Script Missing",
+                                  f"fix_usb_grub.sh not found in {script_dir}")
+            return
+
+        self._log(self._usb_log, f"Running GRUB repair on {dev}…\n", "head")
+
+        def _run():
+            r = subprocess.run(
+                ["sudo", "bash", fix_sh, dev],
+                capture_output=True, text=True, timeout=120)
+            out = (r.stdout + r.stderr)[:1200]
+            tag = "ok" if r.returncode == 0 else "err"
+            self.after(0, lambda: self._log(self._usb_log, out + "\n", tag))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _usb_open_scripts(self):
+        script_dir = self._usb_script_path()
+        opened = False
+        try:
+            if platform.system() == "Windows":
+                subprocess.Popen(["explorer", script_dir])
+                opened = True
+            else:
+                for opener in ("xdg-open", "nautilus", "thunar", "dolphin", "pcmanfm"):
+                    if shutil.which(opener):
+                        subprocess.Popen([opener, script_dir])
+                        opened = True
+                        break
+        except Exception as e:
+            self._log(self._usb_log, f"Cannot open folder: {e}\n", "warn")
+        if not opened:
+            self._log(self._usb_log, f"Scripts at: {script_dir}\n", "dim")
+
+    # ── Fleet scan ────────────────────────────────────────────────────────────
+    def _fleet_scan(self):
+        self._fleet_listbox.delete(0, tk.END)
+        self._log(self._usb_log, "Scanning for fleet target drives…\n", "head")
+        src_dev = self._fleet_src.get().strip()
+
+        def _run():
+            drives = []
+            script_dir = self._usb_script_path()
+            fleet_sh = str(Path(script_dir) / "fleet_sync_usb.sh")
+
+            if platform.system() != "Windows" and Path(fleet_sh).exists():
+                try:
+                    out = subprocess.check_output(
+                        ["bash", fleet_sh, "--list"],
+                        text=True, timeout=15)
+                    for line in out.strip().splitlines():
+                        if line.startswith("DRIVE:"):
+                            # DRIVE:path|label|size|mnt|fstype|tran
+                            parts = line[6:].split("|")
+                            dev_path = parts[0] if len(parts) > 0 else "?"
+                            label    = parts[1] if len(parts) > 1 else ""
+                            size     = parts[2] if len(parts) > 2 else ""
+                            mnt      = parts[3] if len(parts) > 3 else "unmounted"
+                            # Skip source device
+                            if src_dev and dev_path.startswith(src_dev):
+                                continue
+                            drives.append(
+                                f"{dev_path}  [{label or 'unlabelled'}  {size}  {mnt}]"
+                            )
+                        elif line == "NO_DRIVES":
+                            drives.append("No ExFAT drives detected")
+                except Exception as e:
+                    drives.append(f"ERROR: {e}")
+            elif platform.system() == "Windows":
+                try:
+                    out = subprocess.check_output(
+                        ["powershell", "-NoProfile", "-Command",
+                         "Get-Volume | Where-Object {$_.FileSystemType -eq 'ExFAT'} | "
+                         "Select-Object DriveLetter,Size,FileSystemLabel | "
+                         "ConvertTo-Csv -NoTypeInformation"],
+                        text=True, timeout=15)
+                    for line in out.strip().splitlines()[1:]:
+                        cols = [c.strip('"') for c in line.split(",")]
+                        if cols and cols[0]:
+                            letter = cols[0] + ":\\"
+                            size_gb = (int(cols[1]) // (1024**3)
+                                       if cols[1].isdigit() else "?")
+                            label = cols[2] if len(cols) > 2 else ""
+                            drives.append(f"{letter}  [{label}  {size_gb} GB]")
+                except Exception as e:
+                    drives.append(f"ERROR: {e}")
+            else:
+                drives.append("fleet_sync_usb.sh not found — scan unavailable")
+
+            def _update():
+                self._fleet_listbox.delete(0, tk.END)
+                if not drives:
+                    self._fleet_listbox.insert(tk.END, "  No target ExFAT drives found")
+                    self._log(self._usb_log, "No target fleet drives found.\n", "warn")
+                else:
+                    for d in drives:
+                        self._fleet_listbox.insert(tk.END, f"  {d}")
+                    self._log(self._usb_log,
+                              f"Fleet scan: {len(drives)} potential target(s).\n", "ok")
+            self.after(0, _update)
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    # ── Fleet sync ────────────────────────────────────────────────────────────
+    def _fleet_sync_all(self, dry_run: bool = False):
+        src_dev = self._fleet_src.get().strip()
+        selected = self._fleet_listbox.curselection()
+
+        # Build target list from selection or all items
+        items = (
+            [self._fleet_listbox.get(i) for i in selected]
+            if selected else
+            [self._fleet_listbox.get(i) for i in range(self._fleet_listbox.size())]
+        )
+        targets = [
+            line.strip().split()[0]
+            for line in items
+            if line.strip() and not line.strip().startswith("No ")
+        ]
+
+        if not targets:
+            messagebox.showwarning("No Targets",
+                                   "No fleet drives found.\nRun 'Scan Fleet Drives' first.")
+            return
+
+        mode_txt = "DRY RUN — " if dry_run else ""
+        if not messagebox.askyesno(
+                "Confirm Fleet Sync",
+                f"{mode_txt}Sync CITL Reimager to {len(targets)} drive(s)?\n\n"
+                + "\n".join(f"  • {t}" for t in targets[:8])
+                + (f"\n  ...and {len(targets)-8} more" if len(targets) > 8 else "")):
+            return
+
+        self._log(self._usb_log,
+                  f"{mode_txt}Starting fleet sync → {len(targets)} drive(s)…\n", "head")
+
+        def _run():
+            script_dir = self._usb_script_path()
+            fleet_sh = str(Path(script_dir) / "fleet_sync_usb.sh")
+
+            if platform.system() == "Windows":
+                # Windows fleet sync: robocopy to each drive letter
+                ok = 0; fail = 0
+                for tgt in targets:
+                    drive_letter = tgt.rstrip("\\").rstrip("/")
+                    dest = os.path.join(drive_letter, "citl_reimager")
+                    self.after(0, lambda t=tgt: self._log(
+                        self._usb_log, f"  → {t}…\n", "dim"))
+                    if dry_run:
+                        self.after(0, lambda t=tgt: self._log(
+                            self._usb_log, f"    DRY RUN: would copy {script_dir} → {dest}\n", "ok"))
+                        ok += 1
+                        continue
+                    try:
+                        r = subprocess.run(
+                            ["robocopy", script_dir, dest,
+                             "/E", "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS"],
+                            capture_output=True, text=True, timeout=300)
+                        if r.returncode in (0, 1, 2, 3):
+                            ok += 1
+                            self.after(0, lambda t=tgt: self._log(
+                                self._usb_log, f"    DONE: {t}\n", "ok"))
+                        else:
+                            fail += 1
+                            self.after(0, lambda t=tgt, rc=r.returncode: self._log(
+                                self._usb_log, f"    FAILED: {t}  (rc={rc})\n", "err"))
+                    except Exception as e:
+                        fail += 1
+                        self.after(0, lambda t=tgt, e=e: self._log(
+                            self._usb_log, f"    ERROR {t}: {e}\n", "err"))
+                self.after(0, lambda: self._log(
+                    self._usb_log,
+                    f"\nFleet sync complete: {ok} OK, {fail} failed.\n",
+                    "ok" if fail == 0 else "err"))
+                return
+
+            # Linux: stream fleet_sync_usb.sh output line by line for live progress
+            if not Path(fleet_sh).exists():
+                self.after(0, lambda: self._log(
+                    self._usb_log, "fleet_sync_usb.sh not found.\n", "err"))
+                return
+
+            args = ["sudo", "bash", fleet_sh, "--all"]
+            if src_dev:
+                args += ["--source", src_dev]
+            if dry_run:
+                args += ["--dry-run"]
+            for tgt in targets:
+                args += ["--target", tgt]
+
+            try:
+                proc = subprocess.Popen(
+                    args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1)
+
+                for line in iter(proc.stdout.readline, ""):
+                    line = line.rstrip()
+                    if not line:
+                        continue
+                    tag = "dim"
+                    if line.startswith("DONE:"):
+                        tag = "ok"
+                    elif line.startswith("FAILED:"):
+                        tag = "err"
+                    elif line.startswith("PROGRESS:"):
+                        tag = "dim"
+                    elif line.startswith("FLEET_DONE:"):
+                        tag = "ok"
+                    self.after(0, lambda l=line, t=tag: self._log(
+                        self._usb_log, l + "\n", t))
+
+                proc.wait(timeout=600)
+                rc = proc.returncode
+                self.after(0, lambda: self._log(
+                    self._usb_log,
+                    f"\nFleet sync finished (exit {rc}).\n",
+                    "ok" if rc == 0 else "err"))
+
+            except Exception as e:
+                self.after(0, lambda e=e: self._log(
+                    self._usb_log, f"Fleet sync error: {e}\n", "err"))
+
+        threading.Thread(target=_run, daemon=True).start()
 
 # ── Common port names ─────────────────────────────────────────────────────────
 _PORT_NAMES = {

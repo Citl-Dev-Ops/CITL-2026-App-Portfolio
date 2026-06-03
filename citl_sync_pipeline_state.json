@@ -416,10 +416,96 @@
         "status": "skipped_no_target",
         "target": null
       }
+    },
+    {
+      "run_at_utc": "2026-05-13T08:26:02.605576+00:00",
+      "target_mode": "auto",
+      "manual_tag": false,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "K:\\CITL_FACTBOOK_UBUNTU V1",
+        "volume_id": "\\\\?\\Volume{389a17f8-f5eb-11f0-944b-345a60774797}\\",
+        "status": "ok",
+        "stats": {
+          "total_files": 22,
+          "copied": 22,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        }
+      }
+    },
+    {
+      "run_at_utc": "2026-05-14T12:36:54.146620+00:00",
+      "target_mode": "auto",
+      "manual_tag": false,
+      "dry_run": false,
+      "auto_apply": true,
+      "stage1": {
+        "target": "C:\\Users\\Doc_M\\CITL",
+        "patches_created": 0
+      },
+      "stage2": {
+        "target": "F:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+        "volume_id": "\\\\?\\Volume{4adaafdf-1abd-11f1-9452-345a60774797}\\",
+        "status": "ok",
+        "stats": {
+          "total_files": 14,
+          "copied": 14,
+          "failed": 0,
+          "missing": 0,
+          "invalid_rel_paths": 0,
+          "manifest_synced": 1
+        },
+        "additional_targets": [
+          {
+            "target": "F:\\CITL_FACTBOOK_UBUNTU V1",
+            "stats": {
+              "total_files": 14,
+              "copied": 14,
+              "failed": 0,
+              "missing": 0,
+              "invalid_rel_paths": 0,
+              "manifest_synced": 1
+            },
+            "status": "ok"
+          },
+          {
+            "target": "F:\\PORTABLE_APPS\\CITL",
+            "stats": {
+              "total_files": 14,
+              "copied": 14,
+              "failed": 0,
+              "missing": 0,
+              "invalid_rel_paths": 0,
+              "manifest_synced": 1
+            },
+            "status": "ok"
+          },
+          {
+            "target": "F:\\",
+            "stats": {
+              "total_files": 2,
+              "copied": 2,
+              "failed": 0,
+              "missing": 0,
+              "invalid_rel_paths": 0,
+              "manifest_synced": 1
+            },
+            "status": "ok"
+          }
+        ]
+      }
     }
   ],
   "last_run": {
-    "run_at_utc": "2026-05-12T00:49:27.117111+00:00",
+    "run_at_utc": "2026-05-14T12:36:54.146620+00:00",
     "target_mode": "auto",
     "manual_tag": false,
     "dry_run": false,
@@ -429,8 +515,55 @@
       "patches_created": 0
     },
     "stage2": {
-      "status": "skipped_no_target",
-      "target": null
+      "target": "F:\\CITL_FACTBOOK_UBUNTU V1\\PORTABLE_APPS\\CITL",
+      "volume_id": "\\\\?\\Volume{4adaafdf-1abd-11f1-9452-345a60774797}\\",
+      "status": "ok",
+      "stats": {
+        "total_files": 14,
+        "copied": 14,
+        "failed": 0,
+        "missing": 0,
+        "invalid_rel_paths": 0,
+        "manifest_synced": 1
+      },
+      "additional_targets": [
+        {
+          "target": "F:\\CITL_FACTBOOK_UBUNTU V1",
+          "stats": {
+            "total_files": 14,
+            "copied": 14,
+            "failed": 0,
+            "missing": 0,
+            "invalid_rel_paths": 0,
+            "manifest_synced": 1
+          },
+          "status": "ok"
+        },
+        {
+          "target": "F:\\PORTABLE_APPS\\CITL",
+          "stats": {
+            "total_files": 14,
+            "copied": 14,
+            "failed": 0,
+            "missing": 0,
+            "invalid_rel_paths": 0,
+            "manifest_synced": 1
+          },
+          "status": "ok"
+        },
+        {
+          "target": "F:\\",
+          "stats": {
+            "total_files": 2,
+            "copied": 2,
+            "failed": 0,
+            "missing": 0,
+            "invalid_rel_paths": 0,
+            "manifest_synced": 1
+          },
+          "status": "ok"
+        }
+      ]
     }
   }
 }

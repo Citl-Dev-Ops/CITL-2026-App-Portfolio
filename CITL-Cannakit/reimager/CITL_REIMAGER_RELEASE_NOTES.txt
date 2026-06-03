@@ -1,0 +1,297 @@
+================================================================================
+CITL REIMAGER  —  Release Notes & Diagnostic Change Log
+Renton Technical College — Center for Innovative Teaching and Learning
+Release: v2.1  |  Date: 2026-06-03
+================================================================================
+
+PURPOSE OF THIS DOCUMENT
+─────────────────────────
+This document records exactly what problems were observed on the CITL mainframe
+fleet, what caused them, and what each script change does to prevent recurrence.
+Suitable for supervisor work logs, IT change records, and team handoff notes.
+
+================================================================================
+SECTION 1 — OBSERVED FAILURES (from screenshots, 2026-06)
+================================================================================
+
+FAILURE 1: USB DRIVES BOOTING TO GRUB SHELL INSTEAD OF REIMAGER
+────────────────────────────────────────────────────────────────
+Symptom:
+    Machine powered on with CITL USB inserted. Instead of the GRUB menu
+    loading the CITL Reimager, the screen showed:
+
+        GNU GRUB version 2.12
+        grub>_
+
+    This is a bare GRUB command shell — the OS never booted.
+
+Root Cause (technical):
+    The CITL USB (sdb) had a hybrid ISO layout with four partitions:
+        sdb1: FAT32  "CITLBOOT"  5.8G  — Ubuntu live files (casper/)
+        sdb2: FAT12  "ESP"             — EFI System Partition (GRUB EFI binary)
+        sdb3: (empty)
+        sdb4: ExFAT  4857-11B5        — NEW: added for CITL data storage
+
+    When sdb4 (ExFAT) was added to the drive, the partition table changed.
+    The GRUB EFI binary in sdb2 had been compiled with a UUID-based search path
+    (e.g., "search --no-floppy --fs-uuid --set=root ABC1-2345"). That UUID
+    pointed to sdb1 BEFORE the partition table changed.
+
+    After sdb4 was added, GRUB found its EFI binary (sdb2 ESP is still there)
+    but could NOT find grub.cfg because the compiled UUID path no longer matched
+    the actual partition. GRUB drops to a rescue shell when this happens.
+
+    Additionally: the grub-install and update-grub commands run on citl-mainframe2
+    were applied to /dev/sda (the mainframe's internal drive), NOT to the USB.
+    This updated the mainframe's boot — the USB's GRUB was not fixed.
+
+    The iso9660 filesystem showing on the whole sdb device confirms the USB was
+    originally written via "dd if=ubuntu.iso of=/dev/sdb" (hybrid ISO), which
+    creates a filesystem signature across the entire device that persists even
+    after adding GPT partitions.
+
+What Was Done Wrong Previously:
+    - GRUB config used UUID-based search (breaks when partitions change)
+    - grub-install target was the host machine, not the USB
+    - No protection against UUID drift when new partitions are added
+    - No documentation of this failure mode for the team
+
+FAILURE 2: CITL REIMAGER SCRIPTS NOT PRODUCING A BOOTABLE IMAGE
+────────────────────────────────────────────────────────────────
+Symptom:
+    Running the reimager on a target machine produced no bootable result.
+    Ubuntu was not installed on the target drive.
+
+Root Cause (technical):
+    The existing CITL-Desktop/install_citl_tools.sh was designed to install
+    CITL apps onto an ALREADY-RUNNING Ubuntu system. It had no ability to:
+        - Partition a blank target drive
+        - Extract Ubuntu from the live USB squashfs
+        - Install a bootloader (grub-install) on the target
+        - Configure fstab, hostname, user accounts
+
+    Specific code failures found:
+        a) IFS=$'\n\t' in the script broke bash read/awk behavior
+        b) Interactive 'read' prompts ran in subprocess context (no tty),
+           causing them to hang or read garbage input
+        c) partition_drive() mixed interactive prompts with captured stdout,
+           causing variable assignment to fail silently
+        d) grub-install was attempted inside chroot with apt-get — requiring
+           internet access inside the chroot, which didn't exist offline
+        e) lsblk output was parsed by column position; when LABEL was empty,
+           columns shifted and the wrong device paths were extracted
+        f) unsquashfs sometimes put extracted files in squashfs-root/ subdir
+           instead of directly at the mount point — not handled
+        g) NVMe partition naming (/dev/nvme0n1p1 vs /dev/sda1) was handled
+           incorrectly in fix_usb_grub.sh glob patterns
+        h) No ExFAT filesystem support was ensured before mounting
+        i) No fleet sync capability existed — each USB had to be updated manually
+
+FAILURE 3: HOST MACHINE GRUB UPDATED INSTEAD OF USB
+────────────────────────────────────────────────────
+Symptom (screenshot 1):
+    The commands "sudo grub-install --target=x86_64-efi --efi-directory=/boot/efi
+    --bootloader-id=ubuntu" and "sudo update-grub" completed successfully but
+    the USB still booted to GRUB shell.
+
+Root Cause:
+    These commands ran against /boot/efi (sda1 — the mainframe's internal EFI
+    partition). The USB's EFI partition (sdb2) was not targeted.
+    The mainframe's GRUB was updated; the USB's GRUB remained broken.
+
+================================================================================
+SECTION 2 — CHANGES MADE (what each file does and why)
+================================================================================
+
+FILE: CITL-Cannakit/reimager/grub.cfg
+──────────────────────────────────────
+Change:  Complete rewrite using label-based search.
+Before:  search --no-floppy --fs-uuid --set=root <UUID>
+After:   search --no-floppy --label --set=root CITLBOOT
+
+Effect:  GRUB now finds its configuration by filesystem LABEL, not UUID.
+         Labels never change when partitions are added or modified.
+         This means adding sdb4 (ExFAT), reformatting sdb4, or repartitioning
+         will NEVER break the USB's ability to boot again.
+
+         The grub.cfg includes five menu entries:
+           1) CITL Reimager — standard boot
+           2) CITL Reimager — CLI only
+           3) CITL Reimager — safe mode (nomodeset, for video compatibility)
+           4) Live Ubuntu (no reimager, for manual troubleshooting)
+           5) Memory Test (memtest86+)
+
+FILE: CITL-Cannakit/reimager/fix_usb_grub.sh
+──────────────────────────────────────────────
+Change:  New script. Repairs GRUB on any CITL USB from the mainframe.
+Command: sudo bash fix_usb_grub.sh /dev/sdb
+
+Effect:  Mounts the USB's ESP (sdb2) and CITLBOOT (sdb1) partitions,
+         runs grub-install with --removable --no-nvram (targets the USB,
+         does NOT touch the host machine's EFI or NVRAM), and writes the
+         label-based grub.cfg to both the ESP and CITLBOOT partition.
+
+         --removable: writes EFI binary to EFI/BOOT/BOOTX64.EFI — the
+         fallback path that every UEFI firmware uses when no specific entry
+         exists in the boot order. Ensures USB boots on any machine.
+         --no-nvram: does NOT add an entry to the host machine's boot order.
+
+         Fixes NVMe partition naming (/dev/nvme0n1p1 format) via lsblk JSON
+         instead of shell globs.
+
+FILE: CITL-Cannakit/reimager/preflight_check.sh
+─────────────────────────────────────────────────
+Change:  New script. Must be run first at Ubuntu live boot.
+Command: sudo bash preflight_check.sh [--fix]
+
+Effect:  Checks all 12 tools required for imaging:
+           sgdisk, mkfs.fat, mkfs.ext4, blkid, wipefs, partprobe,
+           grub-install, lsblk, findmnt, rsync, unsquashfs, ExFAT mount
+         With --fix: attempts apt-get install for anything missing.
+         Machine-readable output (PASS:/FAIL:/WARN: lines) for GUI parsing.
+
+FILE: CITL-Cannakit/reimager/citl_reimager.sh  (v2.1)
+───────────────────────────────────────────────────────
+Change:  Complete rewrite. Addresses all 9 code failures listed above.
+
+Bug fixes applied:
+  - Removed IFS=$'\n\t' (was breaking read, awk, arrays)
+  - All interactive prompts now use </dev/tty (safe in GUI subprocess calls)
+  - partition_drive() uses global vars EFI_PART/ROOT_PART (not captured stdout)
+  - grub-install runs from HOST, not chroot — no internet or apt needed
+  - lsblk output parsed via lsblk -J JSON + Python3 (no column-shift possible)
+  - squashfs-root/ flattening: detects and corrects unsquashfs subdir behavior
+  - NVMe/mmcblk partition naming handled correctly
+  - ExFAT module loaded (modprobe exfat) before mount attempts
+  - ExFAT package (exfatprogs or exfat-fuse) installed if missing
+  - trap EXIT calls finalise() — temp mounts always cleaned up on crash
+
+Three imaging profiles added:
+  lean     — phi3:mini, 16 GB drive, older hardware
+  standard — mistral:7b-instruct + Factbook + FLEX, 64 GB, CITL classroom
+  full     — standard + OLMo2 7B + Molmo vision, 128 GB, AI workstation
+
+Source priority: USB squashfs (offline) → ExFAT cache (offline) → debootstrap
+
+FILE: CITL-Cannakit/reimager/fleet_sync_usb.sh
+────────────────────────────────────────────────
+Change:  New script. Core fleet management tool.
+Command: sudo bash fleet_sync_usb.sh --source /dev/sdb --all
+
+Effect:  Identifies all connected ExFAT partitions (excluding source USB),
+         deploys the CITL Reimager toolkit to all of them in parallel
+         (up to 4 drives simultaneously by default).
+
+         Machine-readable output for GUI:
+           PROGRESS:device|pct|message
+           DONE:device|SUCCESS
+           FAILED:device|reason
+           FLEET_DONE:N_ok/N_total
+
+         --list flag: enumerates drives without deploying (used by GUI scan)
+         --dry-run flag: shows what would be synced without writing
+         --full-clone flag: copies entire CITLBOOT partition (full USB clone)
+         --parallel N: change concurrency limit
+
+FILE: CITL-Cannakit/reimager/deploy_reimager_to_usb.sh
+────────────────────────────────────────────────────────
+Change:  Existing script. Fixed lsblk column-shift bug.
+Before:  lsblk -rno PATH,FSTYPE,LABEL,MOUNTPOINT,SIZE | awk '$2=="exfat"'
+         (columns shift when LABEL is empty, parsing wrong device paths)
+After:   lsblk -J (JSON) + Python3 parser (fields by name, not position)
+         This cannot fail due to empty labels or missing columns.
+
+FILE: DEPLOY_REIMAGER_TO_USB_WINDOWS.cmd  (NEW — Windows)
+───────────────────────────────────────────────────────────
+Change:  New Windows CMD file. Double-click to deploy from Windows.
+
+Effect:  Uses PowerShell Get-Volume to detect all ExFAT drives.
+         Shows numbered list for selection (or ENTER for all).
+         Uses robocopy (built-in Windows) to copy CITL-Cannakit\reimager\
+         to citl_reimager\ folder on each selected drive.
+         Writes a MANIFEST.txt per drive with timestamp and source.
+
+FILE: REPAIR_CITL_APPS.cmd  (UPDATED — Windows)
+─────────────────────────────────────────────────
+Change:  Added Step 5b between script verification and GUI launch.
+
+Effect:  When ExFAT USB drives are connected, REPAIR_CITL_APPS.cmd now
+         detects them and prompts: "Deploy CITL Reimager to these USB drives? [Y/n]"
+         If Y: calls DEPLOY_REIMAGER_TO_USB_WINDOWS.cmd automatically.
+         If N: skips and proceeds to GUI as before.
+         Non-blocking: if no ExFAT drives detected, this step is skipped silently.
+
+FILE: citl_fixer.py  —  new "USB Reimager" tab
+────────────────────────────────────────────────
+Change:  Added tab between "Portable Fix" and "Full Log".
+
+Features:
+  - Source folder picker (defaults to CITL-Cannakit/reimager/)
+  - ExFAT drive scanner (Windows: PowerShell Get-Volume; Linux: lsblk JSON)
+  - Multi-select target drive list
+  - Deploy button: robocopy (Windows) or rsync (Linux)
+  - Embedded changelog summary showing exactly what each script fixes
+  - Auto-scan on tab open
+
+FILE: citl_flex_troubleshooter/flex_troubleshooter_gui.py  — USB Reimager tab
+───────────────────────────────────────────────────────────────────────────────
+Change:  Added "USB Reimager" tab to FLEX Troubleshooter.
+
+Features:
+  - Individual drive deploy (ExFAT detection + robocopy/rsync)
+  - Fleet Update section: source USB + multi-select targets + Sync All
+  - Real-time progress streaming from fleet_sync_usb.sh
+  - GRUB Fix button: runs fix_usb_grub.sh on a specified device
+  - Works on both Windows and Ubuntu (platform-aware commands)
+
+================================================================================
+SECTION 3 — HOW TO RECOVER FROM THE GRUB SHELL (immediate fix)
+================================================================================
+
+If a USB boots to the "grub>" prompt, type these commands:
+
+    grub> search --label CITLBOOT
+    (note the device ID shown, e.g. hd1,gpt1)
+
+    grub> set root=(hd1,gpt1)
+    grub> configfile /boot/grub/grub.cfg
+
+This loads the grub.cfg if it exists on the CITLBOOT partition.
+If grub.cfg is missing, deploy via DEPLOY_REIMAGER_TO_USB_WINDOWS.cmd from
+Windows, then re-run fix_usb_grub.sh from the mainframe.
+
+Permanent fix from mainframe:
+    sudo bash CITL-Cannakit/reimager/fix_usb_grub.sh /dev/sdb
+
+================================================================================
+SECTION 4 — FLEET UPDATE PROCEDURE (for distributing to colleagues)
+================================================================================
+
+FROM WINDOWS (CITL APP FIXER):
+    1. Connect all fleet USB drives to the mainframe PC
+    2. Double-click REPAIR_CITL_APPS.cmd
+    3. At the prompt "Deploy CITL Reimager to these USB drives? [Y/n]" → Y
+    4. All ExFAT partitions on connected drives receive the updated reimager
+    OR:
+    1. Double-click DEPLOY_REIMAGER_TO_USB_WINDOWS.cmd directly
+    2. Enter drive numbers (or ENTER for all)
+
+FROM UBUNTU MAINFRAME (CLI):
+    sudo bash CITL-Cannakit/reimager/fleet_sync_usb.sh --all
+
+FROM FLEX TROUBLESHOOTER GUI:
+    USB Reimager tab → Scan Fleet Drives → Sync All Fleet Drives
+
+WHAT EACH COLLEAGUE WILL HAVE ON THEIR USB AFTER UPDATE:
+    <drive>:\citl_reimager\
+        citl_reimager.sh         Boot from USB → image any Ubuntu target
+        fleet_sync_usb.sh        Update other USBs from this one
+        fix_usb_grub.sh          Fix the GRUB shell boot failure
+        preflight_check.sh       Check environment before imaging
+        deploy_reimager_to_usb.sh  Self-update from another source
+        grub.cfg                 Label-based GRUB config template
+        MANIFEST.txt             Deployment timestamp and audit trail
+
+================================================================================
+END OF DOCUMENT
+================================================================================
