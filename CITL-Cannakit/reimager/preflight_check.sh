@@ -12,6 +12,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PAYLOAD_GUARD="${SCRIPT_DIR}/boot_payload_guard.sh"
+[[ -f "${PAYLOAD_GUARD}" ]] && source "${PAYLOAD_GUARD}"
+
 FIX=false; QUIET=false
 for arg in "$@"; do
     case "${arg}" in --fix) FIX=true;; --quiet) QUIET=true;; esac
@@ -69,6 +73,29 @@ check_root() {
     fi
 }
 
+check_boot_payload_visibility() {
+    declare -F citl_payload_status >/dev/null 2>&1 || return 0
+    local citlboot_mnt="" exfat_mnt="" status="" candidate=""
+    for candidate in /run/live/medium /cdrom; do
+        if [[ -d "${candidate}/casper" ]]; then
+            citlboot_mnt="${candidate}"
+            break
+        fi
+    done
+    if [[ -z "${citlboot_mnt}" ]]; then
+        citlboot_mnt="$(lsblk -rno LABEL,MOUNTPOINT 2>/dev/null | \
+            awk '$1=="CITLBOOT" && $2!="" {print $2; exit}')"
+    fi
+    exfat_mnt="$(lsblk -rno FSTYPE,MOUNTPOINT 2>/dev/null | \
+        awk '$1=="exfat" && $2!="" {print $2; exit}')"
+    status="$(citl_payload_status "${citlboot_mnt:-}" "${exfat_mnt:-}" 2>/dev/null || true)"
+    if [[ "${status}" == OK:* ]]; then
+        ok "boot-payload" "${status}"
+    else
+        warn "boot-payload" "not visible yet (${status:-UNKNOWN}); reimager will stop before target selection if no payload is found"
+    fi
+}
+
 ${QUIET} || echo -e "\n${GRN}══ CITL Reimager Preflight Check ══${RST}\n"
 
 check_root
@@ -88,6 +115,7 @@ check "rsync"        rsync        rsync           required
 check "unsquashfs"   unsquashfs   squashfs-tools  required
 check_mount_exfat
 check_efi_mode
+check_boot_payload_visibility
 
 # ── Optional tools ────────────────────────────────────────────────────────────
 check "debootstrap"  debootstrap  debootstrap     optional

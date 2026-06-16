@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=CITL Launcher
+GenericName=CITL App Hub
+Comment=Launch any CITL app from this USB drive — EXE or Python fallback
+Exec=bash -c 'k="${1#file://}"; D=$(dirname "$(readlink -f "$k" 2>/dev/null || echo "$k")"); export DISPLAY="${DISPLAY:-:0}"; exec bash "$D/CITL_USB_LAUNCHER.sh"' -- %k
+Icon=applications-system
+Terminal=false
+Categories=System;Utility;
+Keywords=citl;launcher;usb;reimager;flex;fixer;automation;
+StartupNotify=true
+X-Autorun-After-Mount=true
+X-CITL-App=citl_usb_launcher

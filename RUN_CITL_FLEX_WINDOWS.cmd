@@ -1,11 +1,10 @@
 @echo off
-REM CITL FLEX Troubleshooter v1.1 - Windows launcher (dist-first, legacy-safe)
+REM CITL FLEX Troubleshooter v1.2 - Windows launcher (dist-first, USB-aware)
 setlocal
 set "ROOT=%~dp0"
 set "EXE_ONEDIR=%ROOT%dist\CITL FLEX Troubleshooter\CITL FLEX Troubleshooter.exe"
 set "EXE_ONEFILE=%ROOT%dist\CITL-FLEX-Troubleshooter.exe"
 set "EXE_BUILD=%ROOT%build\CITL FLEX Troubleshooter\CITL FLEX Troubleshooter.exe"
-set "SCRIPT=%ROOT%citl_flex_troubleshooter\flex_assistant_gui.py"
 
 REM Preferred launch path (current PyInstaller --windowed onedir output)
 if exist "%EXE_ONEDIR%" (
@@ -26,6 +25,18 @@ if exist "%EXE_BUILD%" (
     exit /b 0
 )
 
+REM Locate Python script -- check local, then USB deployment paths
+set "SCRIPT="
+if exist "%ROOT%citl_flex_troubleshooter\flex_assistant_gui.py" (
+    set "SCRIPT=%ROOT%citl_flex_troubleshooter\flex_assistant_gui.py"
+)
+if not defined SCRIPT if exist "%ROOT%CITL_FACTBOOK_UBUNTU V1\factbook-assistant\citl_flex_troubleshooter\flex_assistant_gui.py" (
+    set "SCRIPT=%ROOT%CITL_FACTBOOK_UBUNTU V1\factbook-assistant\citl_flex_troubleshooter\flex_assistant_gui.py"
+)
+if not defined SCRIPT if exist "%ROOT%factbook-assistant\citl_flex_troubleshooter\flex_assistant_gui.py" (
+    set "SCRIPT=%ROOT%factbook-assistant\citl_flex_troubleshooter\flex_assistant_gui.py"
+)
+
 REM Python fallback
 set "PY="
 if exist "%ROOT%.venv\Scripts\python.exe" set "PY=%ROOT%.venv\Scripts\python.exe"
@@ -37,8 +48,11 @@ if not defined PY (
     exit /b 1
 )
 
-if not exist "%SCRIPT%" (
-    echo ERROR: FLEX launcher script not found: %SCRIPT%
+if not defined SCRIPT (
+    echo ERROR: FLEX launcher script not found in any expected location.
+    echo Checked:
+    echo   %ROOT%citl_flex_troubleshooter\flex_assistant_gui.py
+    echo   %ROOT%CITL_FACTBOOK_UBUNTU V1\factbook-assistant\citl_flex_troubleshooter\flex_assistant_gui.py
     pause
     exit /b 1
 )

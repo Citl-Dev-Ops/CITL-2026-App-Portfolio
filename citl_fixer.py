@@ -49,17 +49,40 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
-for _stream in (sys.stdout, sys.stderr):
-    try:
-        if hasattr(_stream, "reconfigure"):
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+# ── Locate installed root (works from root or CITL-REIMAGER subfolder) ───────
+def _detect_installed_root(script_dir: Path) -> Path:
+    candidates = []
+    if script_dir.name.upper() == "CITL-REIMAGER":
+        candidates.append(script_dir.parent)
+    candidates.extend([script_dir, script_dir.parent])
+    for candidate in candidates:
+        if (
+            (candidate / "CITL_FACTBOOK_UBUNTU V1").exists()
+            or (candidate / "factbook-assistant").exists()
+            or (candidate / "citl_bootstrap.py").exists()
+        ):
+            return candidate
+    return script_dir
 
-# ── Locate USB root (where THIS file lives) ────────────────────────────────────
-USB_ROOT  = Path(__file__).resolve().parent
-FA_DIR    = USB_ROOT / "factbook-assistant"
-SCRIPTS   = USB_ROOT / "scripts"
+
+def _pick_existing_dir(*candidates: Path) -> Path:
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return candidates[0]
+
+
+USB_ROOT  = _detect_installed_root(Path(__file__).resolve().parent)
+FA_DIR    = _pick_existing_dir(
+    USB_ROOT / "CITL_FACTBOOK_UBUNTU V1" / "factbook-assistant",
+    USB_ROOT / "PORTABLE_APPS" / "CITL" / "factbook-assistant",
+    USB_ROOT / "factbook-assistant",
+)
+SCRIPTS   = _pick_existing_dir(
+    USB_ROOT / "scripts",
+    USB_ROOT / "CITL_FACTBOOK_UBUNTU V1" / "scripts",
+    USB_ROOT / "PORTABLE_APPS" / "CITL" / "scripts",
+)
 DIST      = USB_ROOT / "dist"
 IS_WIN    = platform.system() == "Windows"
 IS_LINUX  = platform.system() == "Linux"
@@ -77,6 +100,212 @@ T = {
     "ok":      "#06D6A0",  "warn":    "#FFD166",   "err":     "#FF6B6B",
     "skip":    "#5A7080",  "panel":   "#071520",   "hl2":     "#0A3040",
 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# APP REGISTRY — Master catalogue of every known CITL app + packaging metadata
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_app_registry() -> dict:
+    """
+    Return the live master registry of all known CITL apps.
+    Called fresh so USB_ROOT / FA_DIR paths are always current.
+    """
+    TK = [
+        "tkinter", "_tkinter", "tkinter.ttk", "tkinter.messagebox",
+        "tkinter.filedialog", "tkinter.scrolledtext", "tkinter.simpledialog",
+    ]
+
+    def _pick(*paths: Path) -> Path:
+        for p in paths:
+            if p.exists():
+                return p
+        return paths[0]
+
+    reg = {
+        # ── USB Core Tools ─────────────────────────────────────────────────
+        "citl_fixer": {
+            "name": "CITL Fixer",
+            "script": USB_ROOT / "citl_fixer.py",
+            "imports": TK + ["urllib.request", "subprocess", "threading"],
+            "datas": [],
+            "cat": "USB Core",
+        },
+        "citl_app_sync": {
+            "name": "CITL App Sync",
+            "script": USB_ROOT / "citl_app_sync.py",
+            "imports": TK + ["requests"],
+            "datas": [],
+            "cat": "USB Core",
+        },
+        "citl_sync_hub": {
+            "name": "CITL Sync Hub",
+            "script": USB_ROOT / "citl_sync_hub.py",
+            "imports": TK + ["requests"],
+            "datas": [],
+            "cat": "USB Core",
+        },
+        "citl_app_updater": {
+            "name": "CITL App Updater",
+            "script": USB_ROOT / "citl_app_updater.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "USB Core",
+        },
+        "citl_usb_selfupdate": {
+            "name": "CITL USB Self-Update",
+            "script": USB_ROOT / "citl_usb_selfupdate.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "USB Core",
+        },
+        "citl_bootstrap": {
+            "name": "CITL Bootstrap",
+            "script": USB_ROOT / "citl_bootstrap.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "USB Core",
+        },
+        "citl_patcher": {
+            "name": "CITL Patcher",
+            "script": USB_ROOT / "citl_patcher.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "USB Core",
+        },
+        "citl_repair_all": {
+            "name": "CITL Repair All",
+            "script": USB_ROOT / "citl_repair_all.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "USB Core",
+        },
+        # ── CITL Applications ──────────────────────────────────────────────
+        "factbook_assistant": {
+            "name": "CITL Factbook Assistant",
+            "script": _pick(
+                FA_DIR / "factbook_assistant_gui_ffmpeg_graceful_v2.py",
+                FA_DIR / "factbook_assistant_gui_ffmpeg_graceful.py",
+                FA_DIR / "factbook_assistant_gui.py",
+            ),
+            "imports": TK + [
+                "psutil", "numpy", "PIL", "PIL.Image", "PIL._imagingtk",
+                "citl_factbook_query", "citl_auto_index", "citl_text_extract",
+                "citl_theme", "citl_translation", "parsers",
+                "requests", "docx", "json",
+            ],
+            "datas": [
+                (str(FA_DIR / "fonts"), "fonts"),
+                (str(FA_DIR / "data"),  "data"),
+            ],
+            "cat": "CITL Apps",
+        },
+        "citl_llmops_suite": {
+            "name": "CITL LLMOps Suite",
+            "script": FA_DIR / "citl_llmops_suite.py",
+            "imports": TK + ["requests", "psutil"],
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        "citl_staff_toolkit": {
+            "name": "CITL Staff Toolkit",
+            "script": FA_DIR / "citl_staff_toolkit.py",
+            "imports": TK + ["requests"],
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        "citl_academic_advisor": {
+            "name": "CITL Academic Advisor",
+            "script": FA_DIR / "citl_academic_advisor.py",
+            "imports": TK + ["fastapi", "uvicorn", "httpx", "requests", "starlette"],
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        "citl_screen_recorder": {
+            "name": "CITL Screen Recorder",
+            "script": FA_DIR / "citl_screen_recorder.py",
+            "imports": TK + ["mss", "cv2", "numpy", "pynput"],
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        "citl_workstation_apps": {
+            "name": "CITL Workstation Apps",
+            "script": FA_DIR / "citl_workstation_apps.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        "citl_doc_composer": {
+            "name": "CITL Document Composer",
+            "script": _pick(
+                FA_DIR / "citl_doc_composer.py",
+                FA_DIR / "citl_document_composer.py",
+            ),
+            "imports": TK + ["docx", "requests", "PIL"],
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        "citl_field_apps": {
+            "name": "CITL Field Apps",
+            "script": FA_DIR / "citl_field_apps.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        # ── FLEX Troubleshooter ────────────────────────────────────────────
+        "citl_flex": {
+            "name": "CITL FLEX Troubleshooter",
+            "script": _pick(
+                USB_ROOT / "citl_flex_troubleshooter" / "flex_assistant_gui.py",
+                FA_DIR / "citl_flex_troubleshooter" / "flex_assistant_gui.py",
+            ),
+            "imports": TK + ["psutil", "numpy"],
+            "datas": [],
+            "cat": "CITL Apps",
+        },
+        # ── Imaging Tools ──────────────────────────────────────────────────
+        "citl_reimager": {
+            "name": "CITL Re-Imager",
+            "script": _pick(
+                USB_ROOT / "CITL-REIMAGER" / "citl_reimager.py",
+                USB_ROOT / "citl_reimager.py",
+            ),
+            "imports": [
+                "PySide6", "PySide6.QtCore", "PySide6.QtWidgets", "PySide6.QtGui",
+                "json", "shutil", "subprocess", "threading",
+            ],
+            "datas": [],
+            "cat": "Imaging",
+        },
+        "citl_app_updater_reimager": {
+            "name": "CITL App Updater",
+            "script": _pick(
+                USB_ROOT / "CITL-REIMAGER" / "citl_app_updater.py",
+                USB_ROOT / "citl_app_updater.py",
+            ),
+            "imports": TK + ["hashlib", "shutil", "threading", "subprocess"],
+            "datas": [],
+            "cat": "Imaging",
+        },
+        "citl_bundle_automation": {
+            "name": "CITL Bundle Automation",
+            "script": _pick(
+                USB_ROOT / "CITL-REIMAGER" / "citl_bundle_automation.py",
+                USB_ROOT / "citl_bundle_automation.py",
+            ),
+            "imports": ["shutil", "hashlib", "json", "argparse"],
+            "datas": [],
+            "cat": "Imaging",
+        },
+        "citl_partition_setup": {
+            "name": "CITL Partition Setup",
+            "script": USB_ROOT / "CITL-REIMAGER" / "citl_partition_setup.py",
+            "imports": TK,
+            "datas": [],
+            "cat": "Imaging",
+        },
+    }
+    return reg
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RESULT DATACLASS (no external deps)
@@ -119,6 +348,342 @@ def _run(cmd: List[str], timeout: int = 180,
     except Exception as e:
         log(f"  ERROR: {e}")
         return False, str(e)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PACKAGING ENGINE (professional dist builds)
+# ══════════════════════════════════════════════════════════════════════════════
+
+PKG_CACHE_BASE = Path.home() / ".cache" / "citl_packager"
+PKG_BUILD_ROOT = PKG_CACHE_BASE / "build"
+PKG_SPEC_DIR   = PKG_BUILD_ROOT / "specs"
+PKG_WORK_DIR   = PKG_BUILD_ROOT / "work"
+PKG_LOG_DIR    = PKG_BUILD_ROOT / "logs"
+PKG_LAUNCHERS  = DIST / "launchers"
+PKG_VENV       = PKG_CACHE_BASE / "venv"
+PYI_WARN_IGNORE = (
+    "missing module named winreg",
+    "missing module named msvcrt",
+    "missing module named _winapi",
+    "missing module named nt",
+    "missing module named _frozen_importlib_external",
+    "missing module named org",
+    "missing module named java",
+    "missing module named _scproxy",
+)
+
+
+def _registry_items() -> List[Tuple[str, dict]]:
+    reg = _get_app_registry()
+    return sorted(reg.items(), key=lambda kv: (kv[1].get("cat", ""), kv[1].get("name", kv[0])))
+
+
+def _safe_app_id(app_id: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", app_id.strip()).strip("_") or "citl_app"
+
+
+def _app_expected_binary(app_id: str) -> Path:
+    app_bin = f"{_safe_app_id(app_id)}.exe" if IS_WIN else _safe_app_id(app_id)
+    return DIST / _safe_app_id(app_id) / app_bin
+
+
+def app_packaging_state(app_id: str, meta: dict) -> Tuple[str, str, Path]:
+    script = Path(meta.get("script", ""))
+    exe = _app_expected_binary(app_id)
+    if not script.exists():
+        return "script-missing", f"Script not found: {script}", exe
+    if exe.exists():
+        return "packaged", f"Packaged binary present: {exe}", exe
+    return "missing", f"Missing packaged binary: {exe}", exe
+
+
+def _venv_bin(venv_root: Path, tool: str) -> Path:
+    sub = "Scripts" if IS_WIN else "bin"
+    exe = f"{tool}.exe" if IS_WIN else tool
+    return venv_root / sub / exe
+
+
+def ensure_pyinstaller(log: Callable[[str], None] = print) -> Optional[str]:
+    try:
+        import PyInstaller  # noqa: F401
+        return sys.executable
+    except Exception:
+        pass
+
+    vpy = _venv_bin(PKG_VENV, "python")
+    vpip = _venv_bin(PKG_VENV, "pip")
+
+    if not vpy.exists():
+        log(f"Creating packaging venv: {PKG_VENV}")
+        ok, _ = _run([sys.executable, "-m", "venv", str(PKG_VENV)], timeout=240, log=log)
+        if not ok:
+            log("ERROR: failed to create packaging virtualenv.")
+            return None
+
+    ok, _ = _run([str(vpy), "-m", "PyInstaller", "--version"], timeout=30, log=log)
+    if ok:
+        return str(vpy)
+
+    log("Installing PyInstaller in packaging venv...")
+    ok, _ = _run([str(vpip), "install", "--upgrade", "pip", "setuptools", "wheel"], timeout=600, log=log)
+    if not ok:
+        return None
+    ok, _ = _run([str(vpip), "install", "--upgrade", "pyinstaller"], timeout=1200, log=log)
+    if not ok:
+        log("ERROR: could not install PyInstaller in packaging venv.")
+        return None
+
+    ok, _ = _run([str(vpy), "-m", "PyInstaller", "--version"], timeout=30, log=log)
+    if not ok:
+        log("ERROR: PyInstaller still unavailable after venv install.")
+        return None
+    return str(vpy)
+
+
+def _add_data_arg(src: Path, dest: str) -> str:
+    sep = ";" if IS_WIN else ":"
+    return f"{src}{sep}{dest}"
+
+
+def create_app_launchers(app_id: str, script: Path, log: Callable[[str], None] = print) -> None:
+    PKG_LAUNCHERS.mkdir(parents=True, exist_ok=True)
+    sid = _safe_app_id(app_id)
+    exe = _app_expected_binary(app_id)
+    sh_path = PKG_LAUNCHERS / f"{sid}.sh"
+    cmd_path = PKG_LAUNCHERS / f"{sid}.cmd"
+
+    try:
+        rel_script = script.relative_to(USB_ROOT).as_posix()
+    except Exception:
+        rel_script = str(script).replace("\\", "/")
+
+    sh_path.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "ROOT=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/../..\" && pwd)\"\n"
+        f"APP=\"$ROOT/{exe.relative_to(USB_ROOT).as_posix()}\"\n"
+        "if [[ -x \"$APP\" ]]; then\n"
+        "  exec \"$APP\" \"$@\"\n"
+        "fi\n"
+        "PY=\"\"; command -v python3 >/dev/null 2>&1 && PY=\"$(command -v python3)\"; [[ -z \"$PY\" ]] && PY=python\n"
+        f"exec \"$PY\" \"$ROOT/{rel_script}\" \"$@\"\n",
+        encoding="utf-8"
+    )
+    try:
+        os.chmod(sh_path, 0o755)
+    except Exception:
+        pass
+
+    exe_rel_win = str(exe.relative_to(USB_ROOT)).replace("/", "\\")
+    script_rel_win = rel_script.replace("/", "\\")
+    cmd_path.write_text(
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "set ROOT=%~dp0\\..\\..\\\r\n"
+        f"set APP=%ROOT%\\{exe_rel_win}\r\n"
+        "if exist \"%APP%\" (\r\n"
+        "  \"%APP%\" %*\r\n"
+        "  exit /b %ERRORLEVEL%\r\n"
+        ")\r\n"
+        f"set PY_SCRIPT=%ROOT%\\{script_rel_win}\r\n"
+        "where py >nul 2>nul && (py -3 \"%PY_SCRIPT%\" %* & exit /b %ERRORLEVEL%)\r\n"
+        "where python >nul 2>nul && (python \"%PY_SCRIPT%\" %* & exit /b %ERRORLEVEL%)\r\n"
+        "echo Python not found.\r\n"
+        "exit /b 1\r\n",
+        encoding="utf-8"
+    )
+    log(f"  Launchers: {sh_path.name}, {cmd_path.name}")
+
+
+def build_single_app_package(app_id: str,
+                             log: Callable[[str], None] = print,
+                             clean: bool = True,
+                             onefile: bool = False) -> bool:
+    reg = _get_app_registry()
+    meta = reg.get(app_id)
+    if not meta:
+        log(f"ERROR: unknown app id: {app_id}")
+        return False
+    script = Path(meta.get("script", ""))
+    if not script.exists():
+        log(f"SKIP {app_id}: script not found: {script}")
+        return False
+    py_exec = ensure_pyinstaller(log)
+    if not py_exec:
+        return False
+
+    sid = _safe_app_id(app_id)
+    DIST.mkdir(parents=True, exist_ok=True)
+    PKG_BUILD_ROOT.mkdir(parents=True, exist_ok=True)
+    PKG_SPEC_DIR.mkdir(parents=True, exist_ok=True)
+    PKG_WORK_DIR.mkdir(parents=True, exist_ok=True)
+    PKG_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    cmd: List[str] = [
+        py_exec, "-m", "PyInstaller",
+        "--noconfirm",
+        "--name", sid,
+        "--distpath", str(DIST),
+        "--workpath", str(PKG_WORK_DIR),
+        "--specpath", str(PKG_SPEC_DIR),
+    ]
+    cmd.append("--onefile" if onefile else "--onedir")
+    if clean:
+        cmd.append("--clean")
+
+    for imp in meta.get("imports", []):
+        if isinstance(imp, str) and imp.strip():
+            cmd += ["--hidden-import", imp.strip()]
+
+    for item in meta.get("datas", []):
+        if not isinstance(item, (tuple, list)) or len(item) != 2:
+            continue
+        src = Path(str(item[0]))
+        dst = str(item[1])
+        if src.exists():
+            cmd += ["--add-data", _add_data_arg(src, dst)]
+
+    if not IS_WIN:
+        cmd += ["--noupx"]
+    cmd.append(str(script))
+
+    log(f"\n── Build: {app_id} ({meta.get('name', app_id)}) ─────────────────────────")
+    ok, out = _run(cmd, timeout=3600, log=log)
+    build_log = PKG_LOG_DIR / f"{sid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    try:
+        build_log.write_text(out or "", encoding="utf-8")
+    except Exception:
+        pass
+    if not ok:
+        log(f"FAIL {app_id}: build failed. Log: {build_log}")
+        return False
+
+    state, msg, exe = app_packaging_state(app_id, meta)
+    if state != "packaged":
+        log(f"FAIL {app_id}: {msg}")
+        return False
+
+    create_app_launchers(app_id, script, log=log)
+    verified, issues = verify_packaged_app(app_id, meta, log=log)
+    if not verified:
+        log(f"FAIL {app_id}: post-build verification failed ({len(issues)} issue(s))")
+        return False
+    log(f"OK   {app_id}: {exe}")
+    return True
+
+
+def build_app_packages(app_ids: Optional[List[str]] = None,
+                       log: Callable[[str], None] = print,
+                       clean: bool = True,
+                       onefile: bool = False) -> dict:
+    ids = app_ids[:] if app_ids else [a for a, _ in _registry_items()]
+    result: dict = {}
+    for app_id in ids:
+        result[app_id] = build_single_app_package(app_id, log=log, clean=clean, onefile=onefile)
+    ok_n = sum(1 for v in result.values() if v)
+    log(f"\nPackaging complete: {ok_n}/{len(ids)} succeeded.")
+    return result
+
+
+def verify_packaged_app(app_id: str, meta: dict,
+                        log: Callable[[str], None] = print) -> Tuple[bool, List[str]]:
+    sid = _safe_app_id(app_id)
+    issues: List[str] = []
+    script = Path(meta.get("script", ""))
+    state, msg, exe = app_packaging_state(app_id, meta)
+    if state != "packaged":
+        issues.append(msg)
+        return False, issues
+
+    if not os.access(exe, os.X_OK) and not IS_WIN:
+        issues.append(f"Binary is not executable: {exe}")
+
+    app_root = exe.parent
+    for item in meta.get("datas", []):
+        if not isinstance(item, (tuple, list)) or len(item) != 2:
+            continue
+        src = Path(str(item[0]))
+        dst = str(item[1]).strip("./")
+        if not src.exists():
+            continue
+        expect_dir = app_root / dst if dst else app_root
+        if not expect_dir.exists():
+            issues.append(f"Expected data destination missing: {expect_dir} (from {src})")
+
+    warn_file = PKG_WORK_DIR / sid / f"warn-{sid}.txt"
+    if warn_file.exists():
+        try:
+            lines = warn_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+            flagged = []
+            for line in lines:
+                low = line.strip().lower()
+                if "missing module named" not in low:
+                    continue
+                if any(x in low for x in PYI_WARN_IGNORE):
+                    continue
+                flagged.append(line.strip())
+            if flagged:
+                issues.append(
+                    "PyInstaller unresolved modules: " + "; ".join(flagged[:6]) +
+                    (" ..." if len(flagged) > 6 else "")
+                )
+        except Exception as e:
+            issues.append(f"Could not parse warn file: {warn_file} ({e})")
+    else:
+        issues.append(f"PyInstaller warn file missing: {warn_file}")
+
+    sh_launcher = PKG_LAUNCHERS / f"{sid}.sh"
+    cmd_launcher = PKG_LAUNCHERS / f"{sid}.cmd"
+    if not sh_launcher.exists():
+        issues.append(f"Missing launcher: {sh_launcher}")
+    if not cmd_launcher.exists():
+        issues.append(f"Missing launcher: {cmd_launcher}")
+
+    if issues:
+        log(f"VERIFY FAIL {app_id}:")
+        for issue in issues:
+            log(f"  - {issue}")
+        return False, issues
+    log(f"VERIFY OK   {app_id}: {exe}")
+    return True, []
+
+
+def verify_packaging_suite(app_ids: Optional[List[str]] = None,
+                           log: Callable[[str], None] = print) -> dict:
+    reg = _get_app_registry()
+    ids = app_ids[:] if app_ids else [aid for aid, _ in _registry_items()]
+    report: dict = {}
+    for aid in ids:
+        meta = reg.get(aid)
+        if not meta:
+            report[aid] = {"ok": False, "issues": [f"Unknown app id: {aid}"]}
+            continue
+        ok, issues = verify_packaged_app(aid, meta, log=log)
+        report[aid] = {"ok": ok, "issues": issues}
+    ok_n = sum(1 for v in report.values() if v.get("ok"))
+    log(f"Verification complete: {ok_n}/{len(report)} clean.")
+    return report
+
+
+def cleanup_packaging_artifacts(log: Callable[[str], None] = print) -> bool:
+    targets = [
+        USB_ROOT / "build",
+        USB_ROOT / "__pycache__",
+        PKG_BUILD_ROOT,
+    ]
+    ok = True
+    for p in targets:
+        if p.exists():
+            try:
+                if p.is_dir():
+                    shutil.rmtree(p)
+                else:
+                    p.unlink()
+                log(f"Removed: {p}")
+            except Exception as e:
+                log(f"ERROR removing {p}: {e}")
+                ok = False
+    return ok
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -439,6 +1004,132 @@ def _is_citl_root(p: Path) -> bool:
     return any((p / m).exists() for m in _CITL_MARKERS)
 
 
+def _device_target_map_path() -> Path:
+    return USB_ROOT / "CITL_Logs" / "device_target_map.json"
+
+
+def _quick_out(cmd: List[str]) -> str:
+    try:
+        out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+        return out
+    except Exception:
+        return ""
+
+
+def _current_os_device_id() -> str:
+    """Best-effort stable ID for the currently running OS system drive."""
+    if IS_WIN:
+        for cmd in (
+            ["wmic", "csproduct", "get", "UUID"],
+            ["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_ComputerSystemProduct).UUID"],
+        ):
+            raw = _quick_out(cmd)
+            lines = [ln.strip() for ln in raw.splitlines() if ln.strip() and "UUID" not in ln.upper()]
+            if lines:
+                return f"win:{lines[0]}"
+        return ""
+
+    if IS_LINUX:
+        root_uuid = _quick_out(["findmnt", "-n", "-o", "UUID", "/"])
+        if root_uuid:
+            return f"linux:{root_uuid}"
+        src = _quick_out(["findmnt", "-n", "-o", "SOURCE", "/"])
+        if src:
+            src_uuid = _quick_out(["lsblk", "-no", "UUID", src])
+            if src_uuid:
+                return f"linux:{src_uuid}"
+            return f"linux:{src}"
+    return ""
+
+
+def _load_device_target_map() -> dict:
+    p = _device_target_map_path()
+    if not p.exists():
+        return {"mappings": {}}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8", errors="ignore"))
+        if isinstance(data, dict) and isinstance(data.get("mappings"), dict):
+            return data
+    except Exception:
+        pass
+    return {"mappings": {}}
+
+
+def _save_device_target_map(data: dict) -> None:
+    p = _device_target_map_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _remember_device_target(root: Path, device_id: str = "") -> None:
+    did = device_id or _current_os_device_id()
+    if not did:
+        return
+    try:
+        resolved = str(root.resolve())
+    except Exception:
+        resolved = str(root)
+    data = _load_device_target_map()
+    mappings = data.setdefault("mappings", {})
+    mappings[did] = {
+        "target_root": resolved,
+        "updated_utc": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    _save_device_target_map(data)
+
+
+def _prioritize_citl_roots(candidates: List[Path]) -> List[Path]:
+    if not candidates:
+        return candidates
+    did = _current_os_device_id()
+    preferred: Optional[Path] = None
+
+    try:
+        usb_root_resolved = USB_ROOT.resolve()
+    except Exception:
+        usb_root_resolved = USB_ROOT
+
+    if did:
+        data = _load_device_target_map()
+        target = data.get("mappings", {}).get(did, {}).get("target_root", "")
+        if target:
+            target_path = Path(target)
+            for c in candidates:
+                try:
+                    if c.resolve() == target_path.resolve():
+                        preferred = c
+                        break
+                except Exception:
+                    if str(c) == str(target_path):
+                        preferred = c
+                        break
+
+    if preferred is None:
+        for c in candidates:
+            try:
+                cres = c.resolve()
+            except Exception:
+                cres = c
+            if cres == usb_root_resolved:
+                preferred = c
+                break
+            try:
+                if usb_root_resolved.is_relative_to(cres):
+                    preferred = c
+                    break
+            except Exception:
+                pass
+
+    if preferred is not None:
+        try:
+            pref_res = preferred.resolve()
+            candidates.sort(key=lambda p: 0 if p.resolve() == pref_res else 1)
+        except Exception:
+            candidates.sort(key=lambda p: 0 if str(p) == str(preferred) else 1)
+        _remember_device_target(preferred, did)
+    return candidates
+
+
 def _discover_citl_installs() -> List[Path]:
     """Search common locations for ANY CITL app install (not just factbook)."""
     candidates: List[Path] = []
@@ -500,56 +1191,7 @@ def _discover_citl_installs() -> List[Path]:
     # Always include USB_ROOT itself even if no markers found yet
     if not any(str(c.resolve()) == str(USB_ROOT.resolve()) for c in candidates):
         candidates.insert(0, USB_ROOT)
-    return candidates
-
-
-def _resolve_required_citl_file(rel_name: str, preferred_root: Path = USB_ROOT) -> Optional[Path]:
-    """Find a required CITL file across local installs and attached drives."""
-    rel = Path(rel_name)
-    roots: List[Path] = [preferred_root, Path(__file__).resolve().parent]
-    roots.extend(_discover_citl_installs())
-    if IS_WIN:
-        roots.extend(Path(f"{letter}:\\") / sub
-                     for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                     for sub in ("CITL-REIMAGER", "CITL", ""))
-    else:
-        for base in (Path("/media"), Path("/mnt"), Path("/run/media")):
-            try:
-                for mount in base.iterdir():
-                    roots.extend([mount, mount / "CITL-REIMAGER", mount / "CITL"])
-            except (PermissionError, OSError):
-                pass
-
-    seen = set()
-    for root in roots:
-        try:
-            candidate = (root / rel).resolve()
-        except (OSError, RuntimeError):
-            continue
-        key = str(candidate).lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        if candidate.exists() and candidate.is_file():
-            return candidate
-    return None
-
-
-def _ensure_required_citl_file(rel_name: str, target_root: Path = USB_ROOT) -> Optional[Path]:
-    """Ensure a required file exists at target_root, copying from another CITL repo if needed."""
-    target = target_root / rel_name
-    if target.exists():
-        return target
-    source = _resolve_required_citl_file(rel_name, target_root)
-    if source is None:
-        return None
-    try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if source.resolve() != target.resolve():
-            shutil.copy2(source, target)
-        return target
-    except Exception:
-        return source if source.exists() else None
+    return _prioritize_citl_roots(candidates)
 
 
 # Legacy alias kept so old call-sites still work
@@ -1655,6 +2297,348 @@ def patch_scripts(fb_root: Path, log: Callable[[str], None] = print) -> List[str
     return patched
 
 
+_UBUNTU_LAUNCH_APPS = [
+    {
+        "name": "CITL App Sync",
+        "id": "citl_app_sync",
+        "py_rel": "factbook-assistant/citl_app_sync.py",
+        "legacy_rel": "1-CITL-SYNC/linux/CITL App Sync/CITL App Sync",
+        "sh": "CITL App Sync.sh",
+        "desktop": "CITL App Sync.desktop",
+    },
+    {
+        "name": "CITL Sync Hub",
+        "id": "citl_sync_hub",
+        "py_rel": "factbook-assistant/citl_sync_hub.py",
+        "legacy_rel": "1-CITL-SYNC/linux/CITL Sync Hub/CITL Sync Hub",
+        "sh": "CITL Sync Hub.sh",
+        "desktop": "CITL Sync Hub.desktop",
+    },
+    {
+        "name": "CITL Document Composer",
+        "id": "citl_doc_composer",
+        "py_rel": "factbook-assistant/citl_doc_composer.py",
+        "legacy_rel": "1-CITL-SYNC/linux/CITL Document Composer/CITL Document Composer",
+        "sh": "CITL Document Composer.sh",
+        "desktop": "CITL Document Composer.desktop",
+    },
+    {
+        "name": "CITL Staff Toolkit",
+        "id": "citl_staff_toolkit",
+        "py_rel": "factbook-assistant/citl_staff_toolkit.py",
+        "legacy_rel": "1-CITL-SYNC/linux/CITL Staff Toolkit/CITL Staff Toolkit",
+        "sh": "CITL Staff Toolkit.sh",
+        "desktop": "CITL Staff Toolkit.desktop",
+    },
+    {
+        "name": "CITL Presentation Suite",
+        "id": "citl_llmops_suite",
+        "py_rel": "factbook-assistant/citl_llmops_suite.py",
+        "legacy_rel": "2-CITL-PRESENTATION-SUITE/linux/CITL Presentation Suite/CITL Presentation Suite",
+        "sh": "CITL Presentation Suite.sh",
+        "desktop": "CITL Presentation Suite.desktop",
+    },
+]
+
+
+def _launcher_guard_script_text() -> str:
+    return """#!/usr/bin/env bash
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_NAME="${1:-CITL App}"; APP_ID="${2:-citl_app}"; PY_REL="${3:-}"; LEGACY_REL="${4:-}"
+shift 4 2>/dev/null || true
+TS="$(date -u +%Y%m%dT%H%M%SZ)"
+LOG_DIR="$ROOT/CITL_Logs/launch"; LOG_FILE="$LOG_DIR/${APP_ID}_${TS}.log"; mkdir -p "$LOG_DIR"
+export DISPLAY="${DISPLAY:-:0}"
+say(){ echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE" >/dev/null; }
+kill_stale_by_pattern(){
+  local pattern="$1"; local label="$2"; [[ -n "$pattern" ]] || return 0
+  local pids=(); while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue; [[ "$pid" == "$$" || "$pid" == "$PPID" ]] && continue; pids+=("$pid")
+  done < <(pgrep -f -- "$pattern" 2>/dev/null || true)
+  [[ ${#pids[@]} -gt 0 ]] || return 0; say "REFRESH: stopping ${#pids[@]} stale instance(s) for $label"
+  for pid in "${pids[@]}"; do kill -TERM "$pid" 2>/dev/null || true; done
+  local deadline=$((SECONDS + 4))
+  while (( SECONDS < deadline )); do
+    local alive=0; for pid in "${pids[@]}"; do kill -0 "$pid" 2>/dev/null && { alive=1; break; }; done
+    (( alive == 0 )) && return 0; sleep 0.2
+  done
+  for pid in "${pids[@]}"; do kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true; done
+}
+fail_dialog(){
+  local title="$1"; local msg="$2"; say "ERROR: $msg"
+  if command -v zenity >/dev/null 2>&1; then zenity --error --title "$title" --text "$msg\\n\\nLog:\\n$LOG_FILE" 2>/dev/null || true
+  elif command -v notify-send >/dev/null 2>&1; then notify-send -u critical "$title" "$msg\\nLog: $LOG_FILE" 2>/dev/null || true; fi
+}
+run_probe(){ local label="$1"; shift; say "RUN [$label]: $*"; ("$@" >>"$LOG_FILE" 2>&1) & local pid=$!; sleep 2
+  if kill -0 "$pid" 2>/dev/null; then say "OK  [$label]: pid=$pid"; return 0; fi
+  wait "$pid" 2>/dev/null; local rc=$?; say "FAIL[$label]: exit=$rc"; return "$rc"; }
+pick_python(){ local candidates=("$ROOT/.venv/bin/python" "$HOME/Desktop/CITL/.venv/bin/python" "$HOME/Documents/CITL/.venv/bin/python" "$HOME/CITL/.venv/bin/python" "$(command -v python3 2>/dev/null || true)" "$(command -v python 2>/dev/null || true)")
+  local p; for p in "${candidates[@]}"; do [[ -n "$p" && -x "$p" ]] && { echo "$p"; return 0; }; done; return 1; }
+say "Launcher start: app=$APP_NAME id=$APP_ID root=$ROOT"
+DIST_BIN="$ROOT/dist/$APP_ID/$APP_ID"; [[ -x "$DIST_BIN" ]] && kill_stale_by_pattern "$(readlink -f "$DIST_BIN" 2>/dev/null || echo "$DIST_BIN")" "dist/$APP_ID"
+[[ -x "$DIST_BIN" ]] && run_probe "dist" "$DIST_BIN" "$@" && exit 0
+if [[ -n "$LEGACY_REL" ]]; then LEGACY_BIN="$ROOT/$LEGACY_REL"; [[ -x "$LEGACY_BIN" ]] && kill_stale_by_pattern "$(readlink -f "$LEGACY_BIN" 2>/dev/null || echo "$LEGACY_BIN")" "legacy/$APP_ID"; [[ -x "$LEGACY_BIN" ]] && run_probe "legacy" "$LEGACY_BIN" "$@" && exit 0; fi
+[[ -n "$PY_REL" ]] || { fail_dialog "$APP_NAME launch failed" "No Python script path configured."; exit 1; }
+PY_SCRIPT="$ROOT/$PY_REL"; [[ -f "$PY_SCRIPT" ]] || { fail_dialog "$APP_NAME launch failed" "Python script not found:\\n$PY_SCRIPT"; exit 1; }
+kill_stale_by_pattern "$(readlink -f "$PY_SCRIPT" 2>/dev/null || echo "$PY_SCRIPT")" "python/$APP_ID"
+PYTHON_BIN="$(pick_python)" || { fail_dialog "$APP_NAME launch failed" "Python not found. Install python3/python3-tk."; exit 1; }
+export PYTHONPATH="$ROOT/factbook-assistant:$ROOT:${PYTHONPATH:-}"
+run_probe "python" "$PYTHON_BIN" "$PY_SCRIPT" "$@" && exit 0
+TAIL="$(tail -n 25 "$LOG_FILE" 2>/dev/null)"; fail_dialog "$APP_NAME launch failed" "All launch paths failed for $APP_NAME.\\n\\nRecent log:\\n$TAIL"; exit 1
+"""
+
+
+def _desktop_exec_line(sh_name: str) -> str:
+    return (
+        "Exec=bash -c 'k=\"${1#file://}\"; "
+        "D=$(dirname \"$(readlink -f \"$k\" 2>/dev/null || echo \"$k\")\"); "
+        f"exec bash \"$D/{sh_name}\"' -- %k"
+    )
+
+
+def _desktop_template(app: dict) -> str:
+    return "\n".join([
+        "[Desktop Entry]",
+        "Version=1.0",
+        "Type=Application",
+        f"Name={app['name']}",
+        _desktop_exec_line(app["sh"]),
+        "Terminal=false",
+        "Categories=Utility;",
+        "StartupNotify=true",
+    ]) + "\n"
+
+
+def _discover_launcher_roots(base_root: Path) -> List[Path]:
+    """Find likely mirrored CITL roots that should contain launch assets."""
+    out: List[Path] = []
+    seen = set()
+
+    def _add(p: Path):
+        if not p or not p.is_dir():
+            return
+        if p.name.lower() == "factbook-assistant":
+            return
+        if "CITL_BUNDLES" in p.parts:
+            return
+        try:
+            rp = p.resolve()
+        except Exception:
+            rp = p
+        key = str(rp)
+        if key in seen:
+            return
+        seen.add(key)
+        out.append(rp)
+
+    _add(base_root)
+    for p in base_root.rglob("citl_app_sync.py"):
+        if "factbook-assistant" not in p.parts:
+            continue
+        _add(p.parent.parent)
+    for marker in ("CITL App Sync.sh", "CITL App Sync.desktop"):
+        for p in base_root.rglob(marker):
+            _add(p.parent)
+    out.sort(key=lambda p: (len(p.parts), str(p)))
+    return out
+
+
+def repair_ubuntu_launch_stack(log: Callable[[str], None] = print) -> bool:
+    ok = True
+    launch_roots = _discover_launcher_roots(USB_ROOT)
+    log(f"  Launch roots discovered: {len(launch_roots)}")
+    for root in launch_roots:
+        guard = root / "CITL_APP_LAUNCH_GUARD.sh"
+        try:
+            guard.write_text(_launcher_guard_script_text(), encoding="utf-8")
+            guard.chmod(0o755)
+        except Exception as e:
+            log(f"  ERROR writing launcher guard at {root}: {e}")
+            ok = False
+            continue
+
+        for app in _UBUNTU_LAUNCH_APPS:
+            sh_path = root / app["sh"]
+            sh_txt = (
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "HERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+                "exec bash \"$HERE/CITL_APP_LAUNCH_GUARD.sh\" \\\n"
+                f"  \"{app['name']}\" \\\n"
+                f"  \"{app['id']}\" \\\n"
+                f"  \"{app['py_rel']}\" \\\n"
+                f"  \"{app['legacy_rel']}\" \\\n"
+                "  \"$@\"\n"
+            )
+            try:
+                sh_path.write_text(sh_txt, encoding="utf-8")
+                sh_path.chmod(0o755)
+            except Exception as e:
+                log(f"  ERROR writing {sh_path}: {e}")
+                ok = False
+
+            desktop = root / app["desktop"]
+            exec_line = _desktop_exec_line(app["sh"])
+            try:
+                if desktop.exists():
+                    lines = desktop.read_text(encoding="utf-8", errors="ignore").splitlines()
+                    replaced = False
+                    for i, line in enumerate(lines):
+                        if line.startswith("Exec="):
+                            lines[i] = exec_line
+                            replaced = True
+                            break
+                    if not replaced:
+                        lines.append(exec_line)
+                    desktop.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                else:
+                    desktop.write_text(_desktop_template(app), encoding="utf-8")
+                desktop.chmod(0o755)
+            except Exception as e:
+                log(f"  ERROR patching {desktop}: {e}")
+                ok = False
+        log(f"  Refreshed launch assets in: {root}")
+
+    # Patch Linux crash in document composer (winreg import) and propagate.
+    composer_src = USB_ROOT / "CITL_FACTBOOK_UBUNTU V1" / "factbook-assistant" / "citl_doc_composer.py"
+    if composer_src.exists():
+        try:
+            txt = composer_src.read_text(encoding="utf-8", errors="ignore")
+            if "import winreg" in txt and "try:\n    import winreg" not in txt:
+                txt = txt.replace(
+                    "import winreg",
+                    "try:\\n    import winreg  # Windows-only registry API\\nexcept ImportError:\\n    winreg = None  # type: ignore[assignment]",
+                )
+            blk_old = (
+                "            with winreg.OpenKey(\\n"
+                "                winreg.HKEY_CURRENT_USER,\\n"
+                "                r\"SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Fonts\",\\n"
+                "                access=winreg.KEY_SET_VALUE,\\n"
+                "            ) as k:\\n"
+                "                kind = \"OpenType\" if font_file.suffix.lower() == \".otf\" else \"TrueType\"\\n"
+                "                winreg.SetValueEx(k, f\"{font_file.stem} ({kind})\", 0, winreg.REG_SZ, str(dst))\\n"
+            )
+            blk_new = (
+                "            if winreg is not None:\\n"
+                "                with winreg.OpenKey(\\n"
+                "                    winreg.HKEY_CURRENT_USER,\\n"
+                "                    r\"SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Fonts\",\\n"
+                "                    access=winreg.KEY_SET_VALUE,\\n"
+                "                ) as k:\\n"
+                "                    kind = \"OpenType\" if font_file.suffix.lower() == \".otf\" else \"TrueType\"\\n"
+                "                    winreg.SetValueEx(k, f\"{font_file.stem} ({kind})\", 0, winreg.REG_SZ, str(dst))\\n"
+            )
+            if blk_old in txt:
+                txt = txt.replace(blk_old, blk_new)
+            composer_src.write_text(txt, encoding="utf-8")
+            log(f"  Patched Linux compatibility: {composer_src.name}")
+        except Exception as e:
+            log(f"  ERROR patching doc composer: {e}")
+            ok = False
+
+    if composer_src.exists():
+        for dst in USB_ROOT.rglob("citl_doc_composer.py"):
+            if dst == composer_src:
+                continue
+            if "CITL_BUNDLES" in dst.parts or "factbook-assistant" not in dst.parts:
+                continue
+            try:
+                dtxt = dst.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            if "Missing redirected source:" in dtxt and "runpy.run_path" in dtxt:
+                continue
+            try:
+                shutil.copy2(composer_src, dst)
+            except Exception:
+                pass
+
+    return ok
+
+
+def check_ubuntu_launch_stack() -> CheckResult:
+    guard = USB_ROOT / "CITL_APP_LAUNCH_GUARD.sh"
+    issues: List[str] = []
+    if not guard.exists():
+        issues.append("missing launcher guard")
+    else:
+        txt = guard.read_text(encoding="utf-8", errors="ignore")
+        if "kill_stale_by_pattern" not in txt:
+            issues.append("launcher guard missing refresh-kill logic")
+
+    for app in _UBUNTU_LAUNCH_APPS:
+        sh_path = USB_ROOT / app["sh"]
+        ds_path = USB_ROOT / app["desktop"]
+        if not sh_path.exists():
+            issues.append(f"missing {app['sh']}")
+        else:
+            txt = sh_path.read_text(encoding="utf-8", errors="ignore")
+            if "CITL_APP_LAUNCH_GUARD.sh" not in txt:
+                issues.append(f"legacy launcher format: {app['sh']}")
+        if ds_path.exists():
+            dtx = ds_path.read_text(encoding="utf-8", errors="ignore")
+            if "readlink -f \"$k\"" not in dtx or app["sh"] not in dtx:
+                issues.append(f"desktop Exec miswired: {app['desktop']}")
+
+    if issues:
+        detail = "; ".join(issues[:8]) + (" ..." if len(issues) > 8 else "")
+        return CheckResult(
+            "Ubuntu launcher stack",
+            False,
+            f"{len(issues)} launcher wiring issue(s) detected",
+            fix_fn=repair_ubuntu_launch_stack,
+            fix_label="Repair Ubuntu launch stack",
+            detail=detail,
+        )
+    return CheckResult("Ubuntu launcher stack", True, "Launchers are guard-based and path-safe")
+
+
+def check_packaging_status() -> CheckResult:
+    reg = _get_app_registry()
+    missing: List[str] = []
+    packaged = 0
+    script_missing = 0
+    verify_fail: List[str] = []
+
+    for app_id, meta in _registry_items():
+        state, _msg, _exe = app_packaging_state(app_id, meta)
+        if state == "packaged":
+            ok, _issues = verify_packaged_app(app_id, meta, log=lambda _m: None)
+            if ok:
+                packaged += 1
+            else:
+                verify_fail.append(app_id)
+        elif state == "missing":
+            missing.append(app_id)
+        else:
+            script_missing += 1
+
+    actionable = missing + verify_fail
+    if actionable:
+        missing_ids = actionable[:]
+
+        def _fix(log=print):
+            results = build_app_packages(missing_ids, log=log, clean=True, onefile=False)
+            return all(results.get(aid, False) for aid in missing_ids)
+
+        preview = ", ".join(missing_ids[:8]) + (" ..." if len(missing_ids) > 8 else "")
+        return CheckResult(
+            "Packaged dist builds",
+            False,
+            f"{len(missing)} missing + {len(verify_fail)} verification-fail app(s) (ready={packaged}, script-missing={script_missing})",
+            fix_fn=_fix,
+            fix_label="Rebuild/repair packaged apps",
+            detail=preview,
+        )
+
+    return CheckResult(
+        "Packaged dist builds",
+        True,
+        f"{packaged} app(s) packaged in dist/ (script-missing={script_missing})",
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # FULL CHECK SUITE
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1702,6 +2686,8 @@ def run_all_checks(fb_root: Optional[Path] = None,
     results += check_staff_toolkit_deps()
     results += check_workstation_app_deps()
     results += check_advisor_api_deps()
+    results += [check_ubuntu_launch_stack()]
+    results += [check_packaging_status()]
 
     log("── Running Processes ────────────────────────────────")
     results += check_running_citl_processes()
@@ -2210,16 +3196,11 @@ def run_gui():
         _log_write(boot_log,
                    f"── Bootstrap started {datetime.now().strftime('%H:%M:%S')} ──")
 
-        boot_py = _ensure_required_citl_file("citl_bootstrap.py", USB_ROOT)
-        if not boot_py or not boot_py.exists():
-            _log_write(
-                boot_log,
-                "  ERROR: citl_bootstrap.py not found after searching local installs and attached drives.",
-            )
+        boot_py = USB_ROOT / "citl_bootstrap.py"
+        if not boot_py.exists():
+            _log_write(boot_log, f"  ERROR: {boot_py} not found on USB.")
             _boot_running[0] = False
             return
-        if boot_py.parent != USB_ROOT:
-            _log_write(boot_log, f"  RECOVERED: using bootstrap from {boot_py}")
 
         cmd = [sys.executable, str(boot_py), "--cli"] + list(extra_args)
 
@@ -2281,7 +3262,8 @@ def run_gui():
             raise ImportError("spec loader not available")
     except Exception as _sync_exc:
         tk.Label(tab_sync,
-                 text="Sync engine unavailable: " + str(_sync_exc) + "\n\nEnsure citl_app_sync.py is on the USB root.",
+                 text=("Sync engine unavailable: " + str(_sync_exc) +
+                       "\n\nEnsure citl_app_sync.py is on the USB root."),
                  fg=T["warn"], bg=T["bg"],
                  font=("Consolas", 9), justify="left", padx=20, pady=20,
                  anchor="nw").pack(fill="both", expand=True)
@@ -2427,6 +3409,181 @@ def run_gui():
                  ["explorer", str(USB_ROOT)] if IS_WIN
                  else ["xdg-open", str(USB_ROOT)]),
              3, 2)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TAB — BUILD & PACKAGE (professional dist builder)
+    # ══════════════════════════════════════════════════════════════════════════
+    tab_pkg = tk.Frame(nb, bg=T["bg"])
+    nb.add(tab_pkg, text="  Build & Package  ")
+
+    pkh = tk.Frame(tab_pkg, bg=T["hi"], pady=6)
+    pkh.pack(fill="x")
+    tk.Label(
+        pkh,
+        text="  BUILD & PACKAGE  —  PyInstaller dist builder",
+        fg=T["accent"], bg=T["hi"],
+        font=("Consolas", 10, "bold")
+    ).pack(side="left", padx=8)
+    tk.Label(
+        pkh,
+        text="Build selected apps into professional dist folders + launchers",
+        fg=T["skip"], bg=T["hi"],
+        font=("Consolas", 8)
+    ).pack(side="right", padx=8)
+
+    pkg_outer = tk.Frame(tab_pkg, bg=T["bg"])
+    pkg_outer.pack(fill="both", expand=True)
+
+    pkg_left = tk.Frame(pkg_outer, bg=T["panel"], width=350)
+    pkg_left.pack(side="left", fill="y", padx=(4, 0), pady=4)
+    pkg_right = tk.Frame(pkg_outer, bg=T["bg"])
+    pkg_right.pack(side="left", fill="both", expand=True, padx=4, pady=4)
+
+    tk.Label(pkg_left, text="App Registry",
+             fg=T["accent"], bg=T["panel"],
+             font=("Consolas", 10, "bold")).pack(fill="x", padx=8, pady=(8, 2))
+
+    pkg_list_frame = tk.Frame(pkg_left, bg=T["panel"])
+    pkg_list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 6))
+    pkg_lb = tk.Listbox(
+        pkg_list_frame,
+        bg=T["txt_bg"], fg=T["txt_fg"],
+        selectbackground=T["accent"], selectforeground=T["bg"],
+        font=("Consolas", 8), activestyle="none",
+        relief="flat", borderwidth=0,
+        selectmode="extended"
+    )
+    pkg_sb = ttk.Scrollbar(pkg_list_frame, orient="vertical", command=pkg_lb.yview)
+    pkg_lb.configure(yscrollcommand=pkg_sb.set)
+    pkg_sb.pack(side="right", fill="y")
+    pkg_lb.pack(side="left", fill="both", expand=True)
+
+    pkg_log = _make_log(pkg_right, height=28)
+    pkg_log.pack(fill="both", expand=True)
+    def _pklog(msg: str): _log_write(pkg_log, msg)
+
+    pkg_ctrl = tk.Frame(pkg_left, bg=T["panel"])
+    pkg_ctrl.pack(fill="x", padx=8, pady=(0, 8))
+
+    pkg_ids: List[str] = []
+
+    def _pkg_refresh():
+        nonlocal pkg_ids
+        pkg_ids = []
+        pkg_lb.delete(0, "end")
+        for app_id, meta in _registry_items():
+            state, msg, _exe = app_packaging_state(app_id, meta)
+            name = meta.get("name", app_id)
+            prefix = {
+                "packaged": "READY",
+                "missing": "BUILD",
+                "script-missing": "MISSING",
+            }.get(state, "UNKNOWN")
+            line = f"[{prefix:<7}] {name} ({app_id})"
+            pkg_lb.insert("end", line)
+            idx = pkg_lb.size() - 1
+            pkg_ids.append(app_id)
+            if state == "packaged":
+                pkg_lb.itemconfig(idx, fg=T["ok"])
+            elif state == "missing":
+                pkg_lb.itemconfig(idx, fg=T["warn"])
+            else:
+                pkg_lb.itemconfig(idx, fg=T["skip"])
+        _set_status(f"Packaging registry loaded: {len(pkg_ids)} app(s)")
+
+    def _pkg_selected_ids() -> List[str]:
+        sel = list(pkg_lb.curselection())
+        if not sel:
+            return []
+        return [pkg_ids[i] for i in sel if 0 <= i < len(pkg_ids)]
+
+    def _pkg_build_ids(ids: List[str], label: str):
+        if not ids:
+            _set_status("No apps selected for build", T["warn"])
+            return
+        _set_status(f"{label}: {len(ids)} app(s) in progress…", T["warn"])
+        _pklog(f"\n── {label}: {len(ids)} app(s) ─────────────────────────────")
+
+        def _job():
+            results = build_app_packages(ids, log=_pklog, clean=True, onefile=False)
+            ok_n = sum(1 for v in results.values() if v)
+            fail_n = len(results) - ok_n
+            root.after(0, _pkg_refresh)
+            root.after(0, lambda: _set_status(
+                f"{label} complete: {ok_n} built, {fail_n} failed",
+                T["ok"] if fail_n == 0 else T["warn"]
+            ))
+
+        threading.Thread(target=_job, daemon=True).start()
+
+    def _pkg_build_selected():
+        _pkg_build_ids(_pkg_selected_ids(), "Build selected")
+
+    def _pkg_build_all():
+        ids = [aid for aid, meta in _registry_items() if Path(meta.get("script", "")).exists()]
+        _pkg_build_ids(ids, "Build all")
+
+    def _pkg_build_missing():
+        ids: List[str] = []
+        for aid, meta in _registry_items():
+            state, _msg, _exe = app_packaging_state(aid, meta)
+            if state == "missing":
+                ids.append(aid)
+        _pkg_build_ids(ids, "Build missing")
+
+    def _pkg_verify():
+        ids = _pkg_selected_ids() or [aid for aid, _meta in _registry_items()]
+        _set_status(f"Verifying packaged apps: {len(ids)} target(s)…", T["warn"])
+        _pklog(f"\n── Verify packages: {len(ids)} target(s) ─────────────────────")
+
+        def _job():
+            rep = verify_packaging_suite(ids, log=_pklog)
+            ok_n = sum(1 for v in rep.values() if v.get("ok"))
+            fail_n = len(rep) - ok_n
+            root.after(0, _pkg_refresh)
+            root.after(0, lambda: _set_status(
+                f"Package verify complete: {ok_n} clean, {fail_n} issues",
+                T["ok"] if fail_n == 0 else T["warn"]
+            ))
+
+        threading.Thread(target=_job, daemon=True).start()
+
+    def _pkg_select_all():
+        pkg_lb.selection_set(0, "end")
+
+    def _pkg_clear_sel():
+        pkg_lb.selection_clear(0, "end")
+
+    def _pkg_cleanup():
+        _pklog("\n── Cleanup build artifacts ─────────────────────────────")
+        def _job():
+            ok = cleanup_packaging_artifacts(log=_pklog)
+            root.after(0, lambda: _set_status(
+                "Packaging temp cleanup complete" if ok else "Packaging cleanup finished with warnings",
+                T["ok"] if ok else T["warn"]
+            ))
+        threading.Thread(target=_job, daemon=True).start()
+
+    def _pkg_open_dist():
+        DIST.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.Popen(
+                ["explorer", str(DIST)] if IS_WIN else ["xdg-open", str(DIST)]
+            )
+        except Exception as e:
+            _pklog(f"ERROR opening dist folder: {e}")
+
+    _btn(pkg_ctrl, "Refresh Registry", T["btn"], _pkg_refresh, side="left")
+    _btn(pkg_ctrl, "Build Selected", T["accent"], _pkg_build_selected, side="left")
+    _btn(pkg_ctrl, "Build Missing", T["warn"], _pkg_build_missing, side="left")
+    _btn(pkg_ctrl, "Build All", T["hi"], _pkg_build_all, side="left")
+    _btn(pkg_ctrl, "Verify Packages", T["accent"], _pkg_verify, side="left")
+    _btn(pkg_ctrl, "Select All", T["btn"], _pkg_select_all, side="left")
+    _btn(pkg_ctrl, "Clear Selection", T["skip"], _pkg_clear_sel, side="left")
+    _btn(pkg_ctrl, "Cleanup Build Temp", T["err"], _pkg_cleanup, side="left")
+    _btn(pkg_ctrl, "Open dist/", T["skip"], _pkg_open_dist, side="left")
+
+    _pkg_refresh()
 
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -2626,7 +3783,7 @@ def run_gui():
             _plog("  OK   FFmpeg on system PATH")
         else:
             _plog("  WARN FFmpeg not found — audio features limited")
-            _plog("       Place ffmpeg.exe in .\\bin\ for portable use")
+            _plog("       Place ffmpeg.exe in .\\bin\\ for portable use")
 
         # ── 7. Ollama portable ────────────────────────────────────────────
         _plog("\n── [7/8] Ollama availability ───────────────────────────────────")
@@ -2731,276 +3888,6 @@ def run_gui():
 
     root.after(500, lambda: threading.Thread(
         target=_run_portable_diagnostics, daemon=True).start())
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # TAB — USB REIMAGER DEPLOY
-    # ══════════════════════════════════════════════════════════════════════════
-    tab_usb = tk.Frame(nb, bg=T["bg"])
-    nb.add(tab_usb, text="  USB Reimager  ")
-
-    def _usb_lbl(parent, text, font_size=9, bold=False, color=None):
-        f = ("Consolas", font_size, "bold") if bold else ("Consolas", font_size)
-        tk.Label(parent, text=text, bg=T["bg"], fg=color or T["txt_fg"],
-                 font=f, anchor="w", justify="left").pack(anchor="w", padx=8, pady=1)
-
-    def _usb_sect(parent, title):
-        tk.Label(parent, text=f"  {title}", bg=T["hl2"], fg=T["status"],
-                 font=("Consolas", 9, "bold"),
-                 anchor="w").pack(fill="x", padx=4, pady=(6, 2))
-        f = tk.Frame(parent, bg=T["bg"])
-        f.pack(fill="x", padx=12, pady=2)
-        return f
-
-    # Header
-    hdr = tk.Frame(tab_usb, bg=T["hl2"], pady=6)
-    hdr.pack(fill="x", padx=4, pady=4)
-    tk.Label(hdr, text="  CITL Reimager  —  USB Fleet Deploy",
-             bg=T["hl2"], fg=T["accent"],
-             font=("Consolas", 11, "bold")).pack(side="left", padx=10)
-    tk.Label(hdr, text="Push CITL Reimager to connected ExFAT drives",
-             bg=T["hl2"], fg=T["txt_fg"],
-             font=("Consolas", 8)).pack(side="right", padx=10)
-
-    usb_body = tk.Frame(tab_usb, bg=T["bg"])
-    usb_body.pack(fill="both", expand=True)
-
-    # Left: controls
-    usb_left = tk.Frame(usb_body, bg=T["bg"], width=360)
-    usb_left.pack(side="left", fill="y", padx=(4, 0), pady=4)
-    usb_left.pack_propagate(False)
-
-    # Right: log
-    usb_right = tk.Frame(usb_body, bg=T["bg"])
-    usb_right.pack(side="left", fill="both", expand=True, padx=4, pady=4)
-    usb_log = _make_log(usb_right, height=30)
-    usb_log.pack(fill="both", expand=True)
-
-    def _ulog(msg, tag=""):
-        _log_write(usb_log, msg)
-
-    # ── Source section ────────────────────────────────────────────────────────
-    src_sect = _usb_sect(usb_left, "Source (CITL Reimager scripts)")
-
-    reimager_src = USB_ROOT / "CITL-Cannakit" / "reimager"
-    src_var = tk.StringVar(value=str(reimager_src))
-    src_ent = tk.Entry(src_sect, textvariable=src_var, width=36,
-                       bg=T["txt_bg"], fg=T["txt_fg"],
-                       insertbackground=T["accent"], font=("Consolas", 8))
-    src_ent.pack(fill="x", pady=2)
-
-    def _usb_browse_src():
-        from tkinter import filedialog
-        p = filedialog.askdirectory(title="Select reimager scripts folder",
-                                    initialdir=str(reimager_src))
-        if p:
-            src_var.set(p)
-    _btn(src_sect, "Browse…", T["btn"], _usb_browse_src, side="left")
-
-    def _src_ok():
-        p = Path(src_var.get())
-        return (p / "citl_reimager.sh").exists()
-
-    src_status = tk.Label(src_sect, text="", bg=T["bg"],
-                          font=("Consolas", 7))
-    src_status.pack(anchor="w", pady=1)
-
-    def _refresh_src_status():
-        if _src_ok():
-            src_status.configure(text="✓ Scripts found", fg=T["ok"])
-        else:
-            src_status.configure(text="✗ citl_reimager.sh not found", fg=T["err"])
-    _refresh_src_status()
-    src_var.trace_add("write", lambda *_: _refresh_src_status())
-
-    # ── Target drives section ─────────────────────────────────────────────────
-    tgt_sect = _usb_sect(usb_left, "Target ExFAT USB Drives")
-
-    usb_listbox = tk.Listbox(tgt_sect, height=8, selectmode="multiple",
-                             bg=T["txt_bg"], fg=T["txt_fg"],
-                             selectbackground=T["accent"],
-                             font=("Consolas", 9))
-    usb_listbox.pack(fill="x", pady=2)
-
-    usb_drive_map = {}   # listbox_index → drive_letter
-
-    def _usb_scan():
-        usb_listbox.delete(0, "end")
-        usb_drive_map.clear()
-        _ulog("Scanning for ExFAT drives...\n")
-        found = []
-        try:
-            if IS_WIN:
-                out = subprocess.check_output(
-                    ["powershell", "-NoProfile", "-Command",
-                     "Get-Volume | Where-Object { $_.FileSystemType -eq 'ExFAT' "
-                     "-and $_.DriveLetter } | "
-                     "Select-Object DriveLetter,Size,FileSystemLabel | "
-                     "ConvertTo-Csv -NoTypeInformation"],
-                    text=True, timeout=10)
-                for line in out.strip().splitlines()[1:]:
-                    cols = [c.strip('"') for c in line.split(",")]
-                    if not cols or not cols[0]:
-                        continue
-                    letter = cols[0] + ":\\"
-                    size_gb = (round(int(cols[1]) / (1024**3), 1)
-                               if cols[1].isdigit() else "?")
-                    label = cols[2] if len(cols) > 2 else ""
-                    entry = f"{letter}  [{label or 'unlabelled'}]  {size_gb} GB"
-                    found.append((letter, entry))
-            else:
-                # Linux: use lsblk
-                out = subprocess.check_output(
-                    ["lsblk", "-J", "-o", "PATH,FSTYPE,LABEL,MOUNTPOINT,SIZE"],
-                    text=True, timeout=5)
-                import json as _json
-                data = _json.loads(out)
-                def _flat(devs, acc=None):
-                    if acc is None: acc = []
-                    for d in devs:
-                        acc.append(d)
-                        _flat(d.get("children", []), acc)
-                    return acc
-                for d in _flat(data.get("blockdevices", [])):
-                    if (d.get("fstype") or "") == "exfat":
-                        path = d.get("path", "")
-                        label = d.get("label", "") or ""
-                        mnt = d.get("mountpoint", "") or "unmounted"
-                        size = d.get("size", "") or ""
-                        entry = f"{path}  [{label}  {size}  {mnt}]"
-                        found.append((mnt if mnt != "unmounted" else path, entry))
-        except Exception as e:
-            _ulog(f"Scan error: {e}\n")
-
-        if found:
-            for i, (drive, entry) in enumerate(found):
-                usb_listbox.insert("end", f"  {entry}")
-                usb_drive_map[i] = drive
-            usb_listbox.select_set(0, "end")   # pre-select all
-            _ulog(f"Found {len(found)} ExFAT drive(s). All pre-selected.\n")
-        else:
-            usb_listbox.insert("end", "  No ExFAT drives detected")
-            _ulog("No ExFAT drives found. Connect a USB formatted as ExFAT.\n")
-
-    _btn(tgt_sect, "Scan Drives", T["accent"], _usb_scan, side="left")
-    _btn(tgt_sect, "Select All",  T["btn"],
-         lambda: usb_listbox.select_set(0, "end"), side="left")
-    _btn(tgt_sect, "Clear",       T["btn"],
-         lambda: usb_listbox.selection_clear(0, "end"), side="left")
-
-    # ── Deploy section ────────────────────────────────────────────────────────
-    dep_sect = _usb_sect(usb_left, "Deploy")
-
-    def _usb_deploy():
-        if not _src_ok():
-            _ulog(f"ERROR: Source not found: {src_var.get()}\n")
-            return
-        sel = usb_listbox.curselection()
-        if not sel:
-            _ulog("No drives selected. Select at least one target drive.\n")
-            return
-        targets = [usb_drive_map[i] for i in sel if i in usb_drive_map]
-        if not targets:
-            _ulog("No valid targets — re-scan drives.\n")
-            return
-        src = Path(src_var.get())
-        _ulog(f"\n{'─'*60}\nDeploying CITL Reimager to {len(targets)} drive(s)...\n")
-        _set_status(f"Deploying to {len(targets)} USB drive(s)…")
-
-        def _bg():
-            ok = 0; fail = 0
-            for tgt in targets:
-                _ulog(f"  → {tgt}...")
-                try:
-                    if IS_WIN:
-                        dest = os.path.join(tgt, "citl_reimager")
-                        os.makedirs(dest, exist_ok=True)
-                        r = subprocess.run(
-                            ["robocopy", str(src), dest,
-                             "/E", "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS"],
-                            capture_output=True, text=True, timeout=300)
-                        success = r.returncode < 8
-                    else:
-                        dest = os.path.join(tgt, "citl_reimager")
-                        os.makedirs(dest, exist_ok=True)
-                        r = subprocess.run(
-                            ["rsync", "-a", "--delete",
-                             str(src) + "/", dest + "/"],
-                            capture_output=True, text=True, timeout=300)
-                        success = r.returncode == 0
-
-                    if success:
-                        # Write manifest
-                        manifest = os.path.join(
-                            dest if IS_WIN else dest, "MANIFEST.txt")
-                        try:
-                            with open(manifest, "w") as mf:
-                                mf.write(
-                                    f"CITL Reimager\n"
-                                    f"Deployed: {datetime.now().isoformat()}\n"
-                                    f"Source:   {src}\n"
-                                    f"Target:   {tgt}\n"
-                                    f"Machine:  {platform.node()}\n"
-                                )
-                        except Exception:
-                            pass
-                        _ulog(f"  DONE: {tgt}\n")
-                        ok += 1
-                    else:
-                        out = (r.stderr or r.stdout or "")[:300]
-                        _ulog(f"  FAILED: {tgt} — {out}\n")
-                        fail += 1
-                except Exception as e:
-                    _ulog(f"  ERROR: {tgt} — {e}\n")
-                    fail += 1
-
-            summary = f"\nDeploy complete: {ok} OK, {fail} failed.\n"
-            _ulog(summary)
-            _set_status(f"USB deploy: {ok} OK, {fail} failed",
-                        T["ok"] if fail == 0 else T["warn"])
-
-        threading.Thread(target=_bg, daemon=True).start()
-
-    _btn(dep_sect, "Deploy to Selected Drives", T["ok"],   _usb_deploy, side="left")
-
-    # ── What this fixes section ───────────────────────────────────────────────
-    fix_sect = _usb_sect(usb_left, "What This Fixes (Changelog Summary)")
-    fixes_text = tk.Text(usb_left, height=14, wrap="word",
-                         bg=T["txt_bg"], fg=T["txt_fg"],
-                         font=("Consolas", 7), relief="flat",
-                         state="normal", padx=6, pady=4)
-    fixes_text.pack(fill="x", padx=12, pady=2)
-    fixes_text.insert("end",
-        "GRUB SHELL AT BOOT (Ubuntu UEFI)\n"
-        "─────────────────────────────────\n"
-        "Problem:  Adding the ExFAT partition (sdb4) changed the partition layout\n"
-        "          that GRUB had compiled its UUID search path against.\n"
-        "          Result: GRUB found its EFI binary but not grub.cfg → shell.\n"
-        "Fix:      fix_usb_grub.sh reinstalls GRUB with --removable --no-nvram\n"
-        "          and writes a label-based grub.cfg (search --label CITLBOOT)\n"
-        "          that is immune to UUID changes and partition additions.\n"
-        "\n"
-        "UBUNTU DRIVE IMAGING FAILURES\n"
-        "─────────────────────────────────\n"
-        "Problem:  Original scripts had no partitioner, no squashfs extractor,\n"
-        "          no grub-install on target. Used chroot apt (needed internet).\n"
-        "          IFS change broke read/awk. Prompts blocked GUI calls.\n"
-        "Fix:      citl_reimager.sh v2.1 uses host grub-install (no internet),\n"
-        "          lsblk JSON (no column-shift), /dev/tty for all prompts,\n"
-        "          and global vars (not captured stdout) for partition results.\n"
-        "\n"
-        "FLEET USB SYNC\n"
-        "─────────────────────────────────\n"
-        "Enabled:  fleet_sync_usb.sh syncs content from one source USB to all\n"
-        "          connected ExFAT targets in parallel (up to 4 at once).\n"
-        "          GUI streams PROGRESS/DONE/FAILED lines in real time.\n"
-    )
-    fixes_text.configure(state="disabled")
-
-    # Auto-scan on tab open
-    def _on_usb_tab_select(event):
-        if nb.select() == nb.tabs()[-2]:   # second-to-last = this tab
-            _usb_scan()
-    nb.bind("<<NotebookTabChanged>>", _on_usb_tab_select)
 
     # ══════════════════════════════════════════════════════════════════════════
     # TAB 4 — FULL LOG

@@ -1,31 +1,12 @@
 @echo off
-REM ===============================================================
-REM  CITL Factbook Pipeline Diagnostic - Windows USB Launcher
-REM  Runs the 18-stage live pipeline test.
-REM  Every failure shows exact error + exact fix command + Fix button.
-REM ===============================================================
+call "%~dp0_citl_env.cmd"
 setlocal
-set "ROOT=%~dp0"
-set "DIAG=%ROOT%factbook-assistant\citl_factbook_diagnostic.py"
-
-REM Add factbook-assistant to path
-set "PYTHONPATH=%ROOT%factbook-assistant;%PYTHONPATH%"
-
-REM Find Python
-set "PY="
-if exist "%ROOT%.venv\Scripts\python.exe" set "PY=%ROOT%.venv\Scripts\python.exe"
-if not defined PY ( where python.exe >nul 2>&1 && set "PY=python.exe" )
-if not defined PY ( where py.exe    >nul 2>&1 && set "PY=py -3" )
-if not defined PY (
-    powershell -Command "Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('Python not found. Install Python 3.9+ from python.org', 'CITL Diagnostic Error', 'OK', 'Error')"
-    exit /b 1
-)
-
-if not exist "%DIAG%" (
-    echo ERROR: Diagnostic script not found: %DIAG%
-    pause
-    exit /b 1
-)
-
-%PY% "%DIAG%" %*
-endlocal
+set "HERE=%~dp0"
+title CITL Factbook Diagnostic
+if not defined CITL_FA  ( echo [ERROR] factbook-assistant not found on this drive. & pause & exit /b 1 )
+if not defined CITL_PY  ( echo [ERROR] Python not found. Run INSTALL_CITL_APPS_PORTABLE.cmd & pause & exit /b 1 )
+set "PYTHONPATH=%CITL_FA%;%PYTHONPATH%"
+%CITL_PY% "%CITL_FA%\citl_factbook_diagnostic.py" %*
+set EC=%ERRORLEVEL%
+if %EC% neq 0 pause
+exit /b %EC%

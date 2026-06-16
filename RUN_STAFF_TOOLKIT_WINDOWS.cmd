@@ -1,23 +1,13 @@
 @echo off
+call "%~dp0_citl_env.cmd"
 setlocal
 set "HERE=%~dp0"
 set "EXE=%HERE%dist\CITL Work and Preparedness Launcher\CITL Work and Preparedness Launcher.exe"
 set "EXE_OLD=%HERE%dist\CITL Staff Toolkit\CITL Staff Toolkit.exe"
-
-if exist "%EXE%" (
-  "%EXE%" %*
-  set "EC=%ERRORLEVEL%"
-  if %EC% equ 0 exit /b 0
-  echo [WARN] New EXE launch failed with exit code %EC%. Falling back...
-)
-if exist "%EXE_OLD%" (
-  "%EXE_OLD%" %*
-  set "EC=%ERRORLEVEL%"
-  if %EC% equ 0 exit /b 0
-  echo [WARN] Legacy EXE launch failed with exit code %EC%. Falling back to Python launcher...
-)
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "%HERE%scripts\windows\run_work_preparedness_launcher.ps1" %*
-set "EC=%ERRORLEVEL%"
+if exist "%EXE%"     ( start "" "%EXE%"     %* & exit /b 0 )
+if exist "%EXE_OLD%" ( start "" "%EXE_OLD%" %* & exit /b 0 )
+if not defined CITL_SW ( echo [ERROR] scripts\windows not found on this drive. & pause & exit /b 1 )
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CITL_SW%\run_work_preparedness_launcher.ps1" %*
+set EC=%ERRORLEVEL%
 if %EC% neq 0 pause
 exit /b %EC%

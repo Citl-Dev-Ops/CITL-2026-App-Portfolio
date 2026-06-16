@@ -26,6 +26,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PAYLOAD_GUARD="${SCRIPT_DIR}/boot_payload_guard.sh"
+[[ -f "${PAYLOAD_GUARD}" ]] && source "${PAYLOAD_GUARD}"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 SOURCE_DEV=""
@@ -266,18 +268,33 @@ Target    : ${dev}  (${label:-unlabelled})
 Files     : $(find "${dest}" -type f 2>/dev/null | wc -l)
 MANI
 
-    # Fix GRUB on ExFAT-sibling CITLBOOT partitions
-    emit "PROGRESS:${dev}|90|Checking for GRUB fix opportunity..."
-    local parent; parent="$(lsblk -rno PKNAME "${dev}" 2>/dev/null | head -1)"
+    local parent sibling_boot sibling_boot_mnt payload_status
+    parent="$(lsblk -rno PKNAME "${dev}" 2>/dev/null | head -1)"
+    sibling_boot=""
+    sibling_boot_mnt=""
     if [[ -n "${parent}" ]]; then
-        local sibling_boot
         sibling_boot="$(lsblk -rno PATH,LABEL "/dev/${parent}" 2>/dev/null | \
             awk '$2=="CITLBOOT"{print $1}' | head -1)"
+        if [[ -n "${sibling_boot}" ]]; then
+            sibling_boot_mnt="$(mount_partition "${sibling_boot}" "vfat" "CITLBOOT" 2>/dev/null || true)"
+        fi
+    fi
+
+    if declare -F citl_payload_write_status >/dev/null 2>&1; then
+        payload_status="$(citl_payload_write_status "${dest}" "${sibling_boot_mnt:-}" "${tgt_mnt}" 2>/dev/null || true)"
+        emit "PROGRESS:${dev}|88|Boot payload status: ${payload_status:-UNKNOWN}"
+    fi
+
+    # Fix GRUB on ExFAT-sibling CITLBOOT partitions
+    emit "PROGRESS:${dev}|90|Checking for GRUB fix opportunity..."
+    if [[ -n "${parent}" ]]; then
         if [[ -n "${sibling_boot}" ]] && [[ -x "${dest}/fix_usb_grub.sh" ]]; then
-            bash "${dest}/fix_usb_grub.sh" "/dev/${parent}" \
-                --quiet 2>/dev/null || \
-            log "GRUB fix skipped on /dev/${parent} (may not have ESP)"
-            emit "PROGRESS:${dev}|95|GRUB config updated on /dev/${parent}"
+            if bash "${dest}/fix_usb_grub.sh" "/dev/${parent}" --quiet 2>/dev/null; then
+                emit "PROGRESS:${dev}|95|GRUB config verified on /dev/${parent}"
+            else
+                log "GRUB fix skipped on /dev/${parent} (missing ESP or boot payload)"
+                emit "PROGRESS:${dev}|95|GRUB fix skipped; check CITL_BOOT_PAYLOAD_STATUS.txt"
+            fi
         fi
     fi
 

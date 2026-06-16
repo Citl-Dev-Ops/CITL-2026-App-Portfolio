@@ -21,7 +21,7 @@
     .\build_all_citl_exes.ps1 -Parallel                 # Parallel builds
 #>
 param(
-    [string]$Apps     = "all",   # "all" | "llmops" | "factbook" | "appsync" | "doccomposer" | "dbbuilder" | "avitops" | "stafftoolkit" | "workstationapps" | "fieldapps" | "synchub" | "ticketing"
+    [string]$Apps     = "all",   # "all" | "llmops" | "factbook" | "appsync" | "doccomposer" | "dbbuilder" | "avitops" | "stafftoolkit" | "workstationapps" | "fieldapps" | "synchub" | "flex" | "ticketing" | "reimager" | "fixer" | "updater" | "automation"
     [switch]$Clean,
     [switch]$SkipDeps,
     [switch]$CopyToUsb,
@@ -232,6 +232,11 @@ $buildFieldApps        = $buildAll -or (@("fieldapps","field","fieldtech") -cont
 $buildSyncHub          = $buildAll -or (@("synchub","sync_hub","hub","syncapp") -contains $appsNorm)
 $buildFlex             = $buildAll -or (@("flex","flex_troubleshooter","citlflex","flextroubleshooter") -contains $appsNorm)
 $buildTicketing        = $buildAll -or (@("ticketing","workticketing","ticketingautomation","powerflow","powerflowbuilder") -contains $appsNorm)
+$buildReimager         = $buildAll -or (@("reimager","citlreimager","reimage") -contains $appsNorm)
+$buildFixer            = $buildAll -or (@("fixer","citlfixer","repair") -contains $appsNorm)
+$buildUpdater          = $buildAll -or (@("updater","appupdater","citlupdater","appupdater") -contains $appsNorm)
+$buildAutomation       = $buildAll -or (@("automation","citlautomation","bundle","bundleauto") -contains $appsNorm)
+$buildLauncher         = $buildAll -or (@("launcher","usblauncher","citllauncher") -contains $appsNorm)
 
 $results = @{}
 
@@ -393,6 +398,88 @@ if ($buildTicketing) {
         }
         $results["Ticketing Automation GUI"] = $ok
     }
+}
+
+if ($buildReimager) {
+    # PySide6-based app — collect-all handles Qt plugin resolution
+    $pyiArgs = @(
+        "-m", "PyInstaller",
+        "--noconfirm", "--clean", "--windowed",
+        "--name", "CITL Re-Imager",
+        "--distpath", $DistDir,
+        "--workpath", $WorkDir,
+        "--collect-all", "PySide6",
+        "--hidden-import", "PySide6.QtCore",
+        "--hidden-import", "PySide6.QtWidgets",
+        "--hidden-import", "PySide6.QtGui",
+        "--hidden-import", "json",
+        "--hidden-import", "shutil",
+        "--hidden-import", "subprocess",
+        "--hidden-import", "threading",
+        (Join-Path $Repo "CITL-REIMAGER\citl_reimager.py")
+    )
+    Write-Host ""
+    Write-Host "---- Building: CITL Re-Imager ----" -ForegroundColor Magenta
+    $entryRI = Join-Path $Repo "CITL-REIMAGER\citl_reimager.py"
+    if (!(Test-Path $entryRI)) {
+        Write-Fail "Entry not found: $entryRI  --  skipping."
+        $results["CITL Re-Imager"] = $false
+    } else {
+        Set-Location $Repo
+        & $VenvPy @pyiArgs
+        $ec = $LASTEXITCODE
+        $outRI = Join-Path $DistDir "CITL Re-Imager"
+        if ($ec -eq 0 -and (Test-Path $outRI)) {
+            Write-OK "CITL Re-Imager  -->  $outRI"
+            $results["CITL Re-Imager"] = $true
+        } else {
+            Write-Fail "CITL Re-Imager build FAILED (exit $ec)."
+            $results["CITL Re-Imager"] = $false
+        }
+    }
+}
+
+if ($buildFixer) {
+    $ok = Build-App `
+        -Name "CITL Fixer" `
+        -Entry (Join-Path $Repo "citl_fixer.py") `
+        -HiddenImports @(
+            "tkinter","_tkinter","tkinter.ttk","tkinter.messagebox",
+            "tkinter.filedialog","tkinter.scrolledtext","tkinter.simpledialog",
+            "subprocess","threading","urllib.request","shutil","glob"
+        )
+    $results["CITL Fixer"] = $ok
+}
+
+if ($buildUpdater) {
+    $ok = Build-App `
+        -Name "CITL App Updater" `
+        -Entry (Join-Path $Repo "CITL-REIMAGER\citl_app_updater.py") `
+        -HiddenImports @(
+            "tkinter","_tkinter","tkinter.ttk","tkinter.messagebox",
+            "tkinter.filedialog","tkinter.scrolledtext",
+            "hashlib","shutil","threading","subprocess"
+        )
+    $results["CITL App Updater"] = $ok
+}
+
+if ($buildAutomation) {
+    $ok = Build-App `
+        -Name "CITL Bundle Automation" `
+        -Entry (Join-Path $Repo "CITL-REIMAGER\citl_bundle_automation.py") `
+        -HiddenImports @("shutil","hashlib","json","argparse")
+    $results["CITL Bundle Automation"] = $ok
+}
+
+if ($buildLauncher) {
+    $ok = Build-App `
+        -Name "CITL USB Launcher" `
+        -Entry (Join-Path $Repo "citl_usb_launcher.py") `
+        -HiddenImports @(
+            "tkinter","_tkinter","tkinter.ttk","tkinter.messagebox",
+            "subprocess","threading","pathlib","os"
+        )
+    $results["CITL USB Launcher"] = $ok
 }
 
 # ---- Summary -----------------------------------------------------------

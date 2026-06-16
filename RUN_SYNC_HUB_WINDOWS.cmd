@@ -1,12 +1,13 @@
 @echo off
+call "%~dp0_citl_env.cmd"
 setlocal
 set "HERE=%~dp0"
 set "EXE=%HERE%dist\CITL Sync Hub\CITL Sync Hub.exe"
-if exist "%EXE%" (
-    start "" "%EXE%"
-) else (
-    set "PY=%HERE%.venv\Scripts\python.exe"
-    if not exist "%PY%" set "PY=python"
-    "%PY%" "%HERE%factbook-assistant\citl_sync_hub.py"
-    if %ERRORLEVEL% neq 0 pause
-)
+if exist "%EXE%" ( start "" "%EXE%" %* & exit /b 0 )
+if not defined CITL_FA  ( echo [ERROR] factbook-assistant not found on this drive. & pause & exit /b 1 )
+if not defined CITL_PY  ( echo [ERROR] Python not found. Run INSTALL_CITL_APPS_PORTABLE.cmd & pause & exit /b 1 )
+set "PYTHONPATH=%CITL_FA%;%PYTHONPATH%"
+%CITL_PY% "%CITL_FA%\citl_sync_hub.py" %*
+set EC=%ERRORLEVEL%
+if %EC% neq 0 pause
+exit /b %EC%

@@ -10,6 +10,7 @@ REM  What this deploys:
 REM    • citl_reimager.sh     — Ubuntu drive imager (3 profiles: lean/standard/full)
 REM    • fleet_sync_usb.sh    — Fleet update: one source → all targets
 REM    • fix_usb_grub.sh      — Repairs the GRUB shell boot failure (Ubuntu UEFI)
+REM    • boot_payload_guard.sh — Prevents false boot-ready status
 REM    • preflight_check.sh   — Pre-flight dependency checker for live boot
 REM    • deploy_reimager_to_usb.sh — Self-update tool
 REM    • grub.cfg             — Label-based GRUB config (survives UUID changes)
@@ -38,6 +39,16 @@ if not exist "%REIMAGER_SRC%\citl_reimager.sh" (
     echo.
     echo  Ensure CITL-Cannakit\reimager\ exists in the repo root.
     echo  Run: git pull  to restore missing files.
+    echo.
+    pause
+    exit /b 1
+)
+if not exist "%REIMAGER_SRC%\boot_payload_guard.sh" (
+    echo  [ERROR] Boot payload guard missing at:
+    echo          %REIMAGER_SRC%\boot_payload_guard.sh
+    echo.
+    echo  This file is required so USBs are not falsely marked boot-ready.
+    echo  Restore CITL-Cannakit\reimager before deploying.
     echo.
     pause
     exit /b 1
@@ -192,11 +203,52 @@ REM Write manifest
     echo   citl_reimager.sh        -- Ubuntu drive imager (lean/standard/full)
     echo   fleet_sync_usb.sh       -- Fleet USB sync
     echo   fix_usb_grub.sh         -- GRUB repair for boot failures
+    echo   boot_payload_guard.sh   -- Payload and boot-readiness guard
     echo   preflight_check.sh      -- Boot preflight dependency checker
     echo   deploy_reimager_to_usb.sh -- Self-deploy/update tool
     echo   grub.cfg                -- Label-based GRUB config
 ) > "!DEST!\MANIFEST.txt" 2>nul
 
+set "PAYLOAD_STATUS=MISSING:no-citlboot-or-offline-payload"
+set "CITLBOOT_DRIVE="
+set "HAS_KERNEL="
+set "HAS_INITRD="
+for /f "usebackq delims=" %%B in (`powershell -NoProfile -Command "$v=Get-Volume ^| Where-Object { $_.FileSystemLabel -eq 'CITLBOOT' -and $_.DriveLetter } ^| Select-Object -First 1; if($v){ Write-Output ($v.DriveLetter + ':') }"`) do (
+    if not defined CITLBOOT_DRIVE set "CITLBOOT_DRIVE=%%B"
+)
+if defined CITLBOOT_DRIVE (
+    if exist "!CITLBOOT_DRIVE!\casper\vmlinuz" set "HAS_KERNEL=1"
+    if exist "!CITLBOOT_DRIVE!\casper\vmlinuz.efi" set "HAS_KERNEL=1"
+    if exist "!CITLBOOT_DRIVE!\casper\initrd" set "HAS_INITRD=1"
+    if exist "!CITLBOOT_DRIVE!\casper\initrd.lz" set "HAS_INITRD=1"
+    if exist "!CITLBOOT_DRIVE!\casper\filesystem.squashfs" (
+        if defined HAS_KERNEL if defined HAS_INITRD set "PAYLOAD_STATUS=OK:casper:!CITLBOOT_DRIVE!\casper"
+    )
+)
+if "!PAYLOAD_STATUS:~0,3!" neq "OK:" (
+    if exist "!DLETTER!\ubuntu-base\filesystem.squashfs" set "PAYLOAD_STATUS=OK:offline:!DLETTER!\ubuntu-base\filesystem.squashfs"
+)
+if "!PAYLOAD_STATUS:~0,3!" neq "OK:" (
+    for %%I in ("!DLETTER!\ubuntu-24*.iso" "!DLETTER!\CITL_Images\ubuntu-24*.iso" "!DLETTER!\*ubuntu*desktop*.iso") do (
+        if exist "%%~fI" if "!PAYLOAD_STATUS:~0,3!" neq "OK:" set "PAYLOAD_STATUS=OK:offline:%%~fI"
+    )
+)
+(
+    echo CITL boot payload status
+    echo.
+    echo Checked: %DATE% %TIME%
+    echo Status : !PAYLOAD_STATUS!
+    echo Target : !DEST!
+    echo.
+    echo Boot-ready requires CITLBOOT\casper\vmlinuz, CITLBOOT\casper\initrd,
+    echo and CITLBOOT\casper\filesystem.squashfs. Offline ISO/squashfs payloads
+    echo can support repair or reimage work, but do not replace casper boot files.
+) > "!DEST!\CITL_BOOT_PAYLOAD_STATUS.txt" 2>nul
+
+if "!PAYLOAD_STATUS:~0,7!"=="MISSING" (
+    echo  [WARN]  Boot payload missing on/near !DLETTER!. Tools copied, but this USB is not boot-ready.
+    echo          See !DEST!\CITL_BOOT_PAYLOAD_STATUS.txt
+)
 echo  [OK]    Deployed to !DLETTER! — %REIMAGER_SRC% files copied.
 set /a "OK_COUNT+=1"
 goto :eof

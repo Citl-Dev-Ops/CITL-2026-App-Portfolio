@@ -20,6 +20,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PAYLOAD_GUARD="${SCRIPT_DIR}/boot_payload_guard.sh"
+[[ -f "${PAYLOAD_GUARD}" ]] && source "${PAYLOAD_GUARD}"
 QUIET=false
 LIST_ONLY=false
 TARGET_DEV=""
@@ -60,6 +62,15 @@ for d in flat(data.get('blockdevices', [])):
         size  = d.get('size','') or ''
         print(f'{path}\t{label}\t{mnt}\t{size}')
 PYEOF
+}
+
+find_sibling_citlboot_mount() {
+    local dev="$1"
+    local parent=""
+    parent="$(lsblk -rno PKNAME "${dev}" 2>/dev/null | head -1 || true)"
+    [[ -n "${parent}" ]] || return 0
+    lsblk -rno PATH,LABEL,MOUNTPOINT "/dev/${parent}" 2>/dev/null | \
+        awk '$2=="CITLBOOT" && $3!="" {print $3; exit}'
 }
 
 # ── List mode (GUI queries this) ──────────────────────────────────────────────
@@ -173,6 +184,15 @@ Deployed: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 Source: $(hostname)
 Files: $(find "${DEST}" -type f | wc -l)
 MANIFEST
+
+if declare -F citl_payload_write_status >/dev/null 2>&1; then
+    CITLBOOT_MOUNT="$(find_sibling_citlboot_mount "${TARGET_DEV}" 2>/dev/null || true)"
+    PAYLOAD_STATUS="$(citl_payload_write_status "${DEST}" "${CITLBOOT_MOUNT:-}" "${TARGET_MOUNT}" 2>/dev/null || true)"
+    log "Boot payload status: ${PAYLOAD_STATUS:-UNKNOWN}"
+    if [[ "${PAYLOAD_STATUS:-}" == MISSING:* ]]; then
+        log "WARNING: boot/recovery payload missing; USB tools copied but media is not boot-ready."
+    fi
+fi
 
 sync
 

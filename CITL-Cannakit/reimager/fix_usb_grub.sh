@@ -15,6 +15,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GRUB_CFG_SRC="${SCRIPT_DIR}/grub.cfg"
+PAYLOAD_GUARD="${SCRIPT_DIR}/boot_payload_guard.sh"
+[[ -f "${PAYLOAD_GUARD}" ]] && source "${PAYLOAD_GUARD}"
 QUIET=false
 
 # ── Argument check ────────────────────────────────────────────────────────────
@@ -56,6 +58,7 @@ log ""
 # ── Find partitions (handles sda1 AND nvme0n1p1 and mmcblk0p1 naming) ────────
 CITLBOOT_PART=""
 ESP_PART=""
+DATA_PART=""
 
 # Build partition glob that works for both /dev/sdb and /dev/nvme0n1
 if [[ "${USB_DEV}" =~ (nvme|mmcblk) ]]; then
@@ -86,6 +89,9 @@ while IFS=$'\t' read -r path label fstype parttype; do
     if [[ "${label}" == "CITLBOOT" ]]; then
         CITLBOOT_PART="${path}"
     fi
+    if [[ -z "${DATA_PART}" ]] && [[ "${fstype}" == "exfat" ]]; then
+        DATA_PART="${path}"
+    fi
     if [[ "${label}" == "ESP" ]] || \
        [[ "${parttype}" == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" ]] || \
        [[ "${parttype}" == "C12A7328-F81F-11D2-BA4B-00A0C93EC93B" ]]; then
@@ -100,6 +106,7 @@ if [[ -z "${CITLBOOT_PART}" ]] || [[ -z "${ESP_PART}" ]]; then
         local_label="$(lsblk -rno LABEL "${part}" 2>/dev/null || true)"
         local_fstype="$(lsblk -rno FSTYPE "${part}" 2>/dev/null || true)"
         [[ "${local_label}" == "CITLBOOT" ]] && CITLBOOT_PART="${part}"
+        [[ -z "${DATA_PART}" ]] && [[ "${local_fstype}" == "exfat" ]] && DATA_PART="${part}"
         if [[ -z "${ESP_PART}" ]] && [[ "${local_fstype}" == "vfat" ]]; then
             ESP_PART="${part}"
         fi
@@ -120,19 +127,24 @@ fi
 
 echo "  CITLBOOT partition : ${CITLBOOT_PART:-NOT FOUND}"
 echo "  ESP partition      : ${ESP_PART:-NOT FOUND}"
+echo "  Data partition     : ${DATA_PART:-NOT FOUND}"
 echo ""
+
+[[ -n "${CITLBOOT_PART}" ]] || { echo "ERROR: No CITLBOOT/FAT partition found on ${USB_DEV}."; exit 1; }
 
 # ── Mount points ──────────────────────────────────────────────────────────────
 MNT_CITL="/mnt/citl_boot_repair/citlboot"
 MNT_ESP="/mnt/citl_boot_repair/esp"
-mkdir -p "${MNT_CITL}" "${MNT_ESP}"
+MNT_DATA="/mnt/citl_boot_repair/data"
+mkdir -p "${MNT_CITL}" "${MNT_ESP}" "${MNT_DATA}"
 
 cleanup() {
     echo ""
     echo "[cleanup] Unmounting..."
     umount "${MNT_CITL}" 2>/dev/null || true
     umount "${MNT_ESP}" 2>/dev/null || true
-    rmdir "${MNT_CITL}" "${MNT_ESP}" /mnt/citl_boot_repair 2>/dev/null || true
+    umount "${MNT_DATA}" 2>/dev/null || true
+    rmdir "${MNT_CITL}" "${MNT_ESP}" "${MNT_DATA}" /mnt/citl_boot_repair 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -141,7 +153,26 @@ if [[ -n "${CITLBOOT_PART}" ]]; then
     echo "[1/4] Mounting CITLBOOT → ${MNT_CITL}"
     mount -t vfat -o uid=0,gid=0,umask=022 "${CITLBOOT_PART}" "${MNT_CITL}" 2>/dev/null || \
     mount "${CITLBOOT_PART}" "${MNT_CITL}"
+fi
 
+if [[ -n "${DATA_PART}" ]]; then
+    echo "[payload] Mounting data partition -> ${MNT_DATA}"
+    mount -t exfat "${DATA_PART}" "${MNT_DATA}" 2>/dev/null || \
+    mount "${DATA_PART}" "${MNT_DATA}" 2>/dev/null || true
+fi
+
+if declare -F citl_payload_require_bootable >/dev/null 2>&1; then
+    if ! citl_payload_require_bootable "${MNT_CITL}" "${MNT_DATA}"; then
+        echo "[payload] Missing bootable Ubuntu casper payload."
+        echo "[payload] GRUB repair stopped so the USB is not falsely marked boot-ready."
+        exit 2
+    fi
+else
+    echo "ERROR: boot_payload_guard.sh missing; refusing to mark USB boot-ready."
+    exit 2
+fi
+
+if [[ -n "${CITLBOOT_PART}" ]]; then
     # Write grub.cfg to the main partition (GRUB searches here too)
     mkdir -p "${MNT_CITL}/boot/grub"
     cp "${GRUB_CFG_SRC}" "${MNT_CITL}/boot/grub/grub.cfg"

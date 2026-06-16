@@ -4,8 +4,11 @@
 # Renton Technical College — Center for Innovative Teaching and Learning
 #
 # Boot from CITLBOOT USB into Ubuntu 24.04 live, then run:
+# Usage:
 #   sudo bash citl_reimager.sh [--profile lean|standard|full]
 #                              [--target /dev/sdX] [--hostname NAME]
+#                              [--allow-internet-bootstrap]
+#
 #
 # Profiles:
 #   lean     — Ubuntu minimal + phi3:mini             (16 GB+ drive)
@@ -15,7 +18,7 @@
 # Source priority (squashfs):
 #   1) CITLBOOT/casper/filesystem.squashfs   (on-USB, offline)
 #   2) any-ExFAT-drive/ubuntu-base/filesystem.squashfs (offline cache)
-#   3) debootstrap over internet             (last resort)
+#   3) debootstrap over internet             (explicit operator approval only)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 # NOTE: IFS left at default — changing IFS breaks read/awk/arrays in subtle ways
@@ -26,6 +29,9 @@ CITL_USER="citl"
 CITL_PASS="CITL2024!"     # forced change on first login
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PAYLOAD_GUARD="${SCRIPT_DIR}/boot_payload_guard.sh"
+[[ -f "${PAYLOAD_GUARD}" ]] && source "${PAYLOAD_GUARD}"
+ALLOW_INTERNET_BOOTSTRAP=false
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; YEL='\033[0;33m'; GRN='\033[0;32m'
@@ -157,9 +163,36 @@ PYEOF
     fi
 
     echo ""
-    info "CITLBOOT  : ${CITLBOOT_MNT:-NOT FOUND — will use internet fallback}"
+    info "CITLBOOT  : ${CITLBOOT_MNT:-NOT FOUND}"
     info "ExFAT src : ${EXFAT_MNT:-NOT FOUND}"
-    info "Squashfs  : ${SQUASHFS:-NOT FOUND — will use internet fallback}"
+    info "Squashfs  : ${SQUASHFS:-NOT FOUND — restore payload or approve internet bootstrap}"
+    if declare -F citl_payload_status >/dev/null 2>&1; then
+        local payload_status
+        payload_status="$(citl_payload_status "${CITLBOOT_MNT:-}" "${EXFAT_MNT:-}" 2>/dev/null || true)"
+        info "Payload   : ${payload_status:-UNKNOWN}"
+    fi
+}
+
+validate_boot_payload_plan() {
+    [[ -n "${SQUASHFS:-}" ]] && [[ -f "${SQUASHFS}" ]] && return 0
+
+    if [[ "${ALLOW_INTERNET_BOOTSTRAP}" == "true" ]]; then
+        warn "No offline Ubuntu payload found; internet debootstrap fallback was explicitly enabled."
+        return 0
+    fi
+
+    warn "No offline Ubuntu payload was found on CITLBOOT or ExFAT."
+    warn "This usually means Ubuntu live/recovery files were removed from the USB."
+    if confirm "Use internet debootstrap fallback instead of a local Ubuntu payload?"; then
+        ALLOW_INTERNET_BOOTSTRAP=true
+        warn "Internet bootstrap approved for this run."
+        return 0
+    fi
+
+    if declare -F citl_payload_write_missing_notice >/dev/null 2>&1; then
+        citl_payload_write_missing_notice "${CITLBOOT_MNT:-}" || true
+    fi
+    die "Ubuntu payload missing. Restore CITLBOOT/casper/* or ubuntu-base/filesystem.squashfs before reimaging."
 }
 
 # ── Drive list + picker ───────────────────────────────────────────────────────
@@ -296,6 +329,8 @@ extract_base() {
         fi
 
     else
+        [[ "${ALLOW_INTERNET_BOOTSTRAP}" == "true" ]] || \
+            die "No offline Ubuntu payload and internet bootstrap was not approved."
         step "Bootstrapping Ubuntu ${UBUNTU_CODENAME} via debootstrap (needs internet)"
         command -v debootstrap >/dev/null 2>&1 || \
             apt-get install -y debootstrap 2>/dev/null || \
@@ -546,6 +581,7 @@ main() {
             --profile)  profile_arg="$2";  shift 2;;
             --target)   target_arg="$2";   shift 2;;
             --hostname) hostname_arg="$2"; shift 2;;
+            --allow-internet-bootstrap) ALLOW_INTERNET_BOOTSTRAP=true; shift;;
             --help|-h)
                 sed -n '/^# Usage:/,/^#$/p' "$0" | head -20
                 exit 0;;
@@ -555,6 +591,7 @@ main() {
 
     run_preflight
     locate_sources
+    validate_boot_payload_plan
 
     local target_dev profile hostname drive_gb
     target_dev="$(pick_target "${target_arg:-}")"

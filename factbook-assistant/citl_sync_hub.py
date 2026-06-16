@@ -100,11 +100,28 @@ PREFERRED_REPO_ROOTS_NIX = [
 ]
 
 APP_BUNDLES = [
-    ("CITL App Sync",                 "1-CITL-SYNC",                "CITL App Sync.exe"),
-    ("CITL Presentation Suite",       "2-CITL-PRESENTATION-SUITE",  "CITL LLMOps Presentation Suite.exe"),
-    ("CITL Workstation Apps",         "3-CITL-WORKSTATION-APPS",    "CITL Workstation Apps.exe"),
-    ("CITL Field Apps",               "4-CITL-FIELD-APPS",          "CITL Field Apps.exe"),
-    ("CITL Ticketing Automation GUI", "6-CITL-WORK-TICKETING",      "CITL Ticketing Automation GUI.exe"),
+    # (display_name, dist_subdir_relative_to_repo_root, exe_name)
+    # Core sync / utility
+    ("CITL App Sync",                       "dist/CITL App Sync",                               "CITL App Sync.exe"),
+    ("CITL Sync Hub",                        "dist/CITL Sync Hub",                               "CITL Sync Hub.exe"),
+    ("CITL Fixer",                           "dist/CITL Fixer",                                  "CITL Fixer.exe"),
+    ("CITL App Updater",                     "dist/CITL App Updater",                            "CITL App Updater.exe"),
+    # Presentation / LLMOps
+    ("CITL LLMOps Presentation Suite",       "dist/CITL LLMOps Presentation Suite",              "CITL LLMOps Presentation Suite.exe"),
+    # Field / Workstation
+    ("CITL Workstation Apps",                "dist/CITL Workstation Apps",                       "CITL Workstation Apps.exe"),
+    ("CITL Field Apps",                      "dist/CITL Field Apps",                             "CITL Field Apps.exe"),
+    # Tools
+    ("CITL AV IT Operations",               "dist/CITL AV IT Operations",                       "CITL AV IT Operations.exe"),
+    ("CITL Document Composer",               "dist/CITL Document Composer",                      "CITL Document Composer.exe"),
+    ("CITL Database LLMOps Builder",         "dist/CITL Database LLMOps Builder",                "CITL Database LLMOps Builder.exe"),
+    ("CITL Work and Preparedness Launcher",  "dist/CITL Work and Preparedness Launcher",         "CITL Work and Preparedness Launcher.exe"),
+    # Troubleshooter / Reimager / Automation
+    ("CITL FLEX Troubleshooter",             "dist/CITL FLEX Troubleshooter",                    "CITL FLEX Troubleshooter.exe"),
+    ("CITL Re-Imager",                       "dist/CITL Re-Imager",                              "CITL Re-Imager.exe"),
+    ("CITL Bundle Automation",               "dist/CITL Bundle Automation",                      "CITL Bundle Automation.exe"),
+    # Ticketing (uses its own build path convention)
+    ("CITL Ticketing Automation GUI",        "powerflow_builder/dist/CITL Ticketing Automation GUI", "CITL Ticketing Automation GUI.exe"),
 ]
 
 

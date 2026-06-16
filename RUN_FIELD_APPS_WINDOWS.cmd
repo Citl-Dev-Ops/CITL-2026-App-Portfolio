@@ -1,15 +1,13 @@
 @echo off
+call "%~dp0_citl_env.cmd"
 setlocal
 set "HERE=%~dp0"
 set "EXE=%HERE%dist\CITL Field Apps\CITL Field Apps.exe"
-if exist "%EXE%" (
-    start "" "%EXE%"
-) else (
-    echo CITL Field Apps executable not found.
-    echo Build it first: BUILD_ALL_CITL_EXES_WINDOWS.cmd -Apps fieldapps
-    echo Or run from source:
-    set "PY=%HERE%.venv\Scripts\python.exe"
-    if not exist "%PY%" set "PY=python"
-    "%PY%" "%HERE%factbook-assistant\citl_field_apps.py"
-    pause
-)
+if exist "%EXE%" ( start "" "%EXE%" %* & exit /b 0 )
+if not defined CITL_FA  ( echo [ERROR] factbook-assistant not found on this drive. & pause & exit /b 1 )
+if not defined CITL_PY  ( echo [ERROR] Python not found. Run INSTALL_CITL_APPS_PORTABLE.cmd & pause & exit /b 1 )
+set "PYTHONPATH=%CITL_FA%;%PYTHONPATH%"
+%CITL_PY% "%CITL_FA%\citl_field_apps.py" %*
+set EC=%ERRORLEVEL%
+if %EC% neq 0 pause
+exit /b %EC%
