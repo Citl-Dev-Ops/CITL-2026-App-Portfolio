@@ -1,5 +1,9 @@
 ﻿## What this is
 CITL Library Assistant is a Windows 11–facing offline teaching tool that combines:
+CITL FACTBOOK by Abdo Mohammed 
+CITL ACADEMIC ADVISOR  by Wahaj al Obid 
+LLM Bot Maker Utility ( Developed by CITL Staff - Original source by Mason Jones)
+
 - **Local LLM chat** through **Ollama**
 - **RAG (retrieval)** over instructor-provided .txt documents
 - **Classroom audio capture** + **offline transcription** (record → transcribe → save)
