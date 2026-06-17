@@ -8,10 +8,11 @@ CITL FACTBOOK by Abdo Mohammed
 <img width="1663" height="1247" alt="Factbook 2" src="https://github.com/user-attachments/assets/44bd366d-c219-4c67-bc02-903c327f8987" />
 
 CITL ACADEMIC ADVISOR  by Wahaj al Obid 
-LLM Bot Maker Utility ( Developed by CITL Staff - Original source by Mason Jones)
+
 <img width="799" height="573" alt="CITL Academic Advisor" src="https://github.com/user-attachments/assets/6c8d05fb-627d-475f-849b-2c515481145a" />
 
 - **Local LLM chat** through **Ollama**
+LLM Bot Maker Utility ( Developed by CITL Staff - Original source by Mason Jones)
 - **RAG (retrieval)** over instructor-provided .txt documents
 - <img width="1335" height="881" alt="LLMStudio" src="https://github.com/user-attachments/assets/d07fd37c-fef9-41a2-ad5d-960092cee3c1" />
 
